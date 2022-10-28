@@ -1,0 +1,38 @@
+{
+  "cSpell.words": [
+    "arrayref",
+    "bincode",
+    "blockhash",
+    "bumpalo",
+    "bytemuck",
+    "cdylib",
+    "conterparty",
+    "counterparty",
+    "couterparty",
+    "curr",
+    "getrandom",
+    "keypair",
+    "lamports",
+    "orderbook",
+    "Perp",
+    "POSTONLY",
+    "powf",
+    "Pubkey",
+    "pyth",
+    "repr",
+    "serde",
+    "solana",
+    "struct",
+    "thiserror"
+  ],
+  "rust-analyzer.linkedProjects": ["programs/dex-program/Cargo.toml"],
+  "editor.formatOnSave": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "javascript.updateImportsOnFileMove.enabled": "always"
+}

@@ -1,0 +1,14 @@
+[features]
+seeds = false
+[programs.localnet]
+dex_program = "2aJZ6AufDU5NRzXLg5Ww4S4Nf2tx7xZDQD6he2gjsKyq"
+
+[registry]
+url = "https://anchor.projectserum.com"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run jest --detectOpenHandles --forceExit"
