@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use num_enum::TryFromPrimitive;
 
 #[account(zero_copy)]
 pub struct Dex {
@@ -90,4 +91,21 @@ pub struct Order {
     pub open_or_close: u8,
     pub market: u8,
     pub position_index: u8,
+}
+
+#[derive(Copy, Clone, TryFromPrimitive)]
+#[repr(u8)]
+pub enum OracleSource {
+    Mock = 0,
+    Pyth = 1,
+    StableCoin = 2,
+}
+
+#[account]
+#[repr(C)]
+pub struct MockOracle {
+    pub magic: u64,
+    pub price: u64,
+    pub expo: u8,
+    pub padding1: [u8; 7],
 }

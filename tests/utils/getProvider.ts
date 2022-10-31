@@ -13,7 +13,6 @@ export function getProviderAndProgram() {
 export async function airdrop(provider: anchor.AnchorProvider, receipt: anchor.web3.PublicKey, lamports: number) {
   // Airdropping tokens to a receipt.
   await provider.connection.confirmTransaction(await provider.connection.requestAirdrop(receipt, lamports), 'confirmed')
-  console.log('airdrop confirmed')
 }
 
 export const getBalance = async (provider: anchor.AnchorProvider, receipt: anchor.web3.PublicKey) => {
