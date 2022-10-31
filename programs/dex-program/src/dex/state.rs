@@ -82,6 +82,7 @@ pub struct Position {
 #[zero_copy]
 pub struct Order {
     pub size: u64,
+    pub filled_size: u64,
     pub collateral: u64,
     pub limit_price: u64,
     pub list_time: u64,
@@ -108,4 +109,36 @@ pub struct MockOracle {
     pub price: u64,
     pub expo: u8,
     pub padding1: [u8; 7],
+}
+pub struct UserListItem {
+    pub user_state: [u8; 32],
+    pub serial_number: u32,
+}
+
+impl UserListItem {
+    pub fn init_serial_number(&mut self, user_state: [u8; 32], serial_number: u32) {
+        self.user_state = user_state;
+        self.serial_number = serial_number;
+    }
+
+    pub fn update_serial_number(&mut self, serial_number: u32) {
+        self.serial_number = serial_number;
+    }
+
+    pub fn serial_number(&self) -> u32 {
+        self.serial_number
+    }
+}
+
+pub struct MatchEvent {
+    pub user_state: [u8; 32],
+    pub price: u64,
+    pub fill_size: u64,
+    pub taker_pnl: i64,
+    pub taker_fee: i64,
+    pub order_slot: u32,
+    pub user_order_slot: u8,
+    pub open_or_close: u8,
+    pub long_or_short: u8,
+    _padding: [u8; 1],
 }

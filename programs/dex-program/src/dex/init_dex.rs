@@ -1,6 +1,11 @@
 use anchor_lang::prelude::*;
 
-use crate::{dex::state::*, errors::DexResult, utils::DEX_MAGIC_NUMBER};
+use crate::{
+    collections::{EventQueue, MountMode, PagedList, SingleEventQueue},
+    dex::state::*,
+    errors::{DexError, DexResult},
+    utils::{DEX_MAGIC_NUMBER, USER_LIST_MAGIC_BYTE},
+};
 
 #[derive(Accounts)]
 pub struct InitDex<'info> {
@@ -34,6 +39,19 @@ pub fn handler(ctx: Context<InitDex>) -> DexResult {
     dex.user_list_remaining_pages_number = 0;
     dex.assets_number = 0;
     dex.markets_number = 0;
+
+    EventQueue::mount(&mut ctx.accounts.event_queue, false)?.initialize(true)?;
+    SingleEventQueue::<MatchEvent>::mount(&mut ctx.accounts.match_queue, false)?
+        .initialize()
+        .map_err(|_| DexError::FailedInitMatchQueue)?;
+
+    PagedList::<UserListItem>::mount(
+        &mut ctx.accounts.user_list_entry_page,
+        &[],
+        USER_LIST_MAGIC_BYTE,
+        MountMode::Initialize,
+    )
+    .map_err(|_| DexError::FailedInitializeUserList)?;
 
     Ok(())
 }
