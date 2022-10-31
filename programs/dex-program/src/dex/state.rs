@@ -13,6 +13,7 @@ pub struct Dex {
     pub user_list_remaining_pages_number: u8,
     pub assets_number: u8,
     pub markets_number: u8,
+    pub padding: [u8; 253],
 }
 
 #[zero_copy]
@@ -33,6 +34,7 @@ pub struct AssetInfo {
     pub decimals: u8,
     pub nonce: u8,
     pub oracle_source: u8,
+    pub padding: [u8; 252],
 }
 
 #[zero_copy]
@@ -57,7 +59,7 @@ pub struct MarketInfo {
     pub oracle_source: u8,
     pub asset_index: u8,
     pub significant_decimals: u8,
-    pub _padding: [u8; 2],
+    pub padding: [u8; 254],
 }
 
 #[zero_copy]
@@ -73,7 +75,7 @@ pub struct Position {
     pub profit_stop_price: u64,
     pub long_or_short: u8,
     pub market: u8,
-    pub _padding: [u8; 2],
+    pub _padding: [u8; 6],
 }
 
 #[zero_copy]
