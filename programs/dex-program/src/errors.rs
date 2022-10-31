@@ -73,6 +73,9 @@ pub enum DexError {
 
     #[msg("Safe math error")]
     SafeMathError,
+
+    #[msg("Failed mount user state")]
+    FailedMountUserState,
 }
 
 pub type DexResult<T = ()> = Result<T>;

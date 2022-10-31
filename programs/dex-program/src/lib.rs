@@ -4,6 +4,7 @@ use errors::*;
 pub mod collections;
 pub mod dex;
 pub mod errors;
+pub mod user;
 pub mod utils;
 
 use dex::*;
