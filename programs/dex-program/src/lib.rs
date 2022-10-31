@@ -1,16 +1,21 @@
 use anchor_lang::prelude::*;
 use errors::*;
 
+pub mod dex;
 pub mod errors;
+pub mod utils;
+
+use dex::*;
 
 declare_id!("2aJZ6AufDU5NRzXLg5Ww4S4Nf2tx7xZDQD6he2gjsKyq");
 
 #[program]
 pub mod dex_program {
+
     use super::*;
 
-    pub fn initialize(_ctx: Context<Initialize>) -> DexResult {
-        Ok(())
+    pub fn init_dex(ctx: Context<InitDex>) -> DexResult {
+        dex::init_dex::handler(ctx)
     }
 
     pub fn add_asset(_ctx: Context<AddAsset>) -> DexResult {
@@ -56,12 +61,6 @@ pub mod dex_program {
     pub fn cancel_all_limit_orders(_ctx: Context<CancelAllLimitOrders>) -> DexResult {
         Ok(())
     }
-}
-
-#[derive(Accounts)]
-pub struct Initialize<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
