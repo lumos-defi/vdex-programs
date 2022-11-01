@@ -40,6 +40,32 @@ pub struct UserOrder {
 pub struct UserPosition {
     pub long: Position,
     pub short: Position,
+    pub market: u8,
+    padding: [u8; 3],
+}
+
+impl UserPosition {
+    pub fn init(&mut self, market: u8) {
+        self.market = market;
+
+        self.long.zero(true);
+        self.short.zero(false);
+    }
+
+    pub fn open(
+        &mut self,
+        size: u64,
+        price: u64,
+        collateral: u64,
+        long: bool,
+        ms: &MarketFeeRates,
+    ) -> DexResult<(u64, u64)> {
+        if long {
+            self.long.open(size, price, collateral, ms)
+        } else {
+            self.short.open(size, price, collateral, ms)
+        }
+    }
 }
 
 pub struct UserState<'a> {
@@ -165,11 +191,20 @@ impl<'a> UserState<'a> {
         price: u64,
         collateral: u64,
         long: bool,
-    ) -> DexResult {
-        Ok(())
+        ms: &MarketFeeRates,
+    ) -> DexResult<(u64, u64)> {
+        let position = self.find_or_new_position(market)?;
+        position.data.open(size, price, collateral, long, ms)
     }
 
-    pub fn close_position(&mut self, market: u8, size: u64, price: u64, long: bool) -> DexResult {
+    pub fn close_position(
+        &mut self,
+        market: u8,
+        size: u64,
+        price: u64,
+        long: bool,
+        ms: &MarketFeeRates,
+    ) -> DexResult {
         Ok(())
     }
 
@@ -190,5 +225,22 @@ impl<'a> UserState<'a> {
 
     pub fn fill_order(&mut self, order_slot: u8, price: u64) -> DexResult {
         Ok(())
+    }
+
+    fn find_or_new_position(&self, market: u8) -> DexResult<&mut SmallListSlot<UserPosition>> {
+        let lookup = self
+            .position_pool
+            .into_iter()
+            .find(|x| x.data.market == market);
+
+        if let Some(p) = lookup {
+            return Ok(p);
+        }
+
+        let position = self.position_pool.new_slot()?;
+        self.position_pool.add_to_tail(position)?;
+        position.data.init(market);
+
+        Ok(position)
     }
 }
