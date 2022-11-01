@@ -18,12 +18,58 @@ pub mod dex_program {
         dex::init_dex::handler(ctx)
     }
 
-    pub fn add_asset(_ctx: Context<AddAsset>) -> DexResult {
-        Ok(())
+    pub fn init_mock_oracle(ctx: Context<InitMockOracle>, price: u64, expo: u8) -> DexResult {
+        dex::init_mock_oracle::handler(ctx, price, expo)
     }
 
-    pub fn add_market(_ctx: Context<AddMarket>) -> DexResult {
-        Ok(())
+    pub fn feed_mock_oracle_price(ctx: Context<FeedMockOraclePrice>, price: u64) -> DexResult {
+        dex::feed_mock_oracle_price::handler(ctx, price)
+    }
+
+    pub fn add_asset(
+        ctx: Context<AddAsset>,
+        symbol: String,
+        decimals: u8,
+        nonce: u8,
+        oracle_source: u8,
+        borrowed_fee_rate: u16,
+        add_liquidity_fee_rate: u16,
+        remove_liquidity_fee_rate: u16,
+        target_weight: u16,
+    ) -> DexResult {
+        dex::add_asset::handler(
+            ctx,
+            symbol,
+            decimals,
+            nonce,
+            oracle_source,
+            borrowed_fee_rate,
+            add_liquidity_fee_rate,
+            remove_liquidity_fee_rate,
+            target_weight,
+        )
+    }
+
+    pub fn add_market(
+        ctx: Context<AddMarket>,
+        symbol: String,
+        open_fee_rate: u16,
+        close_fee_rate: u16,
+        decimals: u8,
+        oracle_source: u8,
+        asset_index: u8,
+        significant_decimals: u8,
+    ) -> DexResult {
+        dex::add_market::handler(
+            ctx,
+            symbol,
+            open_fee_rate,
+            close_fee_rate,
+            decimals,
+            oracle_source,
+            asset_index,
+            significant_decimals,
+        )
     }
 
     pub fn add_liquidity(_ctx: Context<AddLiquidity>) -> DexResult {
@@ -61,18 +107,6 @@ pub mod dex_program {
     pub fn cancel_all_limit_orders(_ctx: Context<CancelAllLimitOrders>) -> DexResult {
         Ok(())
     }
-}
-
-#[derive(Accounts)]
-pub struct AddAsset<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct AddMarket<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]

@@ -1,1 +1,4 @@
 pub const DEX_MAGIC_NUMBER: u64 = 0x6666;
+pub const MOCK_ORACLE_MAGIC_NUMBER: u64 = 0x66667;
+pub const FEE_RATE_DECIMALS: u8 = 5;
+pub const WEIGHT_RATE_DECIMALS: u8 = 4;
