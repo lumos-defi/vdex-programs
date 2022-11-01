@@ -174,7 +174,7 @@ impl Position {
         price: u64,
         mfr: &MarketFeeRates,
     ) -> DexResult<(u64, u64, i64, u64)> {
-        let mut collateral_removed = size
+        let mut collateral_unlocked = size
             .safe_mul(self.collateral)?
             .safe_div(self.size as u128)? as u64;
 
@@ -212,27 +212,26 @@ impl Position {
         let pnl = self.pnl(size, price, self.average_price, mfr.base_decimals)?;
         let pnl_with_fee = pnl.i_safe_sub(fee as i64)?;
 
+        // Update the position
         self.borrowed_amount = self.borrowed_amount.safe_sub(fund_returned)?;
-        self.collateral = self.collateral.safe_sub(collateral_removed)?;
+        self.collateral = self.collateral.safe_sub(collateral_unlocked)?;
         self.size = self.size.safe_sub(size)?;
         self.cumulative_fund_fee = 0;
         self.last_fill_time = now;
 
-        // CHECK
-        // If pnl < 0, check if the collateral covers loss + fee
-        // If pnl > 0, check if the return_amount covers (profit - fee)
+        // CHECK:
+        // If (pnl - fee) < 0, check if the unlocked collateral covers loss + fee
+        let user_balance = (collateral_unlocked as i64).i_safe_add(pnl_with_fee)?;
+        if user_balance < 0 {
+            let abs_user_balance = i64::abs(user_balance) as u64;
 
-        let user_amount = (collateral_removed as i64).i_safe_add(pnl_with_fee)?;
-        if user_amount < 0 {
-            let abs_user_amount = i64::abs(user_amount) as u64;
-
-            if abs_user_amount < self.collateral {
-                self.collateral = self.collateral.safe_sub(abs_user_amount)?;
-                collateral_removed = collateral_removed.safe_add(abs_user_amount)?;
+            if abs_user_balance < self.collateral {
+                self.collateral = self.collateral.safe_sub(abs_user_balance)?;
+                collateral_unlocked = collateral_unlocked.safe_add(abs_user_balance)?;
             } else {
                 self.collateral = 0;
                 fund_returned = fund_returned.safe_add(self.borrowed_amount)?;
-                collateral_removed = collateral_removed.safe_add(self.collateral)?;
+                collateral_unlocked = collateral_unlocked.safe_add(self.collateral)?;
             }
         }
 
@@ -240,7 +239,7 @@ impl Position {
             self.zero(self.long)?;
         }
 
-        Ok((fund_returned, collateral_removed, pnl, fee))
+        Ok((fund_returned, collateral_unlocked, pnl, fee))
     }
 
     fn pnl(
