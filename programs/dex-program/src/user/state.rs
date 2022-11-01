@@ -45,11 +45,13 @@ pub struct UserPosition {
 }
 
 impl UserPosition {
-    pub fn init(&mut self, market: u8) {
+    pub fn init(&mut self, market: u8) -> DexResult {
         self.market = market;
 
-        self.long.zero(true);
-        self.short.zero(false);
+        self.long.zero(true)?;
+        self.short.zero(false)?;
+
+        Ok(())
     }
 
     pub fn open(
@@ -58,12 +60,26 @@ impl UserPosition {
         price: u64,
         collateral: u64,
         long: bool,
-        ms: &MarketFeeRates,
+        mfr: &MarketFeeRates,
     ) -> DexResult<(u64, u64)> {
         if long {
-            self.long.open(size, price, collateral, ms)
+            self.long.open(size, price, collateral, mfr)
         } else {
-            self.short.open(size, price, collateral, ms)
+            self.short.open(size, price, collateral, mfr)
+        }
+    }
+
+    pub fn close(
+        &mut self,
+        size: u64,
+        price: u64,
+        long: bool,
+        mfr: &MarketFeeRates,
+    ) -> DexResult<(u64, u64, i64, u64)> {
+        if long {
+            self.long.close(size, price, mfr)
+        } else {
+            self.short.close(size, price, mfr)
         }
     }
 }
@@ -191,10 +207,10 @@ impl<'a> UserState<'a> {
         price: u64,
         collateral: u64,
         long: bool,
-        ms: &MarketFeeRates,
+        mfr: &MarketFeeRates,
     ) -> DexResult<(u64, u64)> {
         let position = self.find_or_new_position(market)?;
-        position.data.open(size, price, collateral, long, ms)
+        position.data.open(size, price, collateral, long, mfr)
     }
 
     pub fn close_position(
@@ -203,9 +219,10 @@ impl<'a> UserState<'a> {
         size: u64,
         price: u64,
         long: bool,
-        ms: &MarketFeeRates,
-    ) -> DexResult {
-        Ok(())
+        mfr: &MarketFeeRates,
+    ) -> DexResult<(u64, u64, i64, u64)> {
+        let position = self.find_or_new_position(market)?;
+        position.data.close(size, price, long, mfr)
     }
 
     pub fn new_order(
@@ -239,7 +256,7 @@ impl<'a> UserState<'a> {
 
         let position = self.position_pool.new_slot()?;
         self.position_pool.add_to_tail(position)?;
-        position.data.init(market);
+        position.data.init(market)?;
 
         Ok(position)
     }

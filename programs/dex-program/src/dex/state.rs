@@ -3,7 +3,7 @@ use num_enum::TryFromPrimitive;
 
 use crate::{
     user::DexResult,
-    utils::{time::get_timestamp, SafeMath, FEE_RATE_MAX},
+    utils::{time::get_timestamp, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_MAX},
 };
 
 #[account(zero_copy)]
@@ -72,9 +72,10 @@ pub struct MarketInfo {
 
 pub struct MarketFeeRates {
     pub charge_borrow_fee_interval: u64,
+    pub borrow_fee_rate: u16,
     pub open_fee_rate: u16,
     pub close_fee_rate: u16,
-    pub borrow_fee_rate: u16,
+    pub base_decimals: u8,
 }
 
 #[zero_copy]
@@ -93,17 +94,19 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn zero(&mut self, long: bool) {
+    pub fn zero(&mut self, long: bool) -> DexResult {
         self.size = 0;
         self.collateral = 0;
         self.average_price = 0;
         self.closing_size = 0;
         self.borrowed_amount = 0;
-        self.last_fill_time = 0;
+        self.last_fill_time = get_timestamp()?;
         self.cumulative_fund_fee = 0;
         self.loss_stop_price = 0;
         self.profit_stop_price = 0;
         self.long = long;
+
+        Ok(())
     }
 
     pub fn open(
@@ -111,17 +114,18 @@ impl Position {
         size: u64,
         price: u64,
         collateral: u64,
-        ms: &MarketFeeRates,
+        mfr: &MarketFeeRates,
     ) -> DexResult<(u64, u64)> {
         // Update cumulative fund fee
         let now = get_timestamp()?;
         let cumulative_fund_fee = if self.borrowed_amount > 0 {
             // TODO: check now is gte last_fill_time
             self.borrowed_amount
-                .safe_mul(ms.borrow_fee_rate as u64)?
+                .safe_mul(mfr.borrow_fee_rate as u64)?
                 .safe_mul((now - self.last_fill_time) as u128)?
                 .safe_div(FEE_RATE_MAX)?
-                .safe_div(ms.charge_borrow_fee_interval as u128)? as u64
+                .safe_div(mfr.charge_borrow_fee_interval as u128)? as u64
+                + self.cumulative_fund_fee
         } else {
             0
         };
@@ -132,11 +136,6 @@ impl Position {
         } else {
             price.safe_mul(size)
         }? as u64;
-
-        // Calculate fee
-        let fee = collateral
-            .safe_mul(ms.borrow_fee_rate as u64)?
-            .safe_div(FEE_RATE_MAX)? as u64;
 
         let merged_size = self.size.safe_add(size)?;
 
@@ -153,7 +152,115 @@ impl Position {
         self.cumulative_fund_fee = cumulative_fund_fee;
         self.last_fill_time = now;
 
+        // Calculate open position fee
+        let fee = if self.long {
+            size.safe_mul(mfr.open_fee_rate as u64)?
+                .safe_div(FEE_RATE_MAX)? as u64
+        } else {
+            let quote_amount =
+                size.safe_mul(price)?
+                    .safe_div(10u64.pow(mfr.base_decimals.into()) as u128)? as u64;
+            quote_amount
+                .safe_mul(mfr.open_fee_rate as u64)?
+                .safe_div(FEE_RATE_MAX)? as u64
+        };
+
         Ok((borrow, fee))
+    }
+
+    pub fn close(
+        &mut self,
+        size: u64,
+        price: u64,
+        mfr: &MarketFeeRates,
+    ) -> DexResult<(u64, u64, i64, u64)> {
+        let mut collateral_removed = size
+            .safe_mul(self.collateral)?
+            .safe_div(self.size as u128)? as u64;
+
+        let mut fund_returned = size
+            .safe_mul(self.borrowed_amount)?
+            .safe_div(self.size as u128)? as u64;
+
+        // Update cumulative fund fee
+        let now = get_timestamp()?;
+        let fund_fee = if self.borrowed_amount > 0 {
+            // TODO: check now is gte last_fill_time
+            self.borrowed_amount
+                .safe_mul(mfr.borrow_fee_rate as u64)?
+                .safe_mul((now - self.last_fill_time) as u128)?
+                .safe_div(FEE_RATE_MAX)?
+                .safe_div(mfr.charge_borrow_fee_interval as u128)? as u64
+                + self.cumulative_fund_fee
+        } else {
+            0
+        };
+
+        // Calculate close position fee
+        let fee = if self.long {
+            size.safe_mul(mfr.close_fee_rate as u64)?
+                .safe_div(FEE_RATE_MAX)? as u64
+        } else {
+            let quote_amount =
+                size.safe_mul(price)?
+                    .safe_div(10u64.pow(mfr.base_decimals.into()) as u128)? as u64;
+            quote_amount
+                .safe_mul(mfr.close_fee_rate as u64)?
+                .safe_div(FEE_RATE_MAX)? as u64
+        } + fund_fee;
+
+        let pnl = self.pnl(size, price, self.average_price, mfr.base_decimals)?;
+        let pnl_with_fee = pnl.i_safe_sub(fee as i64)?;
+
+        self.borrowed_amount = self.borrowed_amount.safe_sub(fund_returned)?;
+        self.collateral = self.collateral.safe_sub(collateral_removed)?;
+        self.size = self.size.safe_sub(size)?;
+        self.cumulative_fund_fee = 0;
+        self.last_fill_time = now;
+
+        // CHECK
+        // If pnl < 0, check if the collateral covers loss + fee
+        // If pnl > 0, check if the return_amount covers (profit - fee)
+
+        let user_amount = (collateral_removed as i64).i_safe_add(pnl_with_fee)?;
+        if user_amount < 0 {
+            let abs_user_amount = i64::abs(user_amount) as u64;
+
+            if abs_user_amount < self.collateral {
+                self.collateral = self.collateral.safe_sub(abs_user_amount)?;
+                collateral_removed = collateral_removed.safe_add(abs_user_amount)?;
+            } else {
+                self.collateral = 0;
+                fund_returned = fund_returned.safe_add(self.borrowed_amount)?;
+                collateral_removed = collateral_removed.safe_add(self.collateral)?;
+            }
+        }
+
+        if self.size == 0 || self.collateral == 0 {
+            self.zero(self.long)?;
+        }
+
+        Ok((fund_returned, collateral_removed, pnl, fee))
+    }
+
+    fn pnl(
+        &self,
+        size: u64,
+        close_price: u64,
+        open_price: u64,
+        base_decimals: u8,
+    ) -> DexResult<i64> {
+        let pnl = if self.long {
+            (close_price as i128 - open_price as i128)
+                .i_safe_mul(size as i128)?
+                .i_safe_div(open_price as i128)? as i64
+        } else {
+            (open_price as i128 - close_price as i128)
+                .i_safe_mul(size as i128)?
+                .i_safe_div(10i128.pow(base_decimals as u32))? as i64
+        };
+
+        Ok(pnl)
     }
 }
 
