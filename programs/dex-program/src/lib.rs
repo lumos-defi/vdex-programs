@@ -50,8 +50,26 @@ pub mod dex_program {
         )
     }
 
-    pub fn add_market(_ctx: Context<AddMarket>) -> DexResult {
-        Ok(())
+    pub fn add_market(
+        ctx: Context<AddMarket>,
+        symbol: String,
+        open_fee_rate: u16,
+        close_fee_rate: u16,
+        decimals: u8,
+        oracle_source: u8,
+        asset_index: u8,
+        significant_decimals: u8,
+    ) -> DexResult {
+        dex::add_market::handler(
+            ctx,
+            symbol,
+            open_fee_rate,
+            close_fee_rate,
+            decimals,
+            oracle_source,
+            asset_index,
+            significant_decimals,
+        )
     }
 
     pub fn add_liquidity(_ctx: Context<AddLiquidity>) -> DexResult {
@@ -89,12 +107,6 @@ pub mod dex_program {
     pub fn cancel_all_limit_orders(_ctx: Context<CancelAllLimitOrders>) -> DexResult {
         Ok(())
     }
-}
-
-#[derive(Accounts)]
-pub struct AddMarket<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]

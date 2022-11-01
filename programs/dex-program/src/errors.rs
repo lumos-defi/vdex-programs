@@ -19,6 +19,15 @@ pub enum DexError {
 
     #[msg("Insufficient asset index")]
     InsufficientAssetIndex,
+
+    #[msg("Invalid significant decimals")]
+    InvalidSignificantDecimals,
+
+    #[msg("Duplicate market name")]
+    DuplicateMarketName,
+
+    #[msg("Insufficient market index")]
+    InsufficientMarketIndex,
 }
 
 pub type DexResult<T = ()> = Result<T>;
