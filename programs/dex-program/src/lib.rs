@@ -20,10 +20,6 @@ pub mod dex_program {
         dex::init_dex::handler(ctx, vlp_decimals, vlp_mint_nonce)
     }
 
-    pub fn mint_vlp_token(ctx: Context<MintToken>, amount: u64) -> DexResult {
-        dex::mint_vlp_token::handler(ctx, amount)
-    }
-
     pub fn init_mock_oracle(ctx: Context<InitMockOracle>, price: u64, expo: u8) -> DexResult {
         dex::init_mock_oracle::handler(ctx, price, expo)
     }

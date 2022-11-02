@@ -66,11 +66,10 @@ pub struct MarketInfo {
     pub borrow_fee_rate: u16,
     pub valid: bool,
     pub decimals: u8,
-    pub nonce: u8,
     pub oracle_source: u8,
     pub asset_index: u8,
     pub significant_decimals: u8,
-    pub padding: [u8; 252],
+    pub padding: [u8; 253],
 }
 
 pub struct MarketFeeRates {
