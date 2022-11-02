@@ -82,6 +82,15 @@ pub enum DexError {
 
     #[msg("Invalid vault")]
     InvalidVault,
+
+    #[msg("Invalid Amount")]
+    InvalidAmount,
+
+    #[msg("Invalid market index")]
+    InvalidMarketIndex,
+
+    #[msg("Invalid remaining accounts")]
+    InvalidRemainingAccounts,
 }
 
 pub type DexResult<T = ()> = Result<T>;

@@ -5,13 +5,14 @@ pub mod collections;
 pub mod dex;
 pub mod errors;
 pub mod pool;
+pub mod position;
 pub mod user;
 pub mod utils;
 
 use dex::*;
 use pool::*;
+use position::*;
 use user::*;
-
 
 declare_id!("2aJZ6AufDU5NRzXLg5Ww4S4Nf2tx7xZDQD6he2gjsKyq");
 
@@ -101,7 +102,13 @@ pub mod dex_program {
         Ok(())
     }
 
-    pub fn open_position(_ctx: Context<OpenPosition>) -> DexResult {
+    pub fn open_position(
+        ctx: Context<OpenPosition>,
+        market: u8,
+        long: bool,
+        amount: u64,
+        leverage: u32,
+    ) -> DexResult {
         Ok(())
     }
 
@@ -134,12 +141,6 @@ pub struct RemoveLiquidity<'info> {
 
 #[derive(Accounts)]
 pub struct Swap<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct OpenPosition<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 }

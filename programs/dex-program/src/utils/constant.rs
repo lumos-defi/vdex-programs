@@ -8,4 +8,4 @@ pub const USER_STATE_MAGIC_NUMBER: u32 = 0x6668;
 pub const USER_LIST_MAGIC_BYTE: u8 = 0x31;
 
 pub const LEVERAGE_DECIMALS: u8 = 3;
-pub const FEE_RATE_MAX: u128 = 10000;
+pub const FEE_RATE_BASE: u128 = 10000;

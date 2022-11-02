@@ -84,6 +84,7 @@ pub fn handler(
         order_pool_remaining_pages: [Pubkey::default(); 16],
         global_long: Position::new(true)?,
         global_short: Position::new(false)?,
+        fee_amount: 0,
         charge_borrow_fee_interval,
         open_fee_rate,
         close_fee_rate,
