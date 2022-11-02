@@ -8,12 +8,12 @@ pub mod user;
 pub mod utils;
 
 use dex::*;
+use user::*;
 
 declare_id!("2aJZ6AufDU5NRzXLg5Ww4S4Nf2tx7xZDQD6he2gjsKyq");
 
 #[program]
 pub mod dex_program {
-
     use super::*;
 
     pub fn init_dex(ctx: Context<InitDex>, vlp_decimals: u8, vlp_mint_nonce: u8) -> DexResult {
@@ -26,6 +26,14 @@ pub mod dex_program {
 
     pub fn feed_mock_oracle_price(ctx: Context<FeedMockOraclePrice>, price: u64) -> DexResult {
         dex::feed_mock_oracle_price::handler(ctx, price)
+    }
+
+    pub fn create_user_state(
+        ctx: Context<CreateUserState>,
+        order_slot_count: u8,
+        position_slot_count: u8,
+    ) -> DexResult {
+        user::create::handler(ctx, order_slot_count, position_slot_count)
     }
 
     pub fn add_asset(
