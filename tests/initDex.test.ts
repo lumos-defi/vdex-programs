@@ -63,6 +63,8 @@ describe('Init Dex', () => {
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
       vlpMint: vlpMint,
+      vlpMintNonce: vlpMintNonce,
+      vlpMintAuthority: vlpMintAuthority,
       assets: expect.arrayContaining([
         expect.objectContaining({
           valid: false,
@@ -74,11 +76,8 @@ describe('Init Dex', () => {
         expect.objectContaining({
           valid: false,
           decimals: 0,
-          nonce: 0,
         }),
       ]),
     })
   })
-
-  it('should mint vlp token failed', async () => {})
 })
