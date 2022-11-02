@@ -39,8 +39,10 @@ pub struct AddMarket<'info> {
 pub fn handler(
     ctx: Context<AddMarket>,
     symbol: String,
+    charge_borrow_fee_interval: u64,
     open_fee_rate: u16,
     close_fee_rate: u16,
+    borrow_fee_rate: u16,
     decimals: u8,
     oracle_source: u8,
     asset_index: u8,
@@ -73,21 +75,6 @@ pub fn handler(
         return Err(error!(DexError::InsufficientMarketIndex));
     }
 
-    let long_or_short_position = Position {
-        size: 0,
-        collateral: 0,
-        average_price: 0,
-        closing_size: 0,
-        borrowed_amount: 0,
-        last_fill_time: 0,
-        cumulative_fund_fee: 0,
-        loss_stop_price: 0,
-        profit_stop_price: 0,
-        long_or_short: 0,
-        market: 0,
-        _padding: [0; 6],
-    };
-
     let market = MarketInfo {
         symbol: market_symbol,
         oracle: *ctx.accounts.oracle.key,
@@ -95,17 +82,19 @@ pub fn handler(
         short_order_book: *ctx.accounts.short_order_book.key,
         order_pool_entry_page: *ctx.accounts.order_pool_entry_page.key,
         order_pool_remaining_pages: [Pubkey::default(); 16],
-        global_long: long_or_short_position,
-        global_short: long_or_short_position,
+        global_long: Position::new(true)?,
+        global_short: Position::new(false)?,
+        charge_borrow_fee_interval,
         open_fee_rate,
         close_fee_rate,
+        borrow_fee_rate,
         valid: true,
         decimals,
         nonce: 0,
         oracle_source,
         asset_index,
         significant_decimals,
-        padding: [0; 254],
+        padding: [0; 252],
     };
 
     dex.markets[market_index] = market;

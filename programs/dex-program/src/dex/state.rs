@@ -79,6 +79,7 @@ pub struct MarketFeeRates {
 }
 
 #[zero_copy]
+#[derive(Default)]
 pub struct Position {
     pub size: u64,
     pub collateral: u64,
@@ -94,6 +95,13 @@ pub struct Position {
 }
 
 impl Position {
+    pub fn new(long: bool) -> DexResult<Self> {
+        let mut p = Position::default();
+        p.zero(long)?;
+
+        Ok(p)
+    }
+
     pub fn zero(&mut self, long: bool) -> DexResult {
         self.size = 0;
         self.collateral = 0;
