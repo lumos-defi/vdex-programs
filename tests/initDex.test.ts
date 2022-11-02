@@ -1,9 +1,10 @@
-import { Keypair } from '@solana/web3.js'
+import { Keypair, PublicKey } from '@solana/web3.js'
 import { createAccountInstruction } from './utils/createAccountInstruction'
 import { getProviderAndProgram, airdrop } from './utils/getProvider'
 
 describe('Init Dex', () => {
   const { program, provider } = getProviderAndProgram()
+  const VLP_DECIMALS = 6
 
   let dex: Keypair
   let authority: Keypair
@@ -11,24 +12,38 @@ describe('Init Dex', () => {
   let matchQueue: Keypair
   let userListEntryPage: Keypair
 
+  let vlpMint: PublicKey
+  let vlpMintAuthority: PublicKey
+  let vlpMintNonce: number
+
   beforeAll(async () => {
     dex = Keypair.generate()
     eventQueue = Keypair.generate()
     matchQueue = Keypair.generate()
     userListEntryPage = Keypair.generate()
     authority = Keypair.generate()
+
     await airdrop(provider, authority.publicKey, 100_000_000_000)
+
+    //gen vlp mint with seeds
+    ;[vlpMint] = await PublicKey.findProgramAddress([dex.publicKey.toBuffer(), Buffer.from('vlp')], program.programId)
+    ;[vlpMintAuthority, vlpMintNonce] = await PublicKey.findProgramAddress(
+      [dex.publicKey.toBuffer(), vlpMint.toBuffer()],
+      program.programId
+    )
   })
 
   it('should init dex account successfully', async () => {
     await program.methods
-      .initDex()
+      .initDex(VLP_DECIMALS, vlpMintNonce)
       .accounts({
         dex: dex.publicKey,
         authority: authority.publicKey,
         eventQueue: eventQueue.publicKey,
         matchQueue: matchQueue.publicKey,
         userListEntryPage: userListEntryPage.publicKey,
+        vlpMint: vlpMint,
+        vlpMintAuthority: vlpMintAuthority,
       })
       .preInstructions([
         await program.account.dex.createInstruction(dex),
@@ -47,6 +62,7 @@ describe('Init Dex', () => {
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
+      vlpMint: vlpMint,
       assets: expect.arrayContaining([
         expect.objectContaining({
           valid: false,
@@ -63,4 +79,6 @@ describe('Init Dex', () => {
       ]),
     })
   })
+
+  it('should mint vlp token failed', async () => {})
 })

@@ -16,8 +16,12 @@ pub mod dex_program {
 
     use super::*;
 
-    pub fn init_dex(ctx: Context<InitDex>) -> DexResult {
-        dex::init_dex::handler(ctx)
+    pub fn init_dex(ctx: Context<InitDex>, vlp_decimals: u8, vlp_mint_nonce: u8) -> DexResult {
+        dex::init_dex::handler(ctx, vlp_decimals, vlp_mint_nonce)
+    }
+
+    pub fn mint_vlp_token(ctx: Context<MintToken>, amount: u64) -> DexResult {
+        dex::mint_vlp_token::handler(ctx, amount)
     }
 
     pub fn init_mock_oracle(ctx: Context<InitMockOracle>, price: u64, expo: u8) -> DexResult {
