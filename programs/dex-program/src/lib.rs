@@ -1,8 +1,10 @@
 use anchor_lang::prelude::*;
 use errors::*;
 
+pub mod collections;
 pub mod dex;
 pub mod errors;
+pub mod user;
 pub mod utils;
 
 use dex::*;
@@ -53,8 +55,10 @@ pub mod dex_program {
     pub fn add_market(
         ctx: Context<AddMarket>,
         symbol: String,
+        charge_borrow_fee_interval: u64,
         open_fee_rate: u16,
         close_fee_rate: u16,
+        borrow_fee_rate: u16,
         decimals: u8,
         oracle_source: u8,
         asset_index: u8,
@@ -63,8 +67,10 @@ pub mod dex_program {
         dex::add_market::handler(
             ctx,
             symbol,
+            charge_borrow_fee_interval,
             open_fee_rate,
             close_fee_rate,
+            borrow_fee_rate,
             decimals,
             oracle_source,
             asset_index,

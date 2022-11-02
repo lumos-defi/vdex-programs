@@ -3,6 +3,7 @@ import { createAccountInstruction } from './utils/createAccountInstruction'
 import { createDex } from './utils/createDex'
 import { createMockOracle } from './utils/createMockOracle'
 import { getProviderAndProgram } from './utils/getProvider'
+import { BN } from '@project-serum/anchor'
 
 describe('Test Create Market', () => {
   const { program } = getProviderAndProgram()
@@ -13,8 +14,10 @@ describe('Test Create Market', () => {
   const MOCK_ORACLE_PRICE_EXPO = 88
   const ORACLE_SOURCE = 0 // 0: mock,1: pyth
   const SIGNIFICANT_DECIMALS = 2 // 0.00
-  const OPEN_FEE_RATE = 30 // 0.03% (30 / 100000)
-  const CLOSE_FEE_RATE = 50 // 0.05%   (50 /  100000)
+  const CHARGE_BORROW_FEE_INTERVAL = 3600
+  const OPEN_FEE_RATE = 30 // 0.3% (30 / 10000)
+  const CLOSE_FEE_RATE = 50 // 0.5%   (50 /  10000)
+  const BORROW_FEE_RATE = 10 // 0.1%   (10 /  10000)
   const ASSET_INDEX = 0
 
   let dex: Keypair
@@ -37,8 +40,10 @@ describe('Test Create Market', () => {
     await program.methods
       .addMarket(
         MARKET_SYMBOL,
+        new BN(CHARGE_BORROW_FEE_INTERVAL),
         OPEN_FEE_RATE,
         CLOSE_FEE_RATE,
+        BORROW_FEE_RATE,
         DECIMALS,
         ORACLE_SOURCE,
         ASSET_INDEX,
@@ -64,8 +69,10 @@ describe('Test Create Market', () => {
       await program.methods
         .addMarket(
           MARKET_SYMBOL,
+          new BN(CHARGE_BORROW_FEE_INTERVAL),
           OPEN_FEE_RATE,
           CLOSE_FEE_RATE,
+          BORROW_FEE_RATE,
           DECIMALS,
           ORACLE_SOURCE,
           ASSET_INDEX,
@@ -88,8 +95,10 @@ describe('Test Create Market', () => {
     await program.methods
       .addMarket(
         MARKET_SYMBOL,
+        new BN(CHARGE_BORROW_FEE_INTERVAL),
         OPEN_FEE_RATE,
         CLOSE_FEE_RATE,
+        BORROW_FEE_RATE,
         DECIMALS,
         ORACLE_SOURCE,
         ASSET_INDEX,
@@ -126,8 +135,10 @@ describe('Test Create Market', () => {
       shortOrderBook: shortOrderBook.publicKey,
       orderPoolEntryPage: orderPoolEntryPage.publicKey,
       oracle: mockOracle.publicKey,
+      chargeBorrowFeeInterval: expect.toBNEqual(CHARGE_BORROW_FEE_INTERVAL),
       openFeeRate: OPEN_FEE_RATE,
       closeFeeRate: CLOSE_FEE_RATE,
+      borrowFeeRate: BORROW_FEE_RATE,
       significantDecimals: SIGNIFICANT_DECIMALS,
     })
   })
