@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use num_enum::TryFromPrimitive;
 
 use crate::{
-    user::DexResult,
+    errors::DexResult,
     utils::{time::get_timestamp, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_MAX},
 };
 
