@@ -1,6 +1,3 @@
-use core::borrow;
-use std::borrow::Borrow;
-
 use crate::{
     dex::{Dex, UserListItem},
     errors::{DexError, DexResult},
@@ -65,15 +62,20 @@ pub fn handler(
 ) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
     require!(
-        market < dex.markets.len() as u8
+        (market < dex.markets.len() as u8)
             && dex.event_queue == ctx.accounts.event_queue.key()
             && dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
         DexError::InvalidMarketIndex
     );
 
-    require_eq!(
-        dex.user_list_remaining_pages_number as usize,
-        ctx.remaining_accounts.len(),
+    // require_eq!(
+    //     dex.user_list_remaining_pages_number as usize,
+    //     ctx.remaining_accounts.len(),
+    //     DexError::InvalidRemainingAccounts
+    // );
+
+    require!(
+        dex.user_list_remaining_pages_number as usize == ctx.remaining_accounts.len(),
         DexError::InvalidRemainingAccounts
     );
 
@@ -106,13 +108,13 @@ pub fn handler(
     // Get oracle price
     let price = 0u64;
 
-    let mfr = &mi.get_fee_rates();
+    let mfr = mi.get_fee_rates();
 
     // User open position
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     let (size, collateral, borrow, fee) = us
         .borrow_mut()
-        .open_position(market, price, amount, long, leverage, mfr)?;
+        .open_position(market, price, amount, long, leverage, &mfr)?;
 
     // TODO: check if satisfy the minimum open size
 
