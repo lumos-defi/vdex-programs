@@ -14,12 +14,15 @@ pub struct Dex {
     pub authority: Pubkey,
     pub event_queue: Pubkey,
     pub match_queue: Pubkey,
+    pub vlp_mint: Pubkey,
+    pub vlp_mint_authority: Pubkey,
     pub user_list_entry_page: Pubkey,
     pub user_list_remaining_pages: [Pubkey; 8],
     pub user_list_remaining_pages_number: u8,
     pub assets_number: u8,
     pub markets_number: u8,
-    pub padding: [u8; 253],
+    pub vlp_mint_nonce: u8,
+    pub padding: [u8; 252],
 }
 
 #[zero_copy]
@@ -63,11 +66,10 @@ pub struct MarketInfo {
     pub borrow_fee_rate: u16,
     pub valid: bool,
     pub decimals: u8,
-    pub nonce: u8,
     pub oracle_source: u8,
     pub asset_index: u8,
     pub significant_decimals: u8,
-    pub padding: [u8; 252],
+    pub padding: [u8; 253],
 }
 
 pub struct MarketFeeRates {

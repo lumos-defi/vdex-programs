@@ -90,11 +90,10 @@ pub fn handler(
         borrow_fee_rate,
         valid: true,
         decimals,
-        nonce: 0,
         oracle_source,
         asset_index,
         significant_decimals,
-        padding: [0; 252],
+        padding: [0; 253],
     };
 
     dex.markets[market_index] = market;
