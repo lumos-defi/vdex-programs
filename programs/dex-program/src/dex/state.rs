@@ -110,6 +110,7 @@ pub struct MarketInfo {
     pub global_long: Position,
     pub global_short: Position,
 
+    pub minimum_open_amount: u64,
     pub fee_amount: u64,
     pub charge_borrow_fee_interval: u64,
     pub open_fee_rate: u16,

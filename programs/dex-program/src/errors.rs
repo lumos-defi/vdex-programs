@@ -91,6 +91,9 @@ pub enum DexError {
 
     #[msg("Invalid remaining accounts")]
     InvalidRemainingAccounts,
+
+    #[msg("Open size too small")]
+    OpenSizeTooSmall,
 }
 
 pub type DexResult<T = ()> = Result<T>;

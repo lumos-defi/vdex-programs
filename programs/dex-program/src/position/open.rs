@@ -2,6 +2,7 @@ use crate::{
     dex::{Dex, UserListItem},
     errors::{DexError, DexResult},
     user::state::*,
+    utils::SafeMath,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -116,7 +117,11 @@ pub fn handler(
         .borrow_mut()
         .open_position(market, price, amount, long, leverage, &mfr)?;
 
-    // TODO: check if satisfy the minimum open size
+    // Check if satisfy the minimum open size
+    require!(
+        size.safe_mul(price)? as u64 >= mi.minimum_open_amount,
+        DexError::OpenSizeTooSmall
+    );
 
     // Update asset info (collateral amount, borrow amount, fee)
     dex.update_asset(market as usize, long, collateral, borrow, fee)?;
