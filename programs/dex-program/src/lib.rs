@@ -114,8 +114,13 @@ pub mod dex_program {
         position::open::handler(ctx, market, long, amount, leverage)
     }
 
-    pub fn close_position(_ctx: Context<ClosePosition>) -> DexResult {
-        Ok(())
+    pub fn close_position(
+        ctx: Context<ClosePosition>,
+        market: u8,
+        long: bool,
+        size: u64,
+    ) -> DexResult {
+        position::close::handler(ctx, market, long, size)
     }
 
     pub fn close_all_positions(_ctx: Context<CloseAllPositions>) -> DexResult {
@@ -143,12 +148,6 @@ pub struct RemoveLiquidity<'info> {
 
 #[derive(Accounts)]
 pub struct Swap<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct ClosePosition<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 }

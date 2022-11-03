@@ -15,7 +15,7 @@ pub struct InitDex<'info> {
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
-    usdc_mint: AccountInfo<'info>,
+    pub usdc_mint: AccountInfo<'info>,
 
     #[account(mut)]
     pub authority: Signer<'info>,

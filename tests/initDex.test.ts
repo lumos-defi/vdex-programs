@@ -21,7 +21,6 @@ describe('Init Dex', () => {
   let vlpMintNonce: number
 
   beforeAll(async () => {
-    // const { program, provider } = getProviderAndProgram()
     dex = Keypair.generate()
     eventQueue = Keypair.generate()
     matchQueue = Keypair.generate()
@@ -30,14 +29,6 @@ describe('Init Dex', () => {
 
     await airdrop(provider, authority.publicKey, 100_000_000_000)
     usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
-    // usdcMint = await Token.createMint(
-    //   provider.connection,
-    //   authority,
-    //   authority.publicKey,
-    //   null,
-    //   USDC_MINT_DECIMALS,
-    //   TOKEN_PROGRAM_ID
-    // )
 
     //gen vlp mint with seeds
     ;[vlpMint] = await PublicKey.findProgramAddress([dex.publicKey.toBuffer(), Buffer.from('vlp')], program.programId)

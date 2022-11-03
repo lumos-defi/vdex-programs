@@ -23,7 +23,7 @@ pub struct Dex {
     pub markets_number: u8,
     pub vlp_mint_nonce: u8,
     pub usdc_asset_index: u8,
-    pub padding: [u8; 252],
+    pub padding: [u8; 251],
 }
 
 impl Dex {

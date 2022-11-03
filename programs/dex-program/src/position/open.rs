@@ -15,14 +15,14 @@ pub struct OpenPosition<'info> {
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
-    mint: AccountInfo<'info>,
+    pub mint: AccountInfo<'info>,
 
     /// CHECK
     pub oracle: AccountInfo<'info>,
 
     /// CHECK
     #[account(mut)]
-    vault: AccountInfo<'info>,
+    pub vault: AccountInfo<'info>,
 
     /// CHECK
     pub program_signer: AccountInfo<'info>,
@@ -31,7 +31,7 @@ pub struct OpenPosition<'info> {
         mut,
         constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *mint.key)
     )]
-    user_mint_acc: Box<Account<'info, TokenAccount>>,
+    pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
     /// CHECK
     #[account(mut, seeds = [dex.key().as_ref(), authority.key().as_ref()], bump)]
@@ -70,12 +70,6 @@ pub fn handler(
             && dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
         DexError::InvalidMarketIndex
     );
-
-    // require_eq!(
-    //     dex.user_list_remaining_pages_number as usize,
-    //     ctx.remaining_accounts.len(),
-    //     DexError::InvalidRemainingAccounts
-    // );
 
     require!(
         dex.user_list_remaining_pages_number as usize == ctx.remaining_accounts.len(),
