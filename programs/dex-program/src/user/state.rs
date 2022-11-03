@@ -6,7 +6,7 @@ use crate::dex::state::*;
 use crate::utils::{NIL32, USER_STATE_MAGIC_NUMBER};
 use anchor_lang::prelude::*;
 
-use super::{DexError, DexResult};
+use crate::errors::{DexError, DexResult};
 
 #[derive(Copy, Clone)]
 #[repr(u8)]
