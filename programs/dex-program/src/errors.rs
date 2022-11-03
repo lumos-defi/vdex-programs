@@ -76,6 +76,12 @@ pub enum DexError {
 
     #[msg("Failed mount user state")]
     FailedMountUserState,
+
+    #[msg("Invalid PDA")]
+    InvalidPDA,
+
+    #[msg("Invalid vault")]
+    InvalidVault,
 }
 
 pub type DexResult<T = ()> = Result<T>;
