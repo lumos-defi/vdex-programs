@@ -103,6 +103,12 @@ pub enum DexError {
 
     #[msg("Failed load oracle account")]
     FailedLoadOracle,
+
+    #[msg("Failed mount event queue")]
+    FailedMountEventQueue,
+
+    #[msg("Failed append to event queue")]
+    FailedAppendEvent,
 }
 
 pub type DexResult<T = ()> = Result<T>;

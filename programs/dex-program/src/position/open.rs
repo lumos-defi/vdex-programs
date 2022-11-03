@@ -1,6 +1,6 @@
 use crate::{
-    collections::{MountMode, PagedList},
-    dex::{get_oracle_price, Dex, UserListItem},
+    collections::{EventQueue, MountMode, PagedList},
+    dex::{event::PositionFilled, get_oracle_price, Dex, UserListItem},
     errors::{DexError, DexResult},
     position::update_user_serial_number,
     user::state::*,
@@ -130,6 +130,38 @@ pub fn handler(
 
     // Update market global position
     dex.increase_global_position(market as usize, long, price, size, collateral)?;
+
+    // Save to event queue
+    let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
+        .map_err(|_| DexError::FailedMountEventQueue)?;
+
+    let user_state_key = ctx.accounts.user_state.key().to_bytes();
+    let event_seq = event_queue
+        .append(PositionFilled {
+            user_state: user_state_key,
+            price,
+            size,
+            collateral,
+            borrow,
+            market,
+            open_or_close: 0,
+            long_or_short: if long { 0 } else { 1 },
+            fee,
+            pnl: 0,
+        })
+        .map_err(|_| DexError::FailedAppendEvent)?;
+
+    msg!(
+        "Position filled: open {:?} {} {} {} {} {} {} {}",
+        user_state_key,
+        price,
+        size,
+        collateral,
+        borrow,
+        market,
+        fee,
+        event_seq
+    );
 
     // Update user list
     let user_list = PagedList::<UserListItem>::mount(
