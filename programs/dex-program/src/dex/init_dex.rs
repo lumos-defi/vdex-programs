@@ -72,6 +72,7 @@ pub fn handler(ctx: Context<InitDex>, _vlp_decimal: u8, vlp_mint_nonce: u8) -> D
     dex.assets_number = 0;
     dex.markets_number = 0;
     dex.vlp_mint_nonce = vlp_mint_nonce;
+    dex.usdc_asset_index = 0xff;
 
     EventQueue::mount(&mut ctx.accounts.event_queue, false)?.initialize(true)?;
     SingleEventQueue::<MatchEvent>::mount(&mut ctx.accounts.match_queue, false)?
