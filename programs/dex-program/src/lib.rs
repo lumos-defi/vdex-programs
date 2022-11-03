@@ -4,11 +4,14 @@ use errors::*;
 pub mod collections;
 pub mod dex;
 pub mod errors;
+pub mod pool;
 pub mod user;
 pub mod utils;
 
 use dex::*;
+use pool::*;
 use user::*;
+
 
 declare_id!("2aJZ6AufDU5NRzXLg5Ww4S4Nf2tx7xZDQD6he2gjsKyq");
 
@@ -86,8 +89,8 @@ pub mod dex_program {
         )
     }
 
-    pub fn add_liquidity(_ctx: Context<AddLiquidity>) -> DexResult {
-        Ok(())
+    pub fn add_liquidity(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
+        pool::add_liquidity::handler(ctx, amount)
     }
 
     pub fn remove_liquidity(_ctx: Context<RemoveLiquidity>) -> DexResult {
@@ -121,12 +124,6 @@ pub mod dex_program {
     pub fn cancel_all_limit_orders(_ctx: Context<CancelAllLimitOrders>) -> DexResult {
         Ok(())
     }
-}
-
-#[derive(Accounts)]
-pub struct AddLiquidity<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
