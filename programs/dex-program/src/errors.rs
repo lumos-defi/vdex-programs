@@ -94,6 +94,15 @@ pub enum DexError {
 
     #[msg("Open size too small")]
     OpenSizeTooSmall,
+
+    #[msg("Failed new user list slot")]
+    FailedNewUserListSlot,
+
+    #[msg("Failed locate user list slot")]
+    FailedLocateUserListSlot,
+
+    #[msg("Failed load oracle account")]
+    FailedLoadOracle,
 }
 
 pub type DexResult<T = ()> = Result<T>;

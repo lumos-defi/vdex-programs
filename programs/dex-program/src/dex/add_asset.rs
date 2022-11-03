@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 
 use crate::{
-    dex::state::*,
+    dex::{state::*, OracleSource},
     errors::{DexError, DexResult},
 };
 

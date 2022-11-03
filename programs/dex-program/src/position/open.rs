@@ -1,8 +1,10 @@
 use crate::{
-    dex::{Dex, UserListItem},
+    collections::{MountMode, PagedList},
+    dex::{get_oracle_price, Dex, UserListItem},
     errors::{DexError, DexResult},
+    position::update_user_serial_number,
     user::state::*,
-    utils::SafeMath,
+    utils::{SafeMath, USER_LIST_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -107,7 +109,7 @@ pub fn handler(
     token::transfer(cpi_ctx, amount)?;
 
     // Get oracle price
-    let price = 0u64;
+    let price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
 
     let mfr = mi.get_fee_rates();
 
@@ -130,6 +132,13 @@ pub fn handler(
     dex.increase_global_position(market as usize, long, price, size, collateral)?;
 
     // Update user list
+    let user_list = PagedList::<UserListItem>::mount(
+        &ctx.accounts.user_list_entry_page,
+        &ctx.remaining_accounts,
+        USER_LIST_MAGIC_BYTE,
+        MountMode::ReadWrite,
+    )
+    .map_err(|_| DexError::FailedInitializeUserList)?;
 
-    Ok(())
+    update_user_serial_number(&user_list, us.borrow_mut(), ctx.accounts.user_state.key())
 }

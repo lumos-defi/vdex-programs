@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use num_enum::TryFromPrimitive;
 
 use crate::{
     errors::{DexError, DexResult},
@@ -70,6 +69,26 @@ impl Dex {
         size: u64,
         collateral: u64,
     ) -> DexResult {
+        require!(market < self.markets.len(), DexError::InvalidMarketIndex);
+
+        let pos = if long {
+            &mut self.markets[market].global_long
+        } else {
+            &mut self.markets[market].global_short
+        };
+
+        let merged_size = pos.size.safe_add(size)?;
+
+        pos.average_price = pos
+            .average_price
+            .safe_mul(pos.size)?
+            .safe_add(price.safe_mul(size)?)?
+            .safe_div(merged_size as u128)? as u64;
+
+        pos.size = merged_size;
+        pos.collateral = pos.collateral.safe_add(collateral)?;
+        pos.last_fill_time = get_timestamp()?;
+
         Ok(())
     }
 }
@@ -360,14 +379,6 @@ pub struct Order {
     pub open_or_close: u8,
     pub market: u8,
     pub position_index: u8,
-}
-
-#[derive(Copy, Clone, TryFromPrimitive)]
-#[repr(u8)]
-pub enum OracleSource {
-    Mock = 0,
-    Pyth = 1,
-    StableCoin = 2,
 }
 
 #[account]

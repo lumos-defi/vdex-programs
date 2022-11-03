@@ -111,7 +111,7 @@ pub mod dex_program {
         amount: u64,
         leverage: u32,
     ) -> DexResult {
-        Ok(())
+        position::open::handler(ctx, market, long, amount, leverage)
     }
 
     pub fn close_position(_ctx: Context<ClosePosition>) -> DexResult {
