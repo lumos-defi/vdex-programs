@@ -92,9 +92,11 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
 
     // User close position
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let (fund_returned, collateral_unlocked, pnl, fee) = us
+    let (refund, collateral, pnl, fee) = us
         .borrow_mut()
         .close_position(market, size, price, long, &mfr)?;
+
+    dex.return_fund(market as usize, long, collateral, refund, fee)?;
 
     // Save to event queue
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)

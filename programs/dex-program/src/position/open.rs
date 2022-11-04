@@ -120,7 +120,7 @@ pub fn handler(
     );
 
     // Update asset info (collateral amount, borrow amount, fee)
-    dex.update_asset(market as usize, long, collateral, borrow, fee)?;
+    dex.borrow_fund(market as usize, long, collateral, borrow, fee)?;
 
     // Update market global position
     dex.increase_global_position(market as usize, long, price, size, collateral)?;

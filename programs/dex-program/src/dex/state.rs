@@ -27,7 +27,7 @@ pub struct Dex {
 }
 
 impl Dex {
-    pub fn update_asset(
+    pub fn borrow_fund(
         &mut self,
         market: usize,
         long: bool,
@@ -61,6 +61,17 @@ impl Dex {
         Ok(())
     }
 
+    pub fn return_fund(
+        &mut self,
+        market: usize,
+        long: bool,
+        collateral: u64,
+        refund: u64,
+        fee: u64,
+    ) -> DexResult {
+        require!(market < self.markets.len(), DexError::InvalidMarketIndex);
+        Ok(())
+    }
     pub fn increase_global_position(
         &mut self,
         market: usize,
