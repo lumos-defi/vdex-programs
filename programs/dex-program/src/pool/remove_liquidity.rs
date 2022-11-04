@@ -2,10 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, TokenAccount, Transfer};
 
 use crate::{
-    collections::{EventQueue, MountMode, PagedList},
     dex::state::*,
     errors::{DexError, DexResult},
-    utils::{NIL8, USER_LIST_MAGIC_BYTE},
 };
 
 #[derive(Accounts)]
