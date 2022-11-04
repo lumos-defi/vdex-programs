@@ -109,6 +109,9 @@ pub enum DexError {
 
     #[msg("Failed append to event queue")]
     FailedAppendEvent,
+
+    #[msg("Invalid Withdraw Amount")]
+    InvalidWithdrawAmount,
 }
 
 pub type DexResult<T = ()> = Result<T>;
