@@ -171,6 +171,7 @@ impl Dex {
 
         pos.collateral = pos.collateral.safe_sub(collateral)?;
         pos.size = pos.size.safe_sub(size)?;
+        pos.last_fill_time = get_timestamp()?;
 
         if pos.size == 0 {
             pos.zero(long)?;
