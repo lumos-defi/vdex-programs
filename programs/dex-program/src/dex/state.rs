@@ -54,24 +54,75 @@ impl Dex {
         let ai = &mut self.assets[asset_index];
         require!(ai.valid, DexError::InvalidMarketIndex);
 
-        ai.collateral_amount = ai.collateral_amount.safe_add(collateral)? as u64;
-        ai.borrowed_amount = ai.borrowed_amount.safe_add(borrow)? as u64;
-        ai.fee_amount = ai.fee_amount.safe_add(fee)? as u64;
+        ai.liquidity_amount = ai.liquidity_amount.safe_sub(borrow)?;
+        ai.collateral_amount = ai.collateral_amount.safe_add(collateral)?;
+        ai.borrowed_amount = ai.borrowed_amount.safe_add(borrow)?;
+        ai.fee_amount = ai.fee_amount.safe_add(fee)?;
 
         Ok(())
     }
 
-    pub fn return_fund(
+    pub fn settle_pnl(
         &mut self,
         market: usize,
         long: bool,
         collateral: u64,
-        refund: u64,
+        borrow: u64,
+        pnl: i64,
         fee: u64,
-    ) -> DexResult {
+    ) -> DexResult<u64> {
         require!(market < self.markets.len(), DexError::InvalidMarketIndex);
-        Ok(())
+
+        let mi = &mut self.markets[market];
+        require!(mi.valid, DexError::InvalidMarketIndex);
+        mi.fee_amount = mi.fee_amount.safe_add(fee)? as u64;
+
+        let asset_index = if long {
+            mi.asset_index
+        } else {
+            self.usdc_asset_index
+        } as usize;
+
+        require!(
+            asset_index < self.assets.len(),
+            DexError::InvalidMarketIndex
+        );
+
+        let ai = &mut self.assets[asset_index];
+        require!(ai.valid, DexError::InvalidMarketIndex);
+
+        ai.liquidity_amount = ai.liquidity_amount.safe_add(borrow)?;
+        ai.collateral_amount = ai.collateral_amount.safe_sub(collateral)?;
+        ai.borrowed_amount = ai.borrowed_amount.safe_sub(borrow)?;
+        ai.fee_amount = ai.fee_amount.safe_add(fee)?;
+
+        let abs_pnl = i64::abs(pnl) as u64;
+        let user_withdrawable = if pnl >= 0 {
+            // User take the profit
+            ai.liquidity_amount = ai.liquidity_amount.safe_sub(abs_pnl)?;
+            match collateral.safe_add(abs_pnl)?.safe_sub(fee) {
+                Ok(v) => v,
+                Err(_) => 0,
+            }
+        } else {
+            // Pool take the profit
+            let pnl_and_fee = fee.safe_add(abs_pnl)?;
+            match collateral.safe_sub(pnl_and_fee) {
+                Ok(remain) => {
+                    ai.liquidity_amount = ai.liquidity_amount.safe_sub(abs_pnl)?;
+                    remain
+                }
+                Err(_) => {
+                    ai.liquidity_amount =
+                        ai.liquidity_amount.safe_add(collateral)?.safe_sub(fee)?;
+                    0
+                }
+            }
+        };
+
+        Ok(user_withdrawable)
     }
+
     pub fn increase_global_position(
         &mut self,
         market: usize,
@@ -99,6 +150,31 @@ impl Dex {
         pos.size = merged_size;
         pos.collateral = pos.collateral.safe_add(collateral)?;
         pos.last_fill_time = get_timestamp()?;
+
+        Ok(())
+    }
+
+    pub fn decrease_global_position(
+        &mut self,
+        market: usize,
+        long: bool,
+        size: u64,
+        collateral: u64,
+    ) -> DexResult {
+        require!(market < self.markets.len(), DexError::InvalidMarketIndex);
+
+        let pos = if long {
+            &mut self.markets[market].global_long
+        } else {
+            &mut self.markets[market].global_short
+        };
+
+        pos.collateral = pos.collateral.safe_sub(collateral)?;
+        pos.size = pos.size.safe_sub(size)?;
+
+        if pos.size == 0 {
+            pos.zero(long)?;
+        }
 
         Ok(())
     }

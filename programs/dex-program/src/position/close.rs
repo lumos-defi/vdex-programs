@@ -4,7 +4,7 @@ use crate::{
     errors::{DexError, DexResult},
     position::update_user_serial_number,
     user::state::*,
-    utils::{SafeMath, USER_LIST_MAGIC_BYTE},
+    utils::USER_LIST_MAGIC_BYTE,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -85,50 +85,72 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
         DexError::InvalidMarketIndex
     );
 
+    let seeds = &[
+        ctx.accounts.mint.key.as_ref(),
+        ctx.accounts.dex.to_account_info().key.as_ref(),
+        &[ai.nonce],
+    ];
     // Get oracle price
     let price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
 
     let mfr = mi.get_fee_rates();
 
     // User close position
+    // TODO: check minimum close size ??
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let (refund, collateral, pnl, fee) = us
+    let (borrow, collateral, pnl, fee) = us
         .borrow_mut()
         .close_position(market, size, price, long, &mfr)?;
 
-    dex.return_fund(market as usize, long, collateral, refund, fee)?;
+    // Update market global position
+    dex.decrease_global_position(market as usize, long, size, collateral)?;
+
+    let withdrawable = dex.settle_pnl(market as usize, long, collateral, borrow, pnl, fee)?;
+    if withdrawable > 0 {
+        let signer = &[&seeds[..]];
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.vault.to_account_info(),
+            to: ctx.accounts.user_mint_acc.to_account_info(),
+            authority: ctx.accounts.program_signer.to_account_info(),
+        };
+
+        // let cpi_program = ctx.accounts.token_program.clone();
+        let cpi_ctx =
+            CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_accounts, signer);
+        token::transfer(cpi_ctx, withdrawable)?;
+    }
 
     // Save to event queue
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
         .map_err(|_| DexError::FailedMountEventQueue)?;
 
-    // let user_state_key = ctx.accounts.user_state.key().to_bytes();
-    // let event_seq = event_queue
-    //     .append(PositionFilled {
-    //         user_state: user_state_key,
-    //         price,
-    //         size,
-    //         collateral,
-    //         borrow: 0,
-    //         market,
-    //         open_or_close: 0,
-    //         long_or_short: if long { 0 } else { 1 },
-    //         fee,
-    //         pnl: 0,
-    //     })
-    //     .map_err(|_| DexError::FailedAppendEvent)?;
+    let user_state_key = ctx.accounts.user_state.key().to_bytes();
+    let event_seq = event_queue
+        .append(PositionFilled {
+            user_state: user_state_key,
+            price,
+            size,
+            collateral,
+            borrow: 0,
+            market,
+            open_or_close: 1,
+            long_or_short: if long { 0 } else { 1 },
+            fee,
+            pnl,
+        })
+        .map_err(|_| DexError::FailedAppendEvent)?;
 
-    // msg!(
-    //     "Position filled: close {:?} {} {} {} {} {} {} {}",
-    //     user_state_key,
-    //     price,
-    //     size,
-    //     collateral,
-    //     borrow,
-    //     market,
-    //     fee,
-    //     event_seq
-    // );
+    msg!(
+        "Position filled: close {:?} {} {} {} {} {} {} {}",
+        user_state_key,
+        price,
+        size,
+        collateral,
+        market,
+        fee,
+        pnl,
+        event_seq
+    );
 
     // Update user list
     let user_list = PagedList::<UserListItem>::mount(
