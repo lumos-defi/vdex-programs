@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 
 use crate::{
-    dex::state::*,
+    dex::{state::*, OracleSource},
     errors::{DexError, DexResult},
 };
 
@@ -85,13 +85,14 @@ pub fn handler(
 
     let asset = AssetInfo {
         symbol: asset_symbol,
-        mint: *ctx.accounts.mint.key,
-        oracle: *ctx.accounts.oracle.key,
-        vault: *ctx.accounts.vault.to_account_info().key,
-        program_signer: *ctx.accounts.program_signer.key,
+        mint: ctx.accounts.mint.key(),
+        oracle: ctx.accounts.oracle.key(),
+        vault: ctx.accounts.vault.to_account_info().key(),
+        program_signer: ctx.accounts.program_signer.key(),
         liquidity_amount: 0,
         collateral_amount: 0,
         borrowed_amount: 0,
+        fee_amount: 0,
         borrowed_fee_rate,
         add_liquidity_fee_rate,
         remove_liquidity_fee_rate,
@@ -105,6 +106,10 @@ pub fn handler(
 
     dex.assets[asset_index] = asset;
     dex.assets_number += 1;
+
+    if dex.usdc_mint == ctx.accounts.mint.key() {
+        dex.usdc_asset_index = asset_index as u8;
+    }
 
     Ok(())
 }

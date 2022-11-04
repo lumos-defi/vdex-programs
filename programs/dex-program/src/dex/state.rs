@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
-use num_enum::TryFromPrimitive;
 
 use crate::{
-    errors::DexResult,
-    utils::{time::get_timestamp, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_MAX},
+    errors::{DexError, DexResult},
+    utils::{time::get_timestamp, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_BASE},
 };
 
 #[account(zero_copy)]
@@ -14,6 +13,7 @@ pub struct Dex {
     pub authority: Pubkey,
     pub event_queue: Pubkey,
     pub match_queue: Pubkey,
+    pub usdc_mint: Pubkey,
     pub vlp_mint: Pubkey,
     pub vlp_mint_authority: Pubkey,
     pub user_list_entry_page: Pubkey,
@@ -22,7 +22,75 @@ pub struct Dex {
     pub assets_number: u8,
     pub markets_number: u8,
     pub vlp_mint_nonce: u8,
-    pub padding: [u8; 252],
+    pub usdc_asset_index: u8,
+    pub padding: [u8; 251],
+}
+
+impl Dex {
+    pub fn update_asset(
+        &mut self,
+        market: usize,
+        long: bool,
+        collateral: u64,
+        borrow: u64,
+        fee: u64,
+    ) -> DexResult {
+        require!(market < self.markets.len(), DexError::InvalidMarketIndex);
+
+        let mi = &mut self.markets[market];
+        require!(mi.valid, DexError::InvalidMarketIndex);
+        mi.fee_amount = mi.fee_amount.safe_add(fee)? as u64;
+
+        let asset_index = if long {
+            mi.asset_index
+        } else {
+            self.usdc_asset_index
+        } as usize;
+
+        require!(
+            asset_index < self.assets.len(),
+            DexError::InvalidMarketIndex
+        );
+        let ai = &mut self.assets[asset_index];
+        require!(ai.valid, DexError::InvalidMarketIndex);
+
+        ai.collateral_amount = ai.collateral_amount.safe_add(collateral)? as u64;
+        ai.borrowed_amount = ai.borrowed_amount.safe_add(borrow)? as u64;
+        ai.fee_amount = ai.fee_amount.safe_add(fee)? as u64;
+
+        Ok(())
+    }
+
+    pub fn increase_global_position(
+        &mut self,
+        market: usize,
+        long: bool,
+        price: u64,
+        size: u64,
+        collateral: u64,
+    ) -> DexResult {
+        require!(market < self.markets.len(), DexError::InvalidMarketIndex);
+
+        let pos = if long {
+            &mut self.markets[market].global_long
+        } else {
+            &mut self.markets[market].global_short
+        };
+
+        let merged_size = pos.size.safe_add(size)?;
+
+        pos.average_price = pos
+            .average_price
+            .safe_mul(pos.size)?
+            .safe_add(price.safe_mul(size)?)?
+            .safe_div(merged_size as u128)? as u64;
+
+        pos.size = merged_size;
+        pos.collateral = pos.collateral.safe_add(collateral)?;
+        pos.last_fill_time = get_timestamp()?;
+
+        Ok(())
+    }
 }
 
 #[zero_copy]
@@ -35,6 +103,7 @@ pub struct AssetInfo {
     pub liquidity_amount: u64,
     pub collateral_amount: u64,
     pub borrowed_amount: u64,
+    pub fee_amount: u64,
     pub borrowed_fee_rate: u16,
     pub add_liquidity_fee_rate: u16,
     pub remove_liquidity_fee_rate: u16,
@@ -60,6 +129,8 @@ pub struct MarketInfo {
     pub global_long: Position,
     pub global_short: Position,
 
+    pub minimum_open_amount: u64,
+    pub fee_amount: u64,
     pub charge_borrow_fee_interval: u64,
     pub open_fee_rate: u16,
     pub close_fee_rate: u16,
@@ -80,6 +151,18 @@ pub struct MarketFeeRates {
     pub base_decimals: u8,
 }
 
+impl MarketInfo {
+    pub fn get_fee_rates(&self) -> MarketFeeRates {
+        MarketFeeRates {
+            charge_borrow_fee_interval: self.charge_borrow_fee_interval,
+            borrow_fee_rate: self.borrow_fee_rate,
+            open_fee_rate: self.open_fee_rate,
+            close_fee_rate: self.close_fee_rate,
+            base_decimals: self.decimals,
+        }
+    }
+}
+
 #[zero_copy]
 #[derive(Default)]
 pub struct Position {
@@ -95,7 +178,7 @@ pub struct Position {
     pub long: bool,
     pub _padding: [u8; 7],
 }
-
+// TODO: unit test
 impl Position {
     pub fn new(long: bool) -> DexResult<Self> {
         let mut p = Position::default();
@@ -121,11 +204,22 @@ impl Position {
 
     pub fn open(
         &mut self,
-        size: u64,
         price: u64,
-        collateral: u64,
+        amount: u64,
+        leverage: u32,
         mfr: &MarketFeeRates,
-    ) -> DexResult<(u64, u64)> {
+    ) -> DexResult<(u64, u64, u64, u64)> {
+        let (collateral, fee) =
+            Position::calc_collateral_and_fee(amount, leverage, mfr.open_fee_rate)?;
+
+        let size = if self.long {
+            collateral.safe_mul(leverage as u64)
+        } else {
+            collateral
+                .safe_mul(leverage as u64)?
+                .safe_div(price as u128)
+        }? as u64;
+
         // Update cumulative fund fee
         let now = get_timestamp()?;
         let cumulative_fund_fee = if self.borrowed_amount > 0 {
@@ -133,7 +227,7 @@ impl Position {
             self.borrowed_amount
                 .safe_mul(mfr.borrow_fee_rate as u64)?
                 .safe_mul((now - self.last_fill_time) as u128)?
-                .safe_div(FEE_RATE_MAX)?
+                .safe_div(FEE_RATE_BASE)?
                 .safe_div(mfr.charge_borrow_fee_interval as u128)? as u64
                 + self.cumulative_fund_fee
         } else {
@@ -144,7 +238,7 @@ impl Position {
         let borrow = if self.long {
             Ok(size as u128)
         } else {
-            price.safe_mul(size)
+            collateral.safe_mul(leverage as u64)
         }? as u64;
 
         let merged_size = self.size.safe_add(size)?;
@@ -162,20 +256,7 @@ impl Position {
         self.cumulative_fund_fee = cumulative_fund_fee;
         self.last_fill_time = now;
 
-        // Calculate open position fee
-        let fee = if self.long {
-            size.safe_mul(mfr.open_fee_rate as u64)?
-                .safe_div(FEE_RATE_MAX)? as u64
-        } else {
-            let quote_amount =
-                size.safe_mul(price)?
-                    .safe_div(10u64.pow(mfr.base_decimals.into()) as u128)? as u64;
-            quote_amount
-                .safe_mul(mfr.open_fee_rate as u64)?
-                .safe_div(FEE_RATE_MAX)? as u64
-        };
-
-        Ok((borrow, fee))
+        Ok((size, collateral, borrow, fee))
     }
 
     pub fn close(
@@ -199,7 +280,7 @@ impl Position {
             self.borrowed_amount
                 .safe_mul(mfr.borrow_fee_rate as u64)?
                 .safe_mul((now - self.last_fill_time) as u128)?
-                .safe_div(FEE_RATE_MAX)?
+                .safe_div(FEE_RATE_BASE)?
                 .safe_div(mfr.charge_borrow_fee_interval as u128)? as u64
                 + self.cumulative_fund_fee
         } else {
@@ -209,14 +290,14 @@ impl Position {
         // Calculate close position fee
         let fee = if self.long {
             size.safe_mul(mfr.close_fee_rate as u64)?
-                .safe_div(FEE_RATE_MAX)? as u64
+                .safe_div(FEE_RATE_BASE)? as u64
         } else {
             let quote_amount =
                 size.safe_mul(price)?
                     .safe_div(10u64.pow(mfr.base_decimals.into()) as u128)? as u64;
             quote_amount
                 .safe_mul(mfr.close_fee_rate as u64)?
-                .safe_div(FEE_RATE_MAX)? as u64
+                .safe_div(FEE_RATE_BASE)? as u64
         } + fund_fee;
 
         let pnl = self.pnl(size, price, self.average_price, mfr.base_decimals)?;
@@ -250,6 +331,18 @@ impl Position {
         }
 
         Ok((fund_returned, collateral_unlocked, pnl, fee))
+    }
+
+    fn calc_collateral_and_fee(amount: u64, leverage: u32, rate: u16) -> DexResult<(u64, u64)> {
+        let temp = (leverage as u64).safe_mul(rate as u64)? as u64;
+
+        let dividend = amount.safe_mul(temp)?;
+        let divisor = (FEE_RATE_BASE as u128).safe_add(temp as u128)?;
+
+        let fee = dividend.safe_div(divisor)? as u64;
+        let collateral = amount.safe_sub(fee)?;
+
+        Ok((collateral, fee))
     }
 
     fn pnl(
@@ -286,14 +379,6 @@ pub struct Order {
     pub open_or_close: u8,
     pub market: u8,
     pub position_index: u8,
-}
-
-#[derive(Copy, Clone, TryFromPrimitive)]
-#[repr(u8)]
-pub enum OracleSource {
-    Mock = 0,
-    Pyth = 1,
-    StableCoin = 2,
 }
 
 #[account]

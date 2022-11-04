@@ -56,16 +56,16 @@ impl UserPosition {
 
     pub fn open(
         &mut self,
-        size: u64,
         price: u64,
-        collateral: u64,
+        amount: u64,
         long: bool,
+        leverage: u32,
         mfr: &MarketFeeRates,
-    ) -> DexResult<(u64, u64)> {
+    ) -> DexResult<(u64, u64, u64, u64)> {
         if long {
-            self.long.open(size, price, collateral, mfr)
+            self.long.open(price, amount, leverage, mfr)
         } else {
-            self.short.open(size, price, collateral, mfr)
+            self.short.open(price, amount, leverage, mfr)
         }
     }
 
@@ -203,14 +203,14 @@ impl<'a> UserState<'a> {
     pub fn open_position(
         &mut self,
         market: u8,
-        size: u64,
         price: u64,
-        collateral: u64,
+        amount: u64,
         long: bool,
+        leverage: u32,
         mfr: &MarketFeeRates,
-    ) -> DexResult<(u64, u64)> {
+    ) -> DexResult<(u64, u64, u64, u64)> {
         let position = self.find_or_new_position(market)?;
-        position.data.open(size, price, collateral, long, mfr)
+        position.data.open(price, amount, long, leverage, mfr)
     }
 
     pub fn close_position(

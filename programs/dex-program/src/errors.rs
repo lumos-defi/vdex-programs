@@ -82,6 +82,33 @@ pub enum DexError {
 
     #[msg("Invalid vault")]
     InvalidVault,
+
+    #[msg("Invalid Amount")]
+    InvalidAmount,
+
+    #[msg("Invalid market index")]
+    InvalidMarketIndex,
+
+    #[msg("Invalid remaining accounts")]
+    InvalidRemainingAccounts,
+
+    #[msg("Open size too small")]
+    OpenSizeTooSmall,
+
+    #[msg("Failed new user list slot")]
+    FailedNewUserListSlot,
+
+    #[msg("Failed locate user list slot")]
+    FailedLocateUserListSlot,
+
+    #[msg("Failed load oracle account")]
+    FailedLoadOracle,
+
+    #[msg("Failed mount event queue")]
+    FailedMountEventQueue,
+
+    #[msg("Failed append to event queue")]
+    FailedAppendEvent,
 }
 
 pub type DexResult<T = ()> = Result<T>;

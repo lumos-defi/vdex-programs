@@ -5,13 +5,14 @@ pub mod collections;
 pub mod dex;
 pub mod errors;
 pub mod pool;
+pub mod position;
 pub mod user;
 pub mod utils;
 
 use dex::*;
 use pool::*;
+use position::*;
 use user::*;
-
 
 declare_id!("2aJZ6AufDU5NRzXLg5Ww4S4Nf2tx7xZDQD6he2gjsKyq");
 
@@ -66,6 +67,7 @@ pub mod dex_program {
     pub fn add_market(
         ctx: Context<AddMarket>,
         symbol: String,
+        minimum_open_amount: u64,
         charge_borrow_fee_interval: u64,
         open_fee_rate: u16,
         close_fee_rate: u16,
@@ -78,6 +80,7 @@ pub mod dex_program {
         dex::add_market::handler(
             ctx,
             symbol,
+            minimum_open_amount,
             charge_borrow_fee_interval,
             open_fee_rate,
             close_fee_rate,
@@ -101,12 +104,23 @@ pub mod dex_program {
         Ok(())
     }
 
-    pub fn open_position(_ctx: Context<OpenPosition>) -> DexResult {
-        Ok(())
+    pub fn open_position(
+        ctx: Context<OpenPosition>,
+        market: u8,
+        long: bool,
+        amount: u64,
+        leverage: u32,
+    ) -> DexResult {
+        position::open::handler(ctx, market, long, amount, leverage)
     }
 
-    pub fn close_position(_ctx: Context<ClosePosition>) -> DexResult {
-        Ok(())
+    pub fn close_position(
+        ctx: Context<ClosePosition>,
+        market: u8,
+        long: bool,
+        size: u64,
+    ) -> DexResult {
+        position::close::handler(ctx, market, long, size)
     }
 
     pub fn close_all_positions(_ctx: Context<CloseAllPositions>) -> DexResult {
@@ -134,18 +148,6 @@ pub struct RemoveLiquidity<'info> {
 
 #[derive(Accounts)]
 pub struct Swap<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct OpenPosition<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct ClosePosition<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 }

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, MintTo, Token, TokenAccount, Transfer};
 
-use crate::{dex::Dex, errors::DexResult, user::DexError};
+use crate::{dex::Dex, errors::DexError, errors::DexResult};
 
 #[derive(Accounts)]
 pub struct AddLiquidity<'info> {

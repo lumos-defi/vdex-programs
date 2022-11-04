@@ -1,10 +1,13 @@
 import { Keypair, PublicKey } from '@solana/web3.js'
 import { createAccountInstruction } from './utils/createAccountInstruction'
 import { getProviderAndProgram, airdrop } from './utils/getProvider'
+// import { TOKEN_PROGRAM_ID, Token } from '@solana/spl-token'
+import { createMint } from './utils/createMint'
 
 describe('Init Dex', () => {
   const { program, provider } = getProviderAndProgram()
   const VLP_DECIMALS = 6
+  const USDC_MINT_DECIMALS = 6
 
   let dex: Keypair
   let authority: Keypair
@@ -12,6 +15,7 @@ describe('Init Dex', () => {
   let matchQueue: Keypair
   let userListEntryPage: Keypair
 
+  let usdcMint: PublicKey
   let vlpMint: PublicKey
   let vlpMintAuthority: PublicKey
   let vlpMintNonce: number
@@ -24,6 +28,7 @@ describe('Init Dex', () => {
     authority = Keypair.generate()
 
     await airdrop(provider, authority.publicKey, 100_000_000_000)
+    usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
 
     //gen vlp mint with seeds
     ;[vlpMint] = await PublicKey.findProgramAddress([dex.publicKey.toBuffer(), Buffer.from('vlp')], program.programId)
@@ -38,6 +43,7 @@ describe('Init Dex', () => {
       .initDex(VLP_DECIMALS, vlpMintNonce)
       .accounts({
         dex: dex.publicKey,
+        usdcMint: usdcMint,
         authority: authority.publicKey,
         eventQueue: eventQueue.publicKey,
         matchQueue: matchQueue.publicKey,
@@ -62,6 +68,7 @@ describe('Init Dex', () => {
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
+      usdcMint: usdcMint,
       vlpMint: vlpMint,
       vlpMintNonce: vlpMintNonce,
       vlpMintAuthority: vlpMintAuthority,

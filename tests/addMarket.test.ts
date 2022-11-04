@@ -40,6 +40,7 @@ describe('Test Create Market', () => {
     await program.methods
       .addMarket(
         MARKET_SYMBOL,
+        new BN(100),
         new BN(CHARGE_BORROW_FEE_INTERVAL),
         OPEN_FEE_RATE,
         CLOSE_FEE_RATE,
@@ -69,6 +70,7 @@ describe('Test Create Market', () => {
       await program.methods
         .addMarket(
           MARKET_SYMBOL,
+          new BN(100),
           new BN(CHARGE_BORROW_FEE_INTERVAL),
           OPEN_FEE_RATE,
           CLOSE_FEE_RATE,
@@ -95,6 +97,7 @@ describe('Test Create Market', () => {
     await program.methods
       .addMarket(
         MARKET_SYMBOL,
+        new BN(100),
         new BN(CHARGE_BORROW_FEE_INTERVAL),
         OPEN_FEE_RATE,
         CLOSE_FEE_RATE,
@@ -135,6 +138,7 @@ describe('Test Create Market', () => {
       shortOrderBook: shortOrderBook.publicKey,
       orderPoolEntryPage: orderPoolEntryPage.publicKey,
       oracle: mockOracle.publicKey,
+      minimumOpenAmount: expect.toBNEqual(100),
       chargeBorrowFeeInterval: expect.toBNEqual(CHARGE_BORROW_FEE_INTERVAL),
       openFeeRate: OPEN_FEE_RATE,
       closeFeeRate: CLOSE_FEE_RATE,

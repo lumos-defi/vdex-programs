@@ -1,5 +1,6 @@
 import { Keypair, PublicKey } from '@solana/web3.js'
 import { createAccountInstruction } from './createAccountInstruction'
+import { createMint } from './createMint'
 import { airdrop, getProviderAndProgram } from './getProvider'
 
 export async function createDex(authority: Keypair) {
@@ -9,11 +10,13 @@ export async function createDex(authority: Keypair) {
   const matchQueue = Keypair.generate()
   const userListEntryPage = Keypair.generate()
   const VLP_DECIMALS = 6
+  const USDC_MINT_DECIMALS = 6
   let vlpMint: PublicKey
   let vlpMintAuthority: PublicKey
   let vlpMintNonce: number
 
   await airdrop(provider, authority.publicKey, 10000000000)
+  const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
 
   //gen vlp mint with seeds
   // eslint-disable-next-line prefer-const
@@ -28,6 +31,7 @@ export async function createDex(authority: Keypair) {
     .initDex(VLP_DECIMALS, vlpMintNonce)
     .accounts({
       dex: dex.publicKey,
+      usdcMint,
       authority: authority.publicKey,
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,

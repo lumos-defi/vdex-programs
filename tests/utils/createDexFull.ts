@@ -5,6 +5,7 @@ import { TOKEN_PROGRAM_ID, Token } from '@solana/spl-token'
 import { createMockOracle } from './createMockOracle'
 import { createTokenAccount } from './createTokenAccount'
 import { airdrop, getProviderAndProgram } from './getProvider'
+import { createMint } from './createMint'
 
 export async function createDexFull(authority: Keypair) {
   const { program, provider } = getProviderAndProgram()
@@ -31,6 +32,7 @@ export async function createDexFull(authority: Keypair) {
   const CLOSE_FEE_RATE = 50 // 0.5%   (50 /  10000)
   const BORROW_FEE_RATE = 10 // 0.1%   (10 /  10000)
   const ASSET_INDEX = 0
+  const USDC_MINT_DECIMALS = 6
 
   const dex = Keypair.generate()
   const eventQueue = Keypair.generate()
@@ -43,7 +45,7 @@ export async function createDexFull(authority: Keypair) {
   const orderPoolEntryPage = Keypair.generate()
 
   await airdrop(provider, authority.publicKey, 10000000000)
-
+  const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
   //gen vlp mint with seeds
   const [vlpMint] = await PublicKey.findProgramAddress(
     [dex.publicKey.toBuffer(), Buffer.from('vlp')],
@@ -60,6 +62,7 @@ export async function createDexFull(authority: Keypair) {
     .initDex(VLP_DECIMALS, vlpMintNonce)
     .accounts({
       dex: dex.publicKey,
+      usdcMint,
       authority: authority.publicKey,
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
@@ -124,6 +127,7 @@ export async function createDexFull(authority: Keypair) {
   await program.methods
     .addMarket(
       MARKET_SYMBOL,
+      new BN(100),
       new BN(CHARGE_BORROW_FEE_INTERVAL),
       OPEN_FEE_RATE,
       CLOSE_FEE_RATE,
