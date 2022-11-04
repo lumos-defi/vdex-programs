@@ -65,22 +65,25 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
         DexError::InvalidVault
     );
 
-    //transfer to vault
+    //add liquidity
     {
-        let cpi_program = ctx.accounts.token_program.to_account_info().clone();
         let transfer_cpi_accounts = Transfer {
-            from: ctx.accounts.user_mint_acc.to_account_info().clone(),
-            to: ctx.accounts.vault.to_account_info().clone(),
-            authority: ctx.accounts.authority.to_account_info().clone(),
+            from: ctx.accounts.user_mint_acc.to_account_info(),
+            to: ctx.accounts.vault.to_account_info(),
+            authority: ctx.accounts.authority.to_account_info(),
         };
-        let cpi_ctx = CpiContext::new(cpi_program, transfer_cpi_accounts);
+
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            transfer_cpi_accounts,
+        );
 
         token::transfer(cpi_ctx, amount)?;
     }
 
     //todo: calculate glp amount to mint
 
-    //mint glp token to user
+    //mint vlp
     {
         let seeds = &[
             ctx.accounts.dex.to_account_info().key.as_ref(),
@@ -92,10 +95,14 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
         let cpi_accounts = MintTo {
             mint: ctx.accounts.vlp_mint.to_account_info(),
             to: ctx.accounts.user_vlp_account.to_account_info(),
-            authority: ctx.accounts.vlp_mint_authority.to_account_info().clone(),
+            authority: ctx.accounts.vlp_mint_authority.to_account_info(),
         };
-        let cpi_program = ctx.accounts.token_program.to_account_info().clone();
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+            signer,
+        );
 
         token::mint_to(cpi_ctx, amount)?;
     }

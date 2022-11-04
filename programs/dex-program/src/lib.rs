@@ -96,8 +96,8 @@ pub mod dex_program {
         pool::add_liquidity::handler(ctx, amount)
     }
 
-    pub fn remove_liquidity(_ctx: Context<RemoveLiquidity>) -> DexResult {
-        Ok(())
+    pub fn remove_liquidity(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
+        pool::remove_liquidity::handler(ctx, amount)
     }
 
     pub fn swap(_ctx: Context<Swap>) -> DexResult {
@@ -138,12 +138,6 @@ pub mod dex_program {
     pub fn cancel_all_limit_orders(_ctx: Context<CancelAllLimitOrders>) -> DexResult {
         Ok(())
     }
-}
-
-#[derive(Accounts)]
-pub struct RemoveLiquidity<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
