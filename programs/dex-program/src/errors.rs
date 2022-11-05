@@ -112,6 +112,12 @@ pub enum DexError {
 
     #[msg("Invalid Withdraw Amount")]
     InvalidWithdrawAmount,
+
+    #[msg("Found no position")]
+    FoundNoPosition,
+
+    #[msg("Need no liquidation")]
+    NeedNoLiquidation,
 }
 
 pub type DexResult<T = ()> = Result<T>;
