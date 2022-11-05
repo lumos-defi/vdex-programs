@@ -249,6 +249,18 @@ impl MarketInfo {
             base_decimals: self.decimals,
         }
     }
+
+    pub fn un_pnl(&self, price: u64) -> DexResult<i64> {
+        let short_pnl = (self.global_short.average_price as i128 - price as i128)
+            .i_safe_mul(self.global_short.size as i128)?
+            .i_safe_div(10i128.pow(self.decimals as u32))? as i64;
+
+        let long_pnl = (price as i128 - self.global_long.average_price as i128)
+            .i_safe_mul(self.global_long.size as i128)?
+            .i_safe_div(10i128.pow(self.decimals as u32))? as i64;
+
+        short_pnl.i_safe_add(long_pnl)
+    }
 }
 
 #[zero_copy]
