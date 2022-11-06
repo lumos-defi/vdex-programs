@@ -7,13 +7,13 @@ use crate::{
     errors::{DexError, DexResult},
     position::update_user_serial_number,
     user::state::*,
-    utils::USER_LIST_MAGIC_BYTE,
+    utils::{SafeMath, USER_LIST_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
 
 #[derive(Accounts)]
-pub struct ClosePosition<'info> {
+pub struct LiquidatePosition<'info> {
     #[account(mut, owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
@@ -59,7 +59,7 @@ pub struct ClosePosition<'info> {
 // Layout of remaining counts:
 //  offset 0 ~ n: user_list remaining pages
 #[allow(clippy::too_many_arguments)]
-pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -> DexResult {
+pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
     require!(
         (market < dex.markets.len() as u8)
@@ -99,8 +99,8 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
     let mfr = mi.get_fee_rates();
 
     // User close position
-    // TODO: check minimum close size ??
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
+    let size = us.borrow().get_position_size(market, long)?;
     let (borrow, collateral, pnl, fee) = us
         .borrow_mut()
         .close_position(market, size, price, long, &mfr)?;
@@ -109,6 +109,13 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
     dex.decrease_global_position(market as usize, long, size, collateral)?;
 
     let withdrawable = dex.settle_pnl(market as usize, long, collateral, borrow, pnl, fee)?;
+
+    // Should the position be liquidated?
+    let threshold = collateral.safe_mul(15u64)?.safe_div(100u128)? as u64;
+    if withdrawable > threshold {
+        return Err(error!(DexError::NeedNoLiquidation));
+    }
+
     if withdrawable > 0 {
         let signer = &[&seeds[..]];
         let cpi_accounts = Transfer {
@@ -136,7 +143,7 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
             collateral,
             borrow: 0,
             market,
-            action: PositionAct::Close as u8,
+            action: PositionAct::Liquidate as u8,
             long_or_short: if long { 0 } else { 1 },
             fee,
             pnl,
@@ -144,7 +151,7 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
         .map_err(|_| DexError::FailedAppendEvent)?;
 
     msg!(
-        "Position filled: close {:?} {} {} {} {} {} {} {}",
+        "Position liquidated: {:?} {} {} {} {} {} {} {}",
         user_state_key,
         price,
         size,

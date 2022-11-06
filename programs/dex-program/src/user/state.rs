@@ -200,6 +200,17 @@ impl<'a> UserState<'a> {
         self.meta.serial_number += 1;
     }
 
+    pub fn get_position_size(&self, market: u8, long: bool) -> DexResult<u64> {
+        let position = self.find_position(market)?;
+        let size = if long {
+            position.data.long.size
+        } else {
+            position.data.short.size
+        };
+
+        Ok(size)
+    }
+
     pub fn open_position(
         &mut self,
         market: u8,
@@ -242,6 +253,19 @@ impl<'a> UserState<'a> {
 
     pub fn fill_order(&mut self, order_slot: u8, price: u64) -> DexResult {
         Ok(())
+    }
+
+    fn find_position(&self, market: u8) -> DexResult<&mut SmallListSlot<UserPosition>> {
+        let lookup = self
+            .position_pool
+            .into_iter()
+            .find(|x| x.data.market == market);
+
+        if let Some(p) = lookup {
+            return Ok(p);
+        }
+
+        return Err(error!(DexError::FoundNoPosition));
     }
 
     fn find_or_new_position(&self, market: u8) -> DexResult<&mut SmallListSlot<UserPosition>> {

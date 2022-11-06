@@ -1,6 +1,9 @@
 use crate::{
     collections::{EventQueue, MountMode, PagedList},
-    dex::{event::PositionFilled, get_oracle_price, Dex, UserListItem},
+    dex::{
+        event::{PositionAct, PositionFilled},
+        get_oracle_price, Dex, UserListItem,
+    },
     errors::{DexError, DexResult},
     position::update_user_serial_number,
     user::state::*,
@@ -120,7 +123,7 @@ pub fn handler(
     );
 
     // Update asset info (collateral amount, borrow amount, fee)
-    dex.update_asset(market as usize, long, collateral, borrow, fee)?;
+    dex.borrow_fund(market as usize, long, collateral, borrow, fee)?;
 
     // Update market global position
     dex.increase_global_position(market as usize, long, price, size, collateral)?;
@@ -138,7 +141,7 @@ pub fn handler(
             collateral,
             borrow,
             market,
-            open_or_close: 0,
+            action: PositionAct::Open as u8,
             long_or_short: if long { 0 } else { 1 },
             fee,
             pnl: 0,

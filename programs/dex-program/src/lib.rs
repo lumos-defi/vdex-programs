@@ -123,6 +123,14 @@ pub mod dex_program {
         position::close::handler(ctx, market, long, size)
     }
 
+    pub fn liquidate_position(
+        ctx: Context<LiquidatePosition>,
+        market: u8,
+        long: bool,
+    ) -> DexResult {
+        position::liquidate::handler(ctx, market, long)
+    }
+
     pub fn close_all_positions(_ctx: Context<CloseAllPositions>) -> DexResult {
         Ok(())
     }
