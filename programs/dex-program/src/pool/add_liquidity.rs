@@ -5,7 +5,8 @@ use crate::{
     dex::{get_oracle_price, Dex},
     errors::DexError,
     errors::DexResult,
-    utils::{SafeMath, USDC_DECIMALS, USDC_POW_DECIMALS},
+    pool::get_asset_aum,
+    utils::{SafeMath, FEE_RATE_BASE, USDC_POW_DECIMALS},
 };
 
 #[derive(Accounts)]
@@ -78,108 +79,58 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
         DexError::InvalidRemainingAccounts
     );
 
-    //get pool asset sum
-    let mut asset_sum = 0;
-    let mut asset_offset = 0;
-    let mut asset_price = 0;
-    for asset_index in 0..dex.assets.len() {
-        let asset_info = &dex.assets[asset_index];
-        if !asset_info.valid {
-            continue;
-        }
-        require_eq!(
-            dex.assets[asset_index].oracle,
-            *ctx.remaining_accounts[asset_offset].key,
-            DexError::InvalidOracleAccount
-        );
-
-        let oracle_price = get_oracle_price(
-            asset_info.oracle_source,
-            &ctx.remaining_accounts[asset_offset],
-        )?;
-
-        if asset_info.mint == ctx.accounts.mint.key() {
-            asset_price = oracle_price
-        }
-
-        asset_sum += (asset_info
-            .liquidity_amount
-            .safe_add(asset_info.collateral_amount)?)
-        .safe_mul(oracle_price.into())?
-        .safe_div(10u128.pow(asset_info.decimals.into()))? as u64;
-
-        asset_offset += 1;
-    }
-
-    //get pool pnl
-    let mut pnl = 0;
-    let mut market_offset = asset_offset;
-    for market_index in 0..dex.markets.len() {
-        let market_info = &dex.markets[market_index];
-        if !market_info.valid {
-            continue;
-        }
-        require_eq!(
-            dex.markets[market_index].oracle,
-            *ctx.remaining_accounts[market_offset].key,
-            DexError::InvalidOracleAccount
-        );
-
-        let oracle_price = get_oracle_price(
-            market_info.oracle_source,
-            &ctx.remaining_accounts[market_offset],
-        )?;
-
-        if market_info.global_long.size > 0 {
-            pnl += -(market_info.global_long.pnl(
-                market_info.global_long.size,
-                oracle_price,
-                market_info.global_long.average_price,
-                market_info.decimals,
-            )?);
-        }
-
-        if market_info.global_short.size > 0 {
-            pnl += -(market_info.global_short.pnl(
-                market_info.global_short.size,
-                oracle_price,
-                market_info.global_short.average_price,
-                market_info.decimals,
-            )?);
-        }
-
-        market_offset += 1;
-    }
+    let asset_sum = get_asset_aum(&dex, &ctx.remaining_accounts)?;
 
     let vlp_mint_nonce = dex.vlp_mint_nonce;
     let assets = &mut dex.assets;
 
-    let asset = assets
+    let asset_index = assets
         .iter()
         .position(|x| x.mint == *ctx.accounts.mint.key)
         .ok_or(DexError::InvalidMint)? as u8;
-    let asset_info = &mut assets[asset as usize];
 
-    let vlp_mint_info =
-        Mint::try_deserialize(&mut &**ctx.accounts.vlp_mint.try_borrow_mut_data()?)?;
+    let asset_info = &mut assets[asset_index as usize];
 
-    if pnl > 0 {
-        asset_sum += pnl as u64;
-    } else {
-        asset_sum -= pnl as u64;
-    }
+    require_eq!(
+        asset_info.program_signer,
+        *ctx.accounts.program_signer.key,
+        DexError::InvalidPDA
+    );
+    require_eq!(
+        asset_info.vault,
+        *ctx.accounts.vault.key,
+        DexError::InvalidVault
+    );
+
+    let oracle_account = ctx
+        .remaining_accounts
+        .iter()
+        .find(|a| a.key() == asset_info.oracle)
+        .ok_or(DexError::InvalidOracleAccount)?;
+
+    let asset_price = get_oracle_price(asset_info.oracle_source, oracle_account)?;
+
+    let fee_amount = amount
+        .safe_mul(asset_info.add_liquidity_fee_rate as u64)?
+        .safe_div(FEE_RATE_BASE)? as u64;
 
     let asset_in_usdc = amount
+        .safe_sub(fee_amount)?
         .safe_mul(asset_price)?
         .safe_div(10u128.pow(asset_info.decimals.into()))? as u64;
 
     msg!(
-        "asset_in_usdc:{},amount:{},decimals:{},price:{}",
+        "asset_in_usdc:{},amount:{},fee_amount:{},decimals:{},price:{}",
         asset_in_usdc,
         amount,
+        fee_amount,
         asset_info.decimals,
         asset_price
     );
+
+    let vlp_mint_info =
+        Mint::try_deserialize(&mut &**ctx.accounts.vlp_mint.try_borrow_mut_data()?)?;
+
     // mintAmount = asset_in_usdc * glp_supply / assets_sum
     let mint_amount = if asset_sum == 0 {
         asset_in_usdc
@@ -193,17 +144,6 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
             .safe_mul(10u128.pow(vlp_mint_info.decimals.into()))?
             .safe_div(USDC_POW_DECIMALS as u128)? as u64
     };
-
-    require_eq!(
-        asset_info.program_signer,
-        *ctx.accounts.program_signer.key,
-        DexError::InvalidPDA
-    );
-    require_eq!(
-        asset_info.vault,
-        *ctx.accounts.vault.key,
-        DexError::InvalidVault
-    );
 
     //add liquidity
     {

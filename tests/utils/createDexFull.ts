@@ -168,5 +168,6 @@ export async function createDexFull(authority: Keypair) {
     vlpMint,
     vlpMintAuthority,
     MOCK_ORACLE_PRICE,
+    ADD_LIQUIDITY_FEE_RATE,
   }
 }

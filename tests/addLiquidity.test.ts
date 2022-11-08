@@ -88,7 +88,7 @@ describe('Test Add Liquidity', () => {
 
     console.log(99999, MOCK_ORACLE_PRICE, aliceVlpTokenAccount)
     expect(aliceVlpTokenAccount).toMatchObject({
-      amount: MOCK_ORACLE_PRICE.toString(),
+      amount: '19800000000', //size:1 btc, price:20000,fee:200
     })
   })
 })
