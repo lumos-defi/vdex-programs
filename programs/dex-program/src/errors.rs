@@ -118,6 +118,15 @@ pub enum DexError {
 
     #[msg("Need no liquidation")]
     NeedNoLiquidation,
+
+    #[msg("Invalid oracle account")]
+    InvalidOracleAccount,
+
+    #[msg("Invalid vlp mint")]
+    InvalidVlpMint,
+
+    #[msg("Invalid vlp mint authority")]
+    InvalidVlpMintAuthority,
 }
 
 pub type DexResult<T = ()> = Result<T>;
