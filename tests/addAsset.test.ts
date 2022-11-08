@@ -10,7 +10,7 @@ describe('Add Dex Asset', () => {
 
   const ASSET_SYMBOL = 'BTC'
   const ASSET_MINT_DECIMAL = 9
-  const BORROWED_FEE_RATE = 100 // 1-10000, the percentage will be XXXX_RATE / 10000
+  const BORROW_FEE_RATE = 100 // 1-10000, the percentage will be XXXX_RATE / 10000
   const ADD_LIQUIDITY_FEE_RATE = 100
   const REMOVE_LIQUIDITY_FEE_RATE = 100
   const TARGET_WEIGHT = 100 //1-1000, the percentage will be weight / 1000
@@ -65,7 +65,7 @@ describe('Add Dex Asset', () => {
         ASSET_MINT_DECIMAL,
         nonce,
         ORACLE_SOURCE,
-        BORROWED_FEE_RATE,
+        BORROW_FEE_RATE,
         ADD_LIQUIDITY_FEE_RATE,
         REMOVE_LIQUIDITY_FEE_RATE,
         TARGET_WEIGHT
@@ -88,7 +88,7 @@ describe('Add Dex Asset', () => {
           ASSET_MINT_DECIMAL,
           signerNonce(),
           ORACLE_SOURCE,
-          BORROWED_FEE_RATE,
+          BORROW_FEE_RATE,
           ADD_LIQUIDITY_FEE_RATE,
           REMOVE_LIQUIDITY_FEE_RATE,
           TARGET_WEIGHT
@@ -113,7 +113,7 @@ describe('Add Dex Asset', () => {
         ASSET_MINT_DECIMAL,
         nonce,
         ORACLE_SOURCE,
-        BORROWED_FEE_RATE,
+        BORROW_FEE_RATE,
         ADD_LIQUIDITY_FEE_RATE,
         REMOVE_LIQUIDITY_FEE_RATE,
         TARGET_WEIGHT
@@ -144,7 +144,7 @@ describe('Add Dex Asset', () => {
       mint: assetMint,
       vault: assetVault,
       programSigner: programSigner,
-      borrowedFeeRate: BORROWED_FEE_RATE,
+      borrowFeeRate: BORROW_FEE_RATE,
       addLiquidityFeeRate: ADD_LIQUIDITY_FEE_RATE,
       removeLiquidityFeeRate: REMOVE_LIQUIDITY_FEE_RATE,
       targetWeight: TARGET_WEIGHT,

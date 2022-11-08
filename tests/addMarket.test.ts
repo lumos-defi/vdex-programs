@@ -17,7 +17,8 @@ describe('Test Create Market', () => {
   const CHARGE_BORROW_FEE_INTERVAL = 3600
   const OPEN_FEE_RATE = 30 // 0.3% (30 / 10000)
   const CLOSE_FEE_RATE = 50 // 0.5%   (50 /  10000)
-  const BORROW_FEE_RATE = 10 // 0.1%   (10 /  10000)
+  const LIQUIDATE_FEE_RATE = 80 // 0.8%   (80 /  10000)
+
   const ASSET_INDEX = 0
 
   let dex: Keypair
@@ -44,7 +45,7 @@ describe('Test Create Market', () => {
         new BN(CHARGE_BORROW_FEE_INTERVAL),
         OPEN_FEE_RATE,
         CLOSE_FEE_RATE,
-        BORROW_FEE_RATE,
+        LIQUIDATE_FEE_RATE,
         DECIMALS,
         ORACLE_SOURCE,
         ASSET_INDEX,
@@ -74,7 +75,7 @@ describe('Test Create Market', () => {
           new BN(CHARGE_BORROW_FEE_INTERVAL),
           OPEN_FEE_RATE,
           CLOSE_FEE_RATE,
-          BORROW_FEE_RATE,
+          LIQUIDATE_FEE_RATE,
           DECIMALS,
           ORACLE_SOURCE,
           ASSET_INDEX,
@@ -101,7 +102,7 @@ describe('Test Create Market', () => {
         new BN(CHARGE_BORROW_FEE_INTERVAL),
         OPEN_FEE_RATE,
         CLOSE_FEE_RATE,
-        BORROW_FEE_RATE,
+        LIQUIDATE_FEE_RATE,
         DECIMALS,
         ORACLE_SOURCE,
         ASSET_INDEX,
@@ -142,7 +143,7 @@ describe('Test Create Market', () => {
       chargeBorrowFeeInterval: expect.toBNEqual(CHARGE_BORROW_FEE_INTERVAL),
       openFeeRate: OPEN_FEE_RATE,
       closeFeeRate: CLOSE_FEE_RATE,
-      borrowFeeRate: BORROW_FEE_RATE,
+      liquidateFeeRate: LIQUIDATE_FEE_RATE,
       significantDecimals: SIGNIFICANT_DECIMALS,
     })
   })

@@ -96,19 +96,28 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
     // Get oracle price
     let price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
 
-    let mfr = mi.get_fee_rates();
+    let mfr = mi.get_fee_rates(ai.borrow_fee_rate);
 
     // User close position
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     let size = us.borrow().get_position_size(market, long)?;
-    let (borrow, collateral, pnl, fee) = us
+    let (borrow, collateral, pnl, close_fee, borrow_fee) = us
         .borrow_mut()
-        .close_position(market, size, price, long, &mfr)?;
+        .close_position(market, size, price, long, &mfr, true)?;
 
     // Update market global position
     dex.decrease_global_position(market as usize, long, size, collateral)?;
 
-    let withdrawable = dex.settle_pnl(market as usize, long, collateral, borrow, pnl, fee)?;
+    let withdrawable = dex.settle_pnl(
+        market as usize,
+        long,
+        collateral,
+        borrow,
+        pnl,
+        close_fee,
+        borrow_fee,
+        true,
+    )?;
 
     // Should the position be liquidated?
     let threshold = collateral.safe_mul(15u64)?.safe_div(100u128)? as u64;
@@ -134,6 +143,7 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
         .map_err(|_| DexError::FailedMountEventQueue)?;
 
+    let fee = close_fee.safe_add(borrow_fee)?;
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
     let event_seq = event_queue
         .append(PositionFilled {

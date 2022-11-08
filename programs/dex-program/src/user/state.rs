@@ -75,11 +75,12 @@ impl UserPosition {
         price: u64,
         long: bool,
         mfr: &MarketFeeRates,
-    ) -> DexResult<(u64, u64, i64, u64)> {
+        liquidate: bool,
+    ) -> DexResult<(u64, u64, i64, u64, u64)> {
         if long {
-            self.long.close(size, price, mfr)
+            self.long.close(size, price, mfr, liquidate)
         } else {
-            self.short.close(size, price, mfr)
+            self.short.close(size, price, mfr, liquidate)
         }
     }
 }
@@ -231,9 +232,10 @@ impl<'a> UserState<'a> {
         price: u64,
         long: bool,
         mfr: &MarketFeeRates,
-    ) -> DexResult<(u64, u64, i64, u64)> {
+        liquidate: bool,
+    ) -> DexResult<(u64, u64, i64, u64, u64)> {
         let position = self.find_or_new_position(market)?;
-        position.data.close(size, price, long, mfr)
+        position.data.close(size, price, long, mfr, liquidate)
     }
 
     pub fn new_order(

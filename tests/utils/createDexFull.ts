@@ -13,7 +13,7 @@ export async function createDexFull(authority: Keypair) {
   //asset
   const ASSET_SYMBOL = 'BTC'
   const ASSET_MINT_DECIMAL = 9
-  const BORROWED_FEE_RATE = 100 // 1-10000, the percentage will be XXXX_RATE / 10000
+  const BORROW_FEE_RATE = 100 // 1-10000, the percentage will be XXXX_RATE / 10000
   const ADD_LIQUIDITY_FEE_RATE = 100
   const REMOVE_LIQUIDITY_FEE_RATE = 100
   const TARGET_WEIGHT = 100 //1-1000, the percentage will be weight / 1000
@@ -30,7 +30,7 @@ export async function createDexFull(authority: Keypair) {
   const CHARGE_BORROW_FEE_INTERVAL = 3600
   const OPEN_FEE_RATE = 30 // 0.3% (30 / 10000)
   const CLOSE_FEE_RATE = 50 // 0.5%   (50 /  10000)
-  const BORROW_FEE_RATE = 10 // 0.1%   (10 /  10000)
+  const LIQUIDATE_FEE_RATE = 80
   const ASSET_INDEX = 0
   const USDC_MINT_DECIMALS = 6
 
@@ -107,7 +107,7 @@ export async function createDexFull(authority: Keypair) {
       ASSET_MINT_DECIMAL,
       nonce,
       ORACLE_SOURCE,
-      BORROWED_FEE_RATE,
+      BORROW_FEE_RATE,
       ADD_LIQUIDITY_FEE_RATE,
       REMOVE_LIQUIDITY_FEE_RATE,
       TARGET_WEIGHT
@@ -131,7 +131,7 @@ export async function createDexFull(authority: Keypair) {
       new BN(CHARGE_BORROW_FEE_INTERVAL),
       OPEN_FEE_RATE,
       CLOSE_FEE_RATE,
-      BORROW_FEE_RATE,
+      LIQUIDATE_FEE_RATE,
       DECIMALS,
       ORACLE_SOURCE,
       ASSET_INDEX,

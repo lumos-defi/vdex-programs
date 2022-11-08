@@ -108,7 +108,7 @@ pub fn handler(
     // Get oracle price
     let price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
 
-    let mfr = mi.get_fee_rates();
+    let mfr = mi.get_fee_rates(ai.borrow_fee_rate);
 
     // User open position
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
