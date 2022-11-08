@@ -131,7 +131,7 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
     let vlp_mint_info =
         Mint::try_deserialize(&mut &**ctx.accounts.vlp_mint.try_borrow_mut_data()?)?;
 
-    // mintAmount = asset_in_usdc * glp_supply / assets_sum
+    // mint_amount = asset_in_usdc * glp_supply / assets_sum
     let mint_amount = if asset_sum == 0 {
         asset_in_usdc
             .safe_mul(10u64.pow(vlp_mint_info.decimals.into()))?
@@ -185,7 +185,7 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
         token::mint_to(cpi_ctx, mint_amount)?;
     }
 
-    asset_info.liquidity_amount += amount;
+    asset_info.liquidity_amount += amount - fee_amount;
 
     Ok(())
 }

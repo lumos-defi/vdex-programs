@@ -24,16 +24,13 @@ describe('Test Add Liquidity', () => {
   let alice: Keypair
   let aliceAssetToken: PublicKey
   let aliceVlpToken: PublicKey
-  let MOCK_ORACLE_PRICE: number
 
   beforeEach(async () => {
     authority = Keypair.generate()
     alice = Keypair.generate()
 
     await airdrop(provider, alice.publicKey, 10000000000)
-    ;({ dex, assetMint, assetVault, programSigner, vlpMint, vlpMintAuthority, MOCK_ORACLE_PRICE } = await createDexFull(
-      authority
-    ))
+    ;({ dex, assetMint, assetVault, programSigner, vlpMint, vlpMintAuthority } = await createDexFull(authority))
 
     //create alice asset associatedTokenAccount
     aliceAssetToken = await assetMint.createAssociatedTokenAccount(alice.publicKey)
@@ -79,16 +76,16 @@ describe('Test Add Liquidity', () => {
     expect(dexInfo.assets[0]).toMatchObject({
       valid: true,
       symbol: Buffer.from('BTC\0\0\0\0\0\0\0\0\0\0\0\0\0'),
-      liquidityAmount: expect.toBNEqual(DEPOSIT_AMOUNT),
+      liquidityAmount: expect.toBNEqual(DEPOSIT_AMOUNT - 10_000_000), //fee amount:0.01
     })
 
     expect(aliceAssetTokenAccount).toMatchObject({
       amount: (MINT_AMOUNT - DEPOSIT_AMOUNT).toString(),
     })
 
-    console.log(99999, MOCK_ORACLE_PRICE, aliceVlpTokenAccount)
+    console.log('vlp token account', aliceVlpTokenAccount)
     expect(aliceVlpTokenAccount).toMatchObject({
-      amount: '19800000000', //size:1 btc, price:20000,fee:200
+      amount: '19800000000', //size:1 btc, price:20000,fee_rate:1%,fee amount:0.01
     })
   })
 })

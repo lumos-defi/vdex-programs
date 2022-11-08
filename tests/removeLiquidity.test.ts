@@ -1,14 +1,17 @@
-import { Keypair, PublicKey } from '@solana/web3.js'
+import { Keypair, PublicKey, AccountMeta } from '@solana/web3.js'
 import { airdrop, getProviderAndProgram } from './utils/getProvider'
 import { TOKEN_PROGRAM_ID, Token } from '@solana/spl-token'
 import { createTokenAccount } from './utils/createTokenAccount'
 import { BN } from '@project-serum/anchor'
 import { createDexFull } from './utils/createDexFull'
+import { getOracleAccounts } from './utils/getOracleAccounts'
 
 describe('Test Remove Liquidity', () => {
   const { program, provider } = getProviderAndProgram()
-  const MINT_AMOUNT = 1000
-  const DEPOSIT_AMOUNT = 100
+  const MINT_AMOUNT = 10_000_000_000 //10 BTC
+  const DEPOSIT_AMOUNT = 1_000_000_000 //1 BTC
+  const WITHDRAW_VLP_AMOUNT = 19800_000_000 // 19800 vlp
+  let oracleAccounts = new Array<AccountMeta>()
   let dex: Keypair
   let authority: Keypair
 
@@ -42,6 +45,8 @@ describe('Test Remove Liquidity', () => {
       MINT_AMOUNT
     )
 
+    oracleAccounts = await getOracleAccounts(dex.publicKey)
+
     //add liquidity
     await program.methods
       .addLiquidity(new BN(DEPOSIT_AMOUNT))
@@ -57,13 +62,14 @@ describe('Test Remove Liquidity', () => {
         authority: alice.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
+      .remainingAccounts(oracleAccounts)
       .signers([alice])
       .rpc()
   })
 
   it('should remove liquidity success', async () => {
     await program.methods
-      .removeLiquidity(new BN(DEPOSIT_AMOUNT))
+      .removeLiquidity(new BN(WITHDRAW_VLP_AMOUNT))
       .accounts({
         dex: dex.publicKey,
         mint: assetMint.publicKey,
@@ -75,6 +81,7 @@ describe('Test Remove Liquidity', () => {
         authority: alice.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
+      .remainingAccounts(oracleAccounts)
       .signers([alice])
       .rpc()
 
@@ -96,8 +103,9 @@ describe('Test Remove Liquidity', () => {
       amount: '0',
     })
 
+    console.log(999, aliceAssetTokenAccount, MINT_AMOUNT)
     expect(aliceAssetTokenAccount).toMatchObject({
-      amount: MINT_AMOUNT.toString(),
+      amount: (MINT_AMOUNT - 19_900_000).toString(), //fee:{add_liquidity:0.01,remove_liquidity:0.0099}
     })
   })
 })
