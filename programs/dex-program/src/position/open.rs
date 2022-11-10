@@ -119,7 +119,7 @@ pub fn handler(
     // Check if satisfy the minimum open size
     require!(
         size.safe_mul(price)? as u64 >= mi.minimum_position_value,
-        DexError::OpenSizeTooSmall
+        DexError::PositionTooSmall
     );
 
     // Update asset info (collateral amount, borrow amount, fee)

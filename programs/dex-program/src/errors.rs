@@ -92,9 +92,6 @@ pub enum DexError {
     #[msg("Invalid remaining accounts")]
     InvalidRemainingAccounts,
 
-    #[msg("Open size too small")]
-    OpenSizeTooSmall,
-
     #[msg("Failed new user list slot")]
     FailedNewUserListSlot,
 
@@ -127,6 +124,15 @@ pub enum DexError {
 
     #[msg("Invalid vlp mint authority")]
     InvalidVlpMintAuthority,
+
+    #[msg("Position too small")]
+    PositionTooSmall,
+
+    #[msg("Invalid position time")]
+    InvalidPositionTime,
+
+    #[msg("Insufficient liquidity")]
+    InsufficientLiquidity,
 }
 
 pub type DexResult<T = ()> = Result<T>;

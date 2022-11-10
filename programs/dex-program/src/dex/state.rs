@@ -61,7 +61,10 @@ impl Dex {
         require!(ai.valid, DexError::InvalidMarketIndex);
 
         ai.fee_amount = ai.fee_amount.safe_add(open_fee)?;
-        ai.liquidity_amount = ai.liquidity_amount.safe_sub(borrow)?;
+        ai.liquidity_amount = ai
+            .liquidity_amount
+            .safe_sub(borrow)
+            .map_err(|_| error!(DexError::InsufficientLiquidity))?;
         ai.collateral_amount = ai.collateral_amount.safe_add(collateral)?;
         ai.borrowed_amount = ai.borrowed_amount.safe_add(borrow)?;
 
@@ -252,6 +255,7 @@ pub struct MarketInfo {
 
 pub struct MarketFeeRates {
     pub charge_borrow_fee_interval: u64,
+    pub minimum_position_value: u64,
     pub borrow_fee_rate: u16,
     pub open_fee_rate: u16,
     pub close_fee_rate: u16,
@@ -263,6 +267,7 @@ impl MarketInfo {
     pub fn get_fee_rates(&self, borrow_fee_rate: u16) -> MarketFeeRates {
         MarketFeeRates {
             charge_borrow_fee_interval: self.charge_borrow_fee_interval,
+            minimum_position_value: self.minimum_position_value,
             borrow_fee_rate,
             open_fee_rate: self.open_fee_rate,
             close_fee_rate: self.close_fee_rate,
@@ -345,7 +350,8 @@ impl Position {
         // Update cumulative fund fee
         let now = get_timestamp()?;
         let cumulative_fund_fee = if self.borrowed_amount > 0 {
-            // TODO: check now is gte last_fill_time
+            require!(self.last_fill_time >= now, DexError::InvalidPositionTime);
+
             self.borrowed_amount
                 .safe_mul(mfr.borrow_fee_rate as u64)?
                 .safe_mul((now - self.last_fill_time) as u128)?
@@ -399,7 +405,8 @@ impl Position {
         // Update cumulative fund fee
         let now = get_timestamp()?;
         let borrow_fee = if self.borrowed_amount > 0 {
-            // TODO: check now is gte last_fill_time
+            require!(self.last_fill_time >= now, DexError::InvalidPositionTime);
+
             self.borrowed_amount
                 .safe_mul(mfr.borrow_fee_rate as u64)?
                 .safe_mul((now - self.last_fill_time) as u128)?
@@ -436,7 +443,6 @@ impl Position {
         self.cumulative_fund_fee = 0;
         self.last_fill_time = now;
 
-        // CHECK:
         // If (pnl - fee) < 0, check if the unlocked collateral covers loss + fee
         let user_balance = (collateral_unlocked as i64).i_safe_add(pnl_with_fee)?;
         if user_balance < 0 {
@@ -454,6 +460,13 @@ impl Position {
 
         if self.size == 0 || self.collateral == 0 {
             self.zero(self.long)?;
+        }
+
+        if self.size > 0 {
+            require!(
+                self.size.safe_mul(price)? as u64 >= mfr.minimum_position_value,
+                DexError::PositionTooSmall
+            );
         }
 
         Ok((
