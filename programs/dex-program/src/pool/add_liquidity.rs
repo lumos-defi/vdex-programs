@@ -1,7 +1,13 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, MintTo, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount, Transfer};
 
-use crate::{dex::Dex, errors::DexError, errors::DexResult};
+use crate::{
+    dex::{get_oracle_price, Dex},
+    errors::DexError,
+    errors::DexResult,
+    pool::get_asset_aum,
+    utils::{SafeMath, FEE_RATE_BASE, USDC_POW_DECIMALS},
+};
 
 #[derive(Accounts)]
 pub struct AddLiquidity<'info> {
@@ -42,17 +48,48 @@ pub struct AddLiquidity<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+// Remaining accounts layout:
+// dex.assets.map({
+//   asset index price oracle account
+// })
+// dex.markets.map({
+//    market index price oracle account
+// })
 pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
-    let vlp_mint_nonce = dex.vlp_mint_nonce;
 
+    require_eq!(
+        dex.vlp_mint,
+        ctx.accounts.vlp_mint.key(),
+        DexError::InvalidVlpMint
+    );
+
+    require_eq!(
+        dex.vlp_mint_authority,
+        ctx.accounts.vlp_mint_authority.key(),
+        DexError::InvalidVlpMintAuthority
+    );
+
+    let oracle_accounts_len = dex.assets.iter().filter(|a| a.valid).count()
+        + dex.markets.iter().filter(|m| m.valid).count();
+
+    require_eq!(
+        oracle_accounts_len,
+        ctx.remaining_accounts.len(),
+        DexError::InvalidRemainingAccounts
+    );
+
+    let asset_sum = get_asset_aum(&dex, &ctx.remaining_accounts)?;
+
+    let vlp_mint_nonce = dex.vlp_mint_nonce;
     let assets = &mut dex.assets;
 
-    let asset = assets
+    let asset_index = assets
         .iter()
         .position(|x| x.mint == *ctx.accounts.mint.key)
         .ok_or(DexError::InvalidMint)? as u8;
-    let asset_info = &mut assets[asset as usize];
+
+    let asset_info = &mut assets[asset_index as usize];
 
     require_eq!(
         asset_info.program_signer,
@@ -64,6 +101,49 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
         *ctx.accounts.vault.key,
         DexError::InvalidVault
     );
+
+    let oracle_account = ctx
+        .remaining_accounts
+        .iter()
+        .find(|a| a.key() == asset_info.oracle)
+        .ok_or(DexError::InvalidOracleAccount)?;
+
+    let asset_price = get_oracle_price(asset_info.oracle_source, oracle_account)?;
+
+    let fee_amount = amount
+        .safe_mul(asset_info.add_liquidity_fee_rate as u64)?
+        .safe_div(FEE_RATE_BASE)? as u64;
+
+    let asset_in_usdc = amount
+        .safe_sub(fee_amount)?
+        .safe_mul(asset_price)?
+        .safe_div(10u128.pow(asset_info.decimals.into()))? as u64;
+
+    msg!(
+        "asset_in_usdc:{},amount:{},fee_amount:{},decimals:{},price:{}",
+        asset_in_usdc,
+        amount,
+        fee_amount,
+        asset_info.decimals,
+        asset_price
+    );
+
+    let vlp_mint_info =
+        Mint::try_deserialize(&mut &**ctx.accounts.vlp_mint.try_borrow_mut_data()?)?;
+
+    // mint_amount = asset_in_usdc * glp_supply / assets_sum
+    let mint_amount = if asset_sum == 0 {
+        asset_in_usdc
+            .safe_mul(10u64.pow(vlp_mint_info.decimals.into()))?
+            .safe_div(USDC_POW_DECIMALS as u128)? as u64
+    } else {
+        asset_in_usdc
+            .safe_mul(vlp_mint_info.supply)?
+            .safe_div(10u128.pow(vlp_mint_info.decimals.into()))?
+            .safe_div(asset_sum as u128)?
+            .safe_mul(10u128.pow(vlp_mint_info.decimals.into()))?
+            .safe_div(USDC_POW_DECIMALS as u128)? as u64
+    };
 
     //add liquidity
     {
@@ -80,8 +160,6 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
 
         token::transfer(cpi_ctx, amount)?;
     }
-
-    //todo: calculate glp amount to mint
 
     //mint vlp
     {
@@ -104,10 +182,10 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
             signer,
         );
 
-        token::mint_to(cpi_ctx, amount)?;
+        token::mint_to(cpi_ctx, mint_amount)?;
     }
 
-    asset_info.liquidity_amount += amount;
+    asset_info.liquidity_amount += amount - fee_amount;
 
     Ok(())
 }

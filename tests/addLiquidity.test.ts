@@ -1,14 +1,16 @@
-import { Keypair, PublicKey } from '@solana/web3.js'
+import { Keypair, PublicKey, AccountMeta } from '@solana/web3.js'
 import { airdrop, getProviderAndProgram } from './utils/getProvider'
 import { TOKEN_PROGRAM_ID, Token } from '@solana/spl-token'
 import { createTokenAccount } from './utils/createTokenAccount'
+import { getOracleAccounts } from './utils/getOracleAccounts'
 import { BN } from '@project-serum/anchor'
 import { createDexFull } from './utils/createDexFull'
 
 describe('Test Add Liquidity', () => {
   const { program, provider } = getProviderAndProgram()
-  const MINT_AMOUNT = 1000
-  const DEPOSIT_AMOUNT = 100
+  const MINT_AMOUNT = 10_000_000_000 //10 BTC
+  const DEPOSIT_AMOUNT = 1_000_000_000 //1 BTC
+  let oracleAccounts = new Array<AccountMeta>()
   let dex: Keypair
   let authority: Keypair
 
@@ -41,6 +43,7 @@ describe('Test Add Liquidity', () => {
       [authority],
       MINT_AMOUNT
     )
+    oracleAccounts = await getOracleAccounts(dex.publicKey)
   })
 
   it('should add liquidity success', async () => {
@@ -58,6 +61,7 @@ describe('Test Add Liquidity', () => {
         authority: alice.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
+      .remainingAccounts(oracleAccounts)
       .signers([alice])
       .rpc()
 
@@ -72,15 +76,16 @@ describe('Test Add Liquidity', () => {
     expect(dexInfo.assets[0]).toMatchObject({
       valid: true,
       symbol: Buffer.from('BTC\0\0\0\0\0\0\0\0\0\0\0\0\0'),
-      liquidityAmount: expect.toBNEqual(DEPOSIT_AMOUNT),
-    })
-
-    expect(aliceVlpTokenAccount).toMatchObject({
-      amount: DEPOSIT_AMOUNT.toString(),
+      liquidityAmount: expect.toBNEqual(DEPOSIT_AMOUNT - 10_000_000), //fee amount:0.01
     })
 
     expect(aliceAssetTokenAccount).toMatchObject({
       amount: (MINT_AMOUNT - DEPOSIT_AMOUNT).toString(),
+    })
+
+    console.log('vlp token account', aliceVlpTokenAccount)
+    expect(aliceVlpTokenAccount).toMatchObject({
+      amount: '19800000000', //size:1 btc, price:20000,fee_rate:1%,fee amount:0.01
     })
   })
 })

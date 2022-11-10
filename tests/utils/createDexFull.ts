@@ -19,13 +19,13 @@ export async function createDexFull(authority: Keypair) {
   const TARGET_WEIGHT = 100 //1-1000, the percentage will be weight / 1000
 
   //oracle
-  const MOCK_ORACLE_PRICE = 2000_000_000_000 //$20000
-  const MOCK_ORACLE_PRICE_EXPO = 8
+  const MOCK_ORACLE_PRICE = 20_000_000_000 //$20000
+  const MOCK_ORACLE_PRICE_EXPO = 6
   const ORACLE_SOURCE = 0 // 0:mock,1:pyth
 
   //market
   const MARKET_SYMBOL = 'BTC/USDC'
-  const DECIMALS = 8
+  const DECIMALS = 9
   const SIGNIFICANT_DECIMALS = 2 // 0.00
   const CHARGE_BORROW_FEE_INTERVAL = 3600
   const OPEN_FEE_RATE = 30 // 0.3% (30 / 10000)
@@ -167,5 +167,7 @@ export async function createDexFull(authority: Keypair) {
     orderPoolEntryPage,
     vlpMint,
     vlpMintAuthority,
+    MOCK_ORACLE_PRICE,
+    ADD_LIQUIDITY_FEE_RATE,
   }
 }

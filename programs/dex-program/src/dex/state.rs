@@ -5,6 +5,8 @@ use crate::{
     utils::{time::get_timestamp, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_BASE},
 };
 
+use super::get_oracle_price;
+
 #[account(zero_copy)]
 pub struct Dex {
     pub magic: u64,
@@ -445,7 +447,7 @@ impl Position {
         Ok((collateral, fee))
     }
 
-    fn pnl(
+    pub fn pnl(
         &self,
         size: u64,
         close_price: u64,
@@ -520,4 +522,22 @@ pub struct MatchEvent {
     pub open_or_close: u8,
     pub long_or_short: u8,
     _padding: [u8; 1],
+}
+
+pub trait GetOraclePrice {
+    fn get_price(&self) -> Result<(u64, u8)>;
+}
+
+pub struct OracleInfo<'a, 'info> {
+    pub base_decimals: u8,
+    pub oracle_source: u8,
+    pub oracle_account: &'a AccountInfo<'info>,
+}
+
+impl GetOraclePrice for OracleInfo<'_, '_> {
+    fn get_price(&self) -> Result<(u64, u8)> {
+        let price = get_oracle_price(self.oracle_source, self.oracle_account)?;
+
+        Ok((price, self.base_decimals))
+    }
 }
