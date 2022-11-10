@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 
 use crate::{
     errors::{DexError, DexResult},
-    position::close,
     utils::{
         time::get_timestamp, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_BASE, FEE_RATE_DECIMALS,
     },
@@ -47,7 +46,6 @@ impl Dex {
 
         let mi = &mut self.markets[market];
         require!(mi.valid, DexError::InvalidMarketIndex);
-        // mi.open_fee = mi.open_fee.safe_add(open_fee)? as u64;
 
         let asset_index = if long {
             mi.asset_index
@@ -121,7 +119,7 @@ impl Dex {
             let pnl_and_fee = total_fee.safe_add(abs_pnl)?;
             match collateral.safe_sub(pnl_and_fee) {
                 Ok(remain) => {
-                    ai.liquidity_amount = ai.liquidity_amount.safe_sub(abs_pnl)?;
+                    ai.liquidity_amount = ai.liquidity_amount.safe_add(abs_pnl)?;
                     remain
                 }
                 Err(_) => {
@@ -632,7 +630,7 @@ mod test {
     }
 
     impl Dex {
-        pub fn mock_btc_market(&mut self) {
+        pub fn mock_dex(&mut self) {
             // BTC
             self.assets[0] = AssetInfo {
                 valid: true,
@@ -722,7 +720,7 @@ mod test {
     #[test]
     fn test_global_pos_invalid_market() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
 
         dex.increase_global_position(1, true, usdc(20000.), btc(1.0), btc(0.1))
             .assert_err();
@@ -740,7 +738,7 @@ mod test {
     #[test]
     fn test_increase_global_long() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
 
         dex.increase_global_position(0, true, usdc(20000.), btc(1.0), btc(0.1))
             .assert_ok();
@@ -762,7 +760,7 @@ mod test {
     #[test]
     fn test_decrease_global_long() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
 
         dex.increase_global_position(0, true, usdc(20000.), btc(1.0), btc(0.1))
             .assert_ok();
@@ -787,7 +785,7 @@ mod test {
     #[test]
     fn test_increase_global_short() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
 
         dex.increase_global_position(0, false, usdc(20000.), btc(1.0), usdc(2000.))
             .assert_ok();
@@ -809,7 +807,7 @@ mod test {
     #[test]
     fn test_decrease_global_short() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
 
         dex.increase_global_position(0, false, usdc(20000.), btc(1.0), usdc(2000.))
             .assert_ok();
@@ -834,7 +832,7 @@ mod test {
     #[test]
     fn test_decrease_global_long_collateral_overflow() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
 
         dex.increase_global_position(0, true, usdc(20000.), btc(1.0), btc(0.1))
             .assert_ok();
@@ -846,7 +844,7 @@ mod test {
     #[test]
     fn test_decrease_global_long_size_overflow() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
 
         dex.increase_global_position(0, true, usdc(20000.), btc(1.0), btc(0.1))
             .assert_ok();
@@ -858,7 +856,7 @@ mod test {
     #[test]
     fn test_decrease_global_short_collateral_overflow() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
 
         dex.increase_global_position(0, false, usdc(20000.), btc(1.0), usdc(2000.))
             .assert_ok();
@@ -870,7 +868,7 @@ mod test {
     #[test]
     fn test_decrease_global_short_size_overflow() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
 
         dex.increase_global_position(0, false, usdc(20000.), btc(1.0), usdc(2000.))
             .assert_ok();
@@ -903,7 +901,7 @@ mod test {
     #[test]
     fn test_open_long_position() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
         let mfr = dex.markets[0].get_fee_rates(20);
 
         let mut long = Position::new(true).assert_unwrap();
@@ -949,7 +947,7 @@ mod test {
     #[test]
     fn test_close_long_position_with_profit() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
         let mfr = dex.markets[0].get_fee_rates(20);
 
         let mut long = Position::new(true).assert_unwrap();
@@ -982,7 +980,7 @@ mod test {
     #[test]
     fn test_close_long_position_with_loss() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
         let mfr = dex.markets[0].get_fee_rates(20);
 
         let mut long = Position::new(true).assert_unwrap();
@@ -1014,7 +1012,7 @@ mod test {
     #[test]
     fn test_open_short_position() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
         let mfr = dex.markets[0].get_fee_rates(20);
 
         let mut short = Position::new(false).assert_unwrap();
@@ -1069,7 +1067,7 @@ mod test {
     #[test]
     fn test_close_short_position_with_profit() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
         let mfr = dex.markets[0].get_fee_rates(20);
 
         let mut short = Position::new(false).assert_unwrap();
@@ -1105,7 +1103,7 @@ mod test {
     #[test]
     fn test_close_short_position_with_loss() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
         let mfr = dex.markets[0].get_fee_rates(20);
 
         let mut short = Position::new(false).assert_unwrap();
@@ -1141,7 +1139,7 @@ mod test {
     #[test]
     fn test_borrow_fund_insufficient_liquidity() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
         dex.mock_btc_liquidity(btc(1.0));
 
         dex.assert_btc_liquidity(btc(1.0));
@@ -1153,7 +1151,7 @@ mod test {
     #[test]
     fn test_borrow_fund_for_long_position() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
         dex.mock_btc_liquidity(btc(1.0));
 
         dex.assert_btc_liquidity(btc(1.0));
@@ -1170,7 +1168,7 @@ mod test {
     #[test]
     fn test_borrow_fund_for_short_position() {
         let mut dex = Dex::default();
-        dex.mock_btc_market();
+        dex.mock_dex();
         dex.mock_usdc_liquidity(usdc(10000.0));
 
         dex.assert_usdc_liquidity(usdc(10000.0));
@@ -1182,5 +1180,173 @@ mod test {
         dex.assert_usdc_borrowed(usdc(10000.));
         dex.assert_usdc_collateral(usdc(1000.));
         dex.assert_usdc_fee_amount(usdc(20.));
+    }
+
+    #[test]
+    fn test_settle_pnl_long_with_profit() {
+        let mut dex = Dex::default();
+        dex.mock_dex();
+        dex.mock_btc_liquidity(btc(1.0));
+        dex.borrow_fund(0, true, btc(0.1), btc(1.), btc(0.004))
+            .assert_ok();
+
+        let withdrawable = dex
+            .settle_pnl(
+                0,
+                true,
+                btc(0.1),
+                btc(1.),
+                btc_i(0.02),
+                btc(0.002),
+                btc(0.003),
+            )
+            .assert_unwrap();
+
+        assert_eq!(withdrawable, btc(0.1 + 0.02 - 0.002 - 0.003));
+        dex.assert_btc_borrowed(0);
+        dex.assert_btc_collateral(0);
+        dex.assert_btc_fee_amount(btc(0.004 + 0.002 + 0.003));
+        dex.assert_btc_liquidity(btc(1.0 - 0.02));
+    }
+
+    #[test]
+    fn test_settle_pnl_long_with_loss() {
+        let mut dex = Dex::default();
+        dex.mock_dex();
+        dex.mock_btc_liquidity(btc(1.0));
+        dex.borrow_fund(0, true, btc(0.1), btc(1.), btc(0.004))
+            .assert_ok();
+
+        let withdrawable = dex
+            .settle_pnl(
+                0,
+                true,
+                btc(0.1),
+                btc(1.),
+                btc_i(-0.02),
+                btc(0.002),
+                btc(0.003),
+            )
+            .assert_unwrap();
+
+        assert_eq!(withdrawable, btc(0.1 - 0.02 - 0.002 - 0.003));
+        dex.assert_btc_borrowed(0);
+        dex.assert_btc_collateral(0);
+        dex.assert_btc_fee_amount(btc(0.004 + 0.002 + 0.003));
+        dex.assert_btc_liquidity(btc(1.0 + 0.02));
+    }
+
+    #[test]
+    fn test_settle_pnl_long_with_liquidation() {
+        let mut dex = Dex::default();
+        dex.mock_dex();
+        dex.mock_btc_liquidity(btc(1.0));
+        dex.borrow_fund(0, true, btc(0.1), btc(1.), btc(0.004))
+            .assert_ok();
+
+        let withdrawable = dex
+            .settle_pnl(
+                0,
+                true,
+                btc(0.1),
+                btc(1.),
+                btc_i(-0.098),
+                btc(0.002),
+                btc(0.003),
+            )
+            .assert_unwrap();
+
+        assert_eq!(withdrawable, 0);
+        dex.assert_btc_borrowed(0);
+        dex.assert_btc_collateral(0);
+        dex.assert_btc_fee_amount(btc(0.004 + 0.002 + 0.003));
+
+        let _user_paid_fee = 0.002;
+        let actual_pool_pnl = 0.098 - 0.003;
+        dex.assert_btc_liquidity(btc(1.0 + actual_pool_pnl));
+    }
+
+    #[test]
+    fn test_settle_pnl_short_with_profit() {
+        let mut dex = Dex::default();
+        dex.mock_dex();
+        dex.mock_usdc_liquidity(usdc(10000.0));
+        dex.borrow_fund(0, false, usdc(1000.), usdc(10000.), usdc(20.))
+            .assert_ok();
+
+        let withdrawable = dex
+            .settle_pnl(
+                0,
+                false,
+                usdc(1000.),
+                usdc(10000.),
+                usdc_i(500.),
+                usdc(25.),
+                usdc(35.),
+            )
+            .assert_unwrap();
+
+        assert_eq!(withdrawable, usdc(1000. + 500. - 25. - 35.));
+        dex.assert_usdc_borrowed(0);
+        dex.assert_usdc_collateral(0);
+        dex.assert_usdc_fee_amount(usdc(20. + 25. + 35.));
+        dex.assert_usdc_liquidity(usdc(10000. - 500.));
+    }
+
+    #[test]
+    fn test_settle_pnl_short_with_loss() {
+        let mut dex = Dex::default();
+        dex.mock_dex();
+        dex.mock_usdc_liquidity(usdc(10000.0));
+        dex.borrow_fund(0, false, usdc(1000.), usdc(10000.), usdc(20.))
+            .assert_ok();
+
+        let withdrawable = dex
+            .settle_pnl(
+                0,
+                false,
+                usdc(1000.),
+                usdc(10000.),
+                usdc_i(-500.),
+                usdc(25.),
+                usdc(35.),
+            )
+            .assert_unwrap();
+
+        assert_eq!(withdrawable, usdc(1000. - 500. - 25. - 35.));
+        dex.assert_usdc_borrowed(0);
+        dex.assert_usdc_collateral(0);
+        dex.assert_usdc_fee_amount(usdc(20. + 25. + 35.));
+        dex.assert_usdc_liquidity(usdc(10000. + 500.));
+    }
+
+    #[test]
+    fn test_settle_pnl_short_with_liquidation() {
+        let mut dex = Dex::default();
+        dex.mock_dex();
+        dex.mock_usdc_liquidity(usdc(10000.0));
+        dex.borrow_fund(0, false, usdc(1000.), usdc(10000.), usdc(20.))
+            .assert_ok();
+
+        let withdrawable = dex
+            .settle_pnl(
+                0,
+                false,
+                usdc(1000.),
+                usdc(10000.),
+                usdc_i(-980.),
+                usdc(25.),
+                usdc(35.),
+            )
+            .assert_unwrap();
+
+        assert_eq!(withdrawable, 0);
+        dex.assert_usdc_borrowed(0);
+        dex.assert_usdc_collateral(0);
+        dex.assert_usdc_fee_amount(usdc(20. + 25. + 35.));
+
+        let _user_paid_fee = usdc(20.);
+        let actual_pool_pnl = 980. - 25. - 35. + 20.;
+        dex.assert_usdc_liquidity(usdc(10000. + actual_pool_pnl));
     }
 }
