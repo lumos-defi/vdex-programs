@@ -287,3 +287,45 @@ impl<'a> UserState<'a> {
         Ok(position)
     }
 }
+
+#[cfg(test)]
+#[allow(dead_code)]
+mod test {
+    use super::*;
+    use crate::utils::unit_test::*;
+    use bumpalo::Bump;
+
+    #[test]
+    fn test_user_state_init() {
+        let bump = Bump::new();
+        let order_slot_count = 16u8;
+        let position_slot_count = 8u8;
+
+        let required_size = UserState::required_account_size(order_slot_count, position_slot_count);
+
+        println!("required account size {}", required_size);
+
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, order_slot_count, position_slot_count).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+
+        assert_eq!(us.borrow().meta.order_slot_count, order_slot_count);
+        assert_eq!(us.borrow().meta.position_slot_count, position_slot_count);
+
+        let data_ptr = match account.try_borrow_mut_data() {
+            Ok(p) => RefMut::map(p, |data| *data).as_mut_ptr(),
+            Err(_) => panic!("Failed to get data ptr"),
+        };
+
+        let buf = unsafe { std::slice::from_raw_parts(data_ptr, account.data_len()) };
+        assert_eq!(buf.len(), account.data_len());
+
+        let us_on_buf = UserState::mount_buf(buf.to_vec()).assert_unwrap();
+        assert_eq!(us_on_buf.borrow().meta.order_slot_count, order_slot_count);
+        assert_eq!(
+            us_on_buf.borrow().meta.position_slot_count,
+            position_slot_count
+        );
+    }
+}
