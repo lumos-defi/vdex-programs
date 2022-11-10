@@ -116,7 +116,6 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
         pnl,
         close_fee,
         borrow_fee,
-        false,
     )?;
     if withdrawable > 0 {
         let signer = &[&seeds[..]];

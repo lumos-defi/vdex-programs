@@ -116,7 +116,6 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         pnl,
         close_fee,
         borrow_fee,
-        true,
     )?;
 
     // Should the position be liquidated?

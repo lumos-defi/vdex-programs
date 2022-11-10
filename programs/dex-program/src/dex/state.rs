@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     errors::{DexError, DexResult},
+    position::close,
     utils::{
         time::get_timestamp, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_BASE, FEE_RATE_DECIMALS,
     },
@@ -46,7 +47,7 @@ impl Dex {
 
         let mi = &mut self.markets[market];
         require!(mi.valid, DexError::InvalidMarketIndex);
-        mi.open_fee = mi.open_fee.safe_add(open_fee)? as u64;
+        // mi.open_fee = mi.open_fee.safe_add(open_fee)? as u64;
 
         let asset_index = if long {
             mi.asset_index
@@ -55,12 +56,13 @@ impl Dex {
         } as usize;
 
         require!(
-            asset_index < self.assets.len(),
+            asset_index < self.assets_number as usize,
             DexError::InvalidMarketIndex
         );
         let ai = &mut self.assets[asset_index];
         require!(ai.valid, DexError::InvalidMarketIndex);
 
+        ai.fee_amount = ai.fee_amount.safe_add(open_fee)?;
         ai.liquidity_amount = ai.liquidity_amount.safe_sub(borrow)?;
         ai.collateral_amount = ai.collateral_amount.safe_add(collateral)?;
         ai.borrowed_amount = ai.borrowed_amount.safe_add(borrow)?;
@@ -77,7 +79,6 @@ impl Dex {
         pnl: i64,
         close_fee: u64,
         borrow_fee: u64,
-        liquidate: bool,
     ) -> DexResult<u64> {
         require!(
             market < self.markets_number as usize,
@@ -86,11 +87,6 @@ impl Dex {
 
         let mi = &mut self.markets[market];
         require!(mi.valid, DexError::InvalidMarketIndex);
-        if liquidate {
-            mi.liquidate_fee = mi.liquidate_fee.safe_add(close_fee)? as u64;
-        } else {
-            mi.close_fee = mi.close_fee.safe_add(close_fee)? as u64;
-        }
 
         let asset_index = if long {
             mi.asset_index
@@ -99,7 +95,7 @@ impl Dex {
         } as usize;
 
         require!(
-            asset_index < self.assets.len(),
+            asset_index < self.assets_number as usize,
             DexError::InvalidMarketIndex
         );
 
@@ -109,7 +105,7 @@ impl Dex {
         ai.liquidity_amount = ai.liquidity_amount.safe_add(borrow)?;
         ai.collateral_amount = ai.collateral_amount.safe_sub(collateral)?;
         ai.borrowed_amount = ai.borrowed_amount.safe_sub(borrow)?;
-        ai.borrow_fee = ai.borrow_fee.safe_add(borrow_fee)?;
+        ai.fee_amount = ai.fee_amount.safe_add(close_fee)?.safe_add(borrow_fee)?;
 
         let total_fee = borrow_fee.safe_add(close_fee)?;
         let abs_pnl = i64::abs(pnl) as u64;
@@ -215,7 +211,7 @@ pub struct AssetInfo {
     pub liquidity_amount: u64,
     pub collateral_amount: u64,
     pub borrowed_amount: u64,
-    pub borrow_fee: u64,
+    pub fee_amount: u64,
     pub add_liquidity_fee: u64,
     pub remove_liquidity_fee: u64,
     pub borrow_fee_rate: u16,
@@ -243,10 +239,7 @@ pub struct MarketInfo {
     pub global_long: Position,
     pub global_short: Position,
 
-    pub minimum_open_amount: u64,
-    pub open_fee: u64,
-    pub close_fee: u64,
-    pub liquidate_fee: u64,
+    pub minimum_position_value: u64,
     pub charge_borrow_fee_interval: u64,
     pub open_fee_rate: u16,
     pub close_fee_rate: u16,
@@ -681,6 +674,40 @@ mod test {
         pub fn mock_usdc_liquidity(&mut self, amount: u64) {
             self.assets[1].liquidity_amount = amount;
         }
+
+        // Asset BTC properties
+        pub fn assert_btc_liquidity(&self, amount: u64) {
+            assert_eq!(self.assets[0].liquidity_amount, amount)
+        }
+
+        pub fn assert_btc_collateral(&self, amount: u64) {
+            assert_eq!(self.assets[0].collateral_amount, amount)
+        }
+
+        pub fn assert_btc_borrowed(&self, amount: u64) {
+            assert_eq!(self.assets[0].borrowed_amount, amount)
+        }
+
+        pub fn assert_btc_fee_amount(&self, amount: u64) {
+            assert_eq!(self.assets[0].fee_amount, amount)
+        }
+
+        // Asset USDC properties
+        pub fn assert_usdc_liquidity(&self, amount: u64) {
+            assert_eq!(self.assets[1].liquidity_amount, amount)
+        }
+
+        pub fn assert_usdc_collateral(&self, amount: u64) {
+            assert_eq!(self.assets[1].collateral_amount, amount)
+        }
+
+        pub fn assert_usdc_borrowed(&self, amount: u64) {
+            assert_eq!(self.assets[1].borrowed_amount, amount)
+        }
+
+        pub fn assert_usdc_fee_amount(&self, amount: u64) {
+            assert_eq!(self.assets[1].fee_amount, amount)
+        }
     }
 
     impl Position {
@@ -1112,15 +1139,48 @@ mod test {
     }
 
     #[test]
+    fn test_borrow_fund_insufficient_liquidity() {
+        let mut dex = Dex::default();
+        dex.mock_btc_market();
+        dex.mock_btc_liquidity(btc(1.0));
+
+        dex.assert_btc_liquidity(btc(1.0));
+
+        dex.borrow_fund(0, true, btc(0.1), btc(1.1), btc(0.04))
+            .assert_err();
+    }
+
+    #[test]
     fn test_borrow_fund_for_long_position() {
         let mut dex = Dex::default();
         dex.mock_btc_market();
         dex.mock_btc_liquidity(btc(1.0));
 
-        dex.borrow_fund(0, true, btc(0.1), btc(1.1), btc(0.04))
-            .assert_err();
+        dex.assert_btc_liquidity(btc(1.0));
 
         dex.borrow_fund(0, true, btc(0.1), btc(1.), btc(0.04))
             .assert_ok();
+
+        dex.assert_btc_liquidity(0);
+        dex.assert_btc_borrowed(btc(1.));
+        dex.assert_btc_collateral(btc(0.1));
+        dex.assert_btc_fee_amount(btc(0.04));
+    }
+
+    #[test]
+    fn test_borrow_fund_for_short_position() {
+        let mut dex = Dex::default();
+        dex.mock_btc_market();
+        dex.mock_usdc_liquidity(usdc(10000.0));
+
+        dex.assert_usdc_liquidity(usdc(10000.0));
+
+        dex.borrow_fund(0, false, usdc(1000.), usdc(10000.), usdc(20.))
+            .assert_ok();
+
+        dex.assert_usdc_liquidity(0);
+        dex.assert_usdc_borrowed(usdc(10000.));
+        dex.assert_usdc_collateral(usdc(1000.));
+        dex.assert_usdc_fee_amount(usdc(20.));
     }
 }
