@@ -350,7 +350,7 @@ impl Position {
         // Update cumulative fund fee
         let now = get_timestamp()?;
         let cumulative_fund_fee = if self.borrowed_amount > 0 {
-            require!(self.last_fill_time >= now, DexError::InvalidPositionTime);
+            require!(self.last_fill_time <= now, DexError::InvalidPositionTime);
 
             self.borrowed_amount
                 .safe_mul(mfr.borrow_fee_rate as u64)?
@@ -404,7 +404,7 @@ impl Position {
         // Update cumulative fund fee
         let now = get_timestamp()?;
         let borrow_fee = if self.borrowed_amount > 0 {
-            require!(self.last_fill_time >= now, DexError::InvalidPositionTime);
+            require!(self.last_fill_time <= now, DexError::InvalidPositionTime);
 
             self.borrowed_amount
                 .safe_mul(mfr.borrow_fee_rate as u64)?

@@ -133,6 +133,9 @@ pub enum DexError {
 
     #[msg("Insufficient liquidity")]
     InsufficientLiquidity,
+
+    #[msg("Position not existed")]
+    PositionNotExisted,
 }
 
 pub type DexResult<T = ()> = Result<T>;
