@@ -75,11 +75,12 @@ impl UserPosition {
         price: u64,
         long: bool,
         mfr: &MarketFeeRates,
-    ) -> DexResult<(u64, u64, i64, u64)> {
+        liquidate: bool,
+    ) -> DexResult<(u64, u64, i64, u64, u64)> {
         if long {
-            self.long.close(size, price, mfr)
+            self.long.close(size, price, mfr, liquidate)
         } else {
-            self.short.close(size, price, mfr)
+            self.short.close(size, price, mfr, liquidate)
         }
     }
 }
@@ -201,7 +202,7 @@ impl<'a> UserState<'a> {
     }
 
     pub fn get_position_size(&self, market: u8, long: bool) -> DexResult<u64> {
-        let position = self.find_position(market)?;
+        let position = self.find_or_new_position(market, false)?;
         let size = if long {
             position.data.long.size
         } else {
@@ -220,7 +221,7 @@ impl<'a> UserState<'a> {
         leverage: u32,
         mfr: &MarketFeeRates,
     ) -> DexResult<(u64, u64, u64, u64)> {
-        let position = self.find_or_new_position(market)?;
+        let position = self.find_or_new_position(market, true)?;
         position.data.open(price, amount, long, leverage, mfr)
     }
 
@@ -231,9 +232,10 @@ impl<'a> UserState<'a> {
         price: u64,
         long: bool,
         mfr: &MarketFeeRates,
-    ) -> DexResult<(u64, u64, i64, u64)> {
-        let position = self.find_or_new_position(market)?;
-        position.data.close(size, price, long, mfr)
+        liquidate: bool,
+    ) -> DexResult<(u64, u64, i64, u64, u64)> {
+        let position = self.find_or_new_position(market, false)?;
+        position.data.close(size, price, long, mfr, liquidate)
     }
 
     pub fn new_order(
@@ -255,7 +257,11 @@ impl<'a> UserState<'a> {
         Ok(())
     }
 
-    fn find_position(&self, market: u8) -> DexResult<&mut SmallListSlot<UserPosition>> {
+    pub fn find_or_new_position(
+        &self,
+        market: u8,
+        create: bool,
+    ) -> DexResult<&mut SmallListSlot<UserPosition>> {
         let lookup = self
             .position_pool
             .into_iter()
@@ -265,17 +271,8 @@ impl<'a> UserState<'a> {
             return Ok(p);
         }
 
-        return Err(error!(DexError::FoundNoPosition));
-    }
-
-    fn find_or_new_position(&self, market: u8) -> DexResult<&mut SmallListSlot<UserPosition>> {
-        let lookup = self
-            .position_pool
-            .into_iter()
-            .find(|x| x.data.market == market);
-
-        if let Some(p) = lookup {
-            return Ok(p);
+        if !create {
+            return Err(error!(DexError::PositionNotExisted));
         }
 
         let position = self.position_pool.new_slot()?;
@@ -283,5 +280,388 @@ impl<'a> UserState<'a> {
         position.data.init(market)?;
 
         Ok(position)
+    }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+mod test {
+
+    use super::*;
+    use crate::utils::{unit_test::*, FEE_RATE_BASE};
+    use bumpalo::Bump;
+
+    #[test]
+    fn test_user_state_init() {
+        let bump = Bump::new();
+        let order_slot_count = 16u8;
+        let position_slot_count = 8u8;
+
+        let required_size = UserState::required_account_size(order_slot_count, position_slot_count);
+
+        println!("required account size {}", required_size);
+
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, order_slot_count, position_slot_count).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+
+        assert_eq!(us.borrow().meta.order_slot_count, order_slot_count);
+        assert_eq!(us.borrow().meta.position_slot_count, position_slot_count);
+
+        let data_ptr = match account.try_borrow_mut_data() {
+            Ok(p) => RefMut::map(p, |data| *data).as_mut_ptr(),
+            Err(_) => panic!("Failed to get data ptr"),
+        };
+
+        let buf = unsafe { std::slice::from_raw_parts(data_ptr, account.data_len()) };
+        assert_eq!(buf.len(), account.data_len());
+
+        let us_on_buf = UserState::mount_buf(buf.to_vec()).assert_unwrap();
+        assert_eq!(us_on_buf.borrow().meta.order_slot_count, order_slot_count);
+        assert_eq!(
+            us_on_buf.borrow().meta.position_slot_count,
+            position_slot_count
+        );
+    }
+
+    fn mock_mfr() -> MarketFeeRates {
+        MarketFeeRates {
+            charge_borrow_fee_interval: 3600,
+            minimum_position_value: 200u64,
+            borrow_fee_rate: 10,
+            open_fee_rate: 20,
+            close_fee_rate: 20,
+            liquidate_fee_rate: 50,
+            base_decimals: 9,
+        }
+    }
+
+    #[test]
+    fn test_open_long() {
+        let bump = Bump::new();
+        let required_size = UserState::required_account_size(8u8, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+
+        let mfr = mock_mfr();
+        let (size, collateral, borrow, open_fee) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), btc(1.0), true, 20, &mfr)
+            .assert_unwrap();
+
+        let expected_open_fee = btc(0.038461538);
+        let expected_collateral = btc(1.0) - expected_open_fee;
+
+        assert_eq!(open_fee, expected_open_fee);
+        assert_eq!(collateral, expected_collateral);
+        assert_eq!(size, expected_collateral * 20);
+        assert_eq!(borrow, expected_collateral * 20);
+
+        let long = us
+            .borrow()
+            .find_or_new_position(0, false)
+            .assert_unwrap()
+            .data
+            .long;
+
+        assert_eq!(long.size, expected_collateral * 20);
+        assert_eq!(long.average_price, usdc(20000.));
+        assert_eq!(long.collateral, expected_collateral);
+        assert_eq!(long.borrowed_amount, expected_collateral * 20);
+        assert_eq!(long.closing_size, 0);
+        assert_eq!(long.cumulative_fund_fee, 0);
+
+        const HOURS_2: u64 = 2;
+        us.borrow_mut()
+            .find_or_new_position(0, false)
+            .assert_unwrap()
+            .data
+            .long
+            .mock_after_hours(HOURS_2);
+
+        let (size, collateral, borrow, open_fee) = us
+            .borrow_mut()
+            .open_position(0, usdc(26000.), btc(1.0), true, 20, &mfr)
+            .assert_unwrap();
+
+        assert_eq!(open_fee, expected_open_fee);
+        assert_eq!(collateral, expected_collateral);
+        assert_eq!(size, expected_collateral * 20);
+        assert_eq!(borrow, expected_collateral * 20);
+
+        let long = us
+            .borrow()
+            .find_or_new_position(0, false)
+            .assert_unwrap()
+            .data
+            .long;
+
+        assert_eq!(long.size, expected_collateral * 20 * 2);
+        assert_eq!(long.average_price, usdc(23000.));
+        assert_eq!(long.collateral, expected_collateral * 2);
+        assert_eq!(long.borrowed_amount, expected_collateral * 20 * 2);
+        assert_eq!(long.closing_size, 0);
+
+        let expected_fund_fee = expected_collateral * 20 * (mfr.borrow_fee_rate as u64) * HOURS_2
+            / FEE_RATE_BASE as u64;
+        assert_eq!(long.cumulative_fund_fee, expected_fund_fee);
+    }
+
+    #[test]
+    fn test_open_short() {
+        let bump = Bump::new();
+        let required_size = UserState::required_account_size(8u8, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+        let mfr = mock_mfr();
+        let leverage = 10u64;
+        let (size, collateral, borrow, open_fee) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2000.0), false, leverage as u32, &mfr)
+            .assert_unwrap();
+
+        let expected_open_fee = usdc(39.215686);
+        let expected_collateral = usdc(2000.0) - expected_open_fee;
+        let expected_size = ((expected_collateral as u128)
+            * (leverage as u128)
+            * 10u128.pow(mfr.base_decimals.into())
+            / usdc(20000.) as u128) as u64;
+
+        assert_eq!(open_fee, expected_open_fee);
+        assert_eq!(collateral, expected_collateral);
+        assert_eq!(size, expected_size);
+        assert_eq!(borrow, expected_collateral * leverage);
+
+        let short = us
+            .borrow()
+            .find_or_new_position(0, false)
+            .assert_unwrap()
+            .data
+            .short;
+
+        assert_eq!(short.size, expected_size);
+        assert_eq!(short.average_price, usdc(20000.));
+        assert_eq!(short.collateral, expected_collateral);
+        assert_eq!(short.borrowed_amount, expected_collateral * leverage);
+        assert_eq!(short.closing_size, 0);
+        assert_eq!(short.cumulative_fund_fee, 0);
+
+        const HOURS_2: u64 = 2;
+        us.borrow_mut()
+            .find_or_new_position(0, false)
+            .assert_unwrap()
+            .data
+            .short
+            .mock_after_hours(HOURS_2);
+
+        let (size, collateral, borrow, open_fee) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2000.0), false, leverage as u32, &mfr)
+            .assert_unwrap();
+
+        assert_eq!(open_fee, expected_open_fee);
+        assert_eq!(collateral, expected_collateral);
+        assert_eq!(size, expected_size);
+        assert_eq!(borrow, expected_collateral * leverage);
+
+        let short = us
+            .borrow()
+            .find_or_new_position(0, false)
+            .assert_unwrap()
+            .data
+            .short;
+        assert_eq!(short.size, expected_size * 2);
+        assert_eq!(short.average_price, usdc(20000.));
+        assert_eq!(short.collateral, expected_collateral * 2);
+        assert_eq!(short.borrowed_amount, expected_collateral * leverage * 2);
+        assert_eq!(short.closing_size, 0);
+
+        let expected_fund_fee =
+            expected_collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2
+                / FEE_RATE_BASE as u64;
+        assert_eq!(short.cumulative_fund_fee, expected_fund_fee);
+    }
+
+    #[test]
+    fn test_close_long_with_profit() {
+        let bump = Bump::new();
+        let required_size = UserState::required_account_size(8u8, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+        let mfr = mock_mfr();
+        let leverage = 20u64;
+        let (size, collateral, borrow, _) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), btc(1.0), true, leverage as u32, &mfr)
+            .assert_unwrap();
+
+        const HOURS_2: u64 = 2;
+        us.borrow_mut()
+            .find_or_new_position(0, false)
+            .assert_unwrap()
+            .data
+            .long
+            .mock_after_hours(HOURS_2);
+
+        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
+            .borrow_mut()
+            .close_position(0, size, usdc(25000.), true, &mfr, false)
+            .assert_unwrap();
+
+        let expected_borrow_fee =
+            collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
+
+        let expected_close_fee = size * (mfr.close_fee_rate as u64) / FEE_RATE_BASE as u64;
+
+        let expected_pnl =
+            (size as u128) * (usdc(25000.) - usdc(20000.)) as u128 / usdc(20000.) as u128;
+
+        assert_eq!(returned, borrow);
+        assert_eq!(collateral_unlocked, collateral);
+        assert_eq!(borrow_fee, expected_borrow_fee);
+        assert_eq!(close_fee, expected_close_fee);
+        assert_eq!(pnl, expected_pnl as i64);
+    }
+
+    #[test]
+    fn test_close_long_with_loss() {
+        let bump = Bump::new();
+        let required_size = UserState::required_account_size(8u8, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+        let mfr = mock_mfr();
+        let leverage = 5u64;
+        let (size, collateral, borrow, _) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), btc(1.0), true, leverage as u32, &mfr)
+            .assert_unwrap();
+
+        const HOURS_2: u64 = 2;
+        us.borrow_mut()
+            .find_or_new_position(0, false)
+            .assert_unwrap()
+            .data
+            .long
+            .mock_after_hours(HOURS_2);
+
+        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
+            .borrow_mut()
+            .close_position(0, size, usdc(18000.), true, &mfr, false)
+            .assert_unwrap();
+
+        let expected_borrow_fee =
+            collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
+
+        let expected_close_fee = size * (mfr.close_fee_rate as u64) / FEE_RATE_BASE as u64;
+
+        let expected_pnl =
+            (size as u128) * (usdc(20000.) - usdc(18000.)) as u128 / usdc(20000.) as u128;
+
+        assert_eq!(returned, borrow);
+        assert_eq!(collateral_unlocked, collateral);
+        assert_eq!(borrow_fee, expected_borrow_fee);
+        assert_eq!(close_fee, expected_close_fee);
+        assert_eq!(pnl, -(expected_pnl as i64));
+    }
+
+    #[test]
+    fn test_close_short_with_profit() {
+        let bump = Bump::new();
+        let required_size = UserState::required_account_size(8u8, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+        let mfr = mock_mfr();
+        let leverage = 10u64;
+        let (size, collateral, borrow, _) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2000.), false, leverage as u32, &mfr)
+            .assert_unwrap();
+
+        const HOURS_2: u64 = 2;
+        us.borrow_mut()
+            .find_or_new_position(0, false)
+            .assert_unwrap()
+            .data
+            .short
+            .mock_after_hours(HOURS_2);
+
+        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
+            .borrow_mut()
+            .close_position(0, size, usdc(18000.), false, &mfr, false)
+            .assert_unwrap();
+
+        let expected_borrow_fee =
+            collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
+
+        let expected_close_fee =
+            (size as u128) * (mfr.close_fee_rate as u128) * (usdc(18000.) as u128)
+                / FEE_RATE_BASE as u128
+                / 10u128.pow(mfr.base_decimals.into());
+
+        let expected_pnl =
+            size * (usdc(20000.) - usdc(18000.)) / 10u64.pow(mfr.base_decimals.into());
+
+        assert_eq!(returned, borrow);
+        assert_eq!(collateral_unlocked, collateral);
+        assert_eq!(borrow_fee, expected_borrow_fee);
+        assert_eq!(close_fee, expected_close_fee as u64);
+        assert_eq!(pnl, expected_pnl as i64);
+    }
+
+    #[test]
+    fn test_close_short_with_loss() {
+        let bump = Bump::new();
+        let required_size = UserState::required_account_size(8u8, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+        let mfr = mock_mfr();
+        let leverage = 10u64;
+        let (size, collateral, borrow, _) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2000.), false, leverage as u32, &mfr)
+            .assert_unwrap();
+
+        const HOURS_2: u64 = 2;
+        us.borrow_mut()
+            .find_or_new_position(0, false)
+            .assert_unwrap()
+            .data
+            .short
+            .mock_after_hours(HOURS_2);
+
+        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
+            .borrow_mut()
+            .close_position(0, size, usdc(22000.), false, &mfr, false)
+            .assert_unwrap();
+
+        let expected_borrow_fee =
+            collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
+
+        let expected_close_fee =
+            (size as u128) * (mfr.close_fee_rate as u128) * (usdc(22000.) as u128)
+                / FEE_RATE_BASE as u128
+                / 10u128.pow(mfr.base_decimals.into());
+
+        let expected_pnl =
+            size * (usdc(22000.) - usdc(20000.)) / 10u64.pow(mfr.base_decimals.into());
+
+        assert_eq!(returned, borrow);
+        assert_eq!(collateral_unlocked, collateral);
+        assert_eq!(borrow_fee, expected_borrow_fee);
+        assert_eq!(close_fee, expected_close_fee as u64);
+        assert_eq!(pnl, -(expected_pnl as i64));
     }
 }

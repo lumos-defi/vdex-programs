@@ -7,7 +7,7 @@ use crate::{
     errors::{DexError, DexResult},
     position::update_user_serial_number,
     user::state::*,
-    utils::USER_LIST_MAGIC_BYTE,
+    utils::{SafeMath, USER_LIST_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -96,19 +96,27 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
     // Get oracle price
     let price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
 
-    let mfr = mi.get_fee_rates();
+    let mfr = mi.get_fee_rates(ai.borrow_fee_rate);
 
     // User close position
     // TODO: check minimum close size ??
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let (borrow, collateral, pnl, fee) = us
+    let (borrow, collateral, pnl, close_fee, borrow_fee) = us
         .borrow_mut()
-        .close_position(market, size, price, long, &mfr)?;
+        .close_position(market, size, price, long, &mfr, false)?;
 
     // Update market global position
     dex.decrease_global_position(market as usize, long, size, collateral)?;
 
-    let withdrawable = dex.settle_pnl(market as usize, long, collateral, borrow, pnl, fee)?;
+    let withdrawable = dex.settle_pnl(
+        market as usize,
+        long,
+        collateral,
+        borrow,
+        pnl,
+        close_fee,
+        borrow_fee,
+    )?;
     if withdrawable > 0 {
         let signer = &[&seeds[..]];
         let cpi_accounts = Transfer {
@@ -127,6 +135,7 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
         .map_err(|_| DexError::FailedMountEventQueue)?;
 
+    let fee = close_fee.safe_add(borrow_fee)?;
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
     let event_seq = event_queue
         .append(PositionFilled {
