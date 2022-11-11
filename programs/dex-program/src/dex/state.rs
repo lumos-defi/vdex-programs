@@ -386,7 +386,6 @@ impl Position {
         Ok((size, collateral, borrow, open_fee))
     }
 
-    // TODO: Check if the left size is gte minimum open amount when size > 0
     pub fn close(
         &mut self,
         size: u64,
