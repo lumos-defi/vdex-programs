@@ -34,7 +34,6 @@ pub struct LimitAsk<'info> {
 
 /// Layout of remaining counts:
 /// 1. Order pool remaining pages
-#[allow(clippy::too_many_arguments)]
 pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size: u64) -> DexResult {
     let dex = &ctx.accounts.dex.load()?;
     require!(market < dex.markets_number, DexError::InvalidMarketIndex);

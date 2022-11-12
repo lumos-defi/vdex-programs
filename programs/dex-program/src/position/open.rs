@@ -58,7 +58,6 @@ pub struct OpenPosition<'info> {
 
 // Layout of remaining counts:
 //  offset 0 ~ n: user_list remaining pages
-#[allow(clippy::too_many_arguments)]
 pub fn handler(
     ctx: Context<OpenPosition>,
     market: u8,

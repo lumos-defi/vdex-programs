@@ -58,7 +58,6 @@ pub struct LiquidatePosition<'info> {
 
 // Layout of remaining counts:
 //  offset 0 ~ n: user_list remaining pages
-#[allow(clippy::too_many_arguments)]
 pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
     require!(

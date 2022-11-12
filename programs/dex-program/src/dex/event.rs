@@ -14,7 +14,7 @@ pub enum PositionAct {
 }
 
 impl PositionAct {
-    fn to_string(self) -> (u8, &'static str) {
+    fn decode(self) -> (u8, &'static str) {
         match self {
             PositionAct::Open => (0, "opened"),
             PositionAct::Close => (1, "closed"),
@@ -81,7 +81,7 @@ impl AppendEvent for EventQueue<'_> {
         borrow_fee: u64,
         pnl: i64,
     ) -> DexResult {
-        let (code, text) = action.to_string();
+        let (code, text) = action.decode();
 
         let event = PositionFilled {
             user_state,

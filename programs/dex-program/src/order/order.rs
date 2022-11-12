@@ -18,7 +18,6 @@ pub struct Order {
 }
 
 impl Order {
-    #[allow(clippy::too_many_arguments)]
     pub fn init(&mut self, price: u64, size: u64, user_state: [u8; 32]) {
         self.price = price;
         self.size = size;
