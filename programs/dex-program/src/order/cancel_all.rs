@@ -58,25 +58,21 @@ fn cancel_market_orders(
 
     let orders = us.borrow().collect_market_orders(market as u8);
     for user_order_slot in orders {
-        let (size, order_slot) = us
+        let order_slot = us
             .borrow_mut()
             .get_order_info(user_order_slot)
             .map_err(|_| DexError::InvalidOrderSlot)?;
 
-        let order = order_pool
-            .from_index(order_slot)
-            .map_err(|_| DexError::InvalidOrderSlot)?;
-
-        require_eq!(
-            order.data.user_order_slot,
-            user_order_slot,
-            DexError::InvalidOrderSlot
-        );
-
-        if order.data.size != size {
-            // Un-cranked order
-            continue;
-        }
+        let order = match order_pool.from_index(order_slot) {
+            Ok(o) => {
+                if o.in_use() && o.data.user_order_slot == user_order_slot {
+                    o
+                } else {
+                    continue;
+                }
+            }
+            Err(_) => continue,
+        };
 
         let (_, open, long) = us
             .borrow_mut()

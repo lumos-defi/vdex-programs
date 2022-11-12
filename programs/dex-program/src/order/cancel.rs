@@ -34,7 +34,7 @@ pub struct CancelOrder<'info> {
 pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
     // Mount user state
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let (size, order_slot) = us
+    let order_slot = us
         .borrow_mut()
         .get_order_info(user_order_slot)
         .map_err(|_| DexError::InvalidOrderSlot)?;
@@ -85,14 +85,14 @@ pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
     let order = order_pool
         .from_index(order_slot)
         .map_err(|_| DexError::InvalidOrderSlot)?;
+
+    require!(order.in_use(), DexError::InvalidOrderSlot);
+
     require_eq!(
         order.data.user_order_slot,
         user_order_slot,
         DexError::InvalidOrderSlot
     );
-    if order.data.size != size {
-        // Un-cranked order
-        return Err(error!(DexError::CancelUncrankedOrder));
-    }
+
     order_book.unlink_order(select_side(open, long), order, &order_pool)
 }

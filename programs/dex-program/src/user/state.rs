@@ -359,11 +359,11 @@ impl<'a> UserState<'a> {
         Ok(order.index)
     }
 
-    pub fn get_order_info(&self, user_order_slot: u8) -> DexResult<(u64, u32)> {
+    pub fn get_order_info(&self, user_order_slot: u8) -> DexResult<u32> {
         let order = self.order_pool.from_index(user_order_slot)?;
         require!(order.in_use(), DexError::InvalidIndex);
 
-        Ok((order.data.size, order.data.order_slot))
+        Ok(order.data.order_slot)
     }
 
     pub fn unlink_order(&mut self, user_order_slot: u8) -> DexResult<(u8, bool, bool)> {
