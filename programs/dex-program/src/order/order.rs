@@ -133,6 +133,22 @@ impl LinkedOrder<Order> for PagedListSlot<Order> {
     }
 }
 
+pub fn select_side(open: bool, long: bool) -> OrderSide {
+    if open {
+        if long {
+            OrderSide::BID
+        } else {
+            OrderSide::ASK
+        }
+    } else {
+        if long {
+            OrderSide::ASK
+        } else {
+            OrderSide::BID
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(dead_code)]
 mod test {

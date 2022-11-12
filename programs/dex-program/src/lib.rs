@@ -158,12 +158,12 @@ pub mod dex_program {
         order::ask::handler(ctx, market, long, price, size)
     }
 
-    pub fn cancel_limit_order(_ctx: Context<CancelLimitOrder>) -> DexResult {
-        Ok(())
+    pub fn cancel_order(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
+        order::cancel::handler(ctx, user_order_slot)
     }
 
-    pub fn cancel_all_limit_orders(_ctx: Context<CancelAllLimitOrders>) -> DexResult {
-        Ok(())
+    pub fn cancel_all_orders(ctx: Context<CancelAllOrders>) -> DexResult {
+        order::cancel_all::handler(ctx)
     }
 }
 
@@ -175,18 +175,6 @@ pub struct Swap<'info> {
 
 #[derive(Accounts)]
 pub struct CloseAllPositions<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct CancelLimitOrder<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct CancelAllLimitOrders<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 }

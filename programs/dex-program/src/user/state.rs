@@ -359,8 +359,15 @@ impl<'a> UserState<'a> {
         Ok(order.index)
     }
 
-    pub fn unlink_order(&mut self, order_slot: u8) -> DexResult {
-        let order = self.order_pool.from_index(order_slot)?;
+    pub fn get_order_info(&self, user_order_slot: u8) -> DexResult<(u64, u32)> {
+        let order = self.order_pool.from_index(user_order_slot)?;
+        require!(order.in_use(), DexError::InvalidIndex);
+
+        Ok((order.data.size, order.data.order_slot))
+    }
+
+    pub fn unlink_order(&mut self, user_order_slot: u8) -> DexResult<(u8, bool, bool)> {
+        let order = self.order_pool.from_index(user_order_slot)?;
         require!(order.in_use(), DexError::InvalidIndex);
 
         if !order.data.open {
@@ -370,7 +377,24 @@ impl<'a> UserState<'a> {
                 .sub_closing(order.data.long, order.data.size)?;
         }
 
-        self.order_pool.remove(order_slot)
+        let UserOrder {
+            market, open, long, ..
+        } = order.data;
+        self.order_pool.remove(user_order_slot)?;
+
+        Ok((market, open, long))
+    }
+
+    pub fn collect_market_orders(&self, market: u8) -> Vec<u8> {
+        let mut orders: Vec<u8> = vec![];
+
+        for order in self.order_pool.into_iter() {
+            if order.data.market == market {
+                orders.push(order.index);
+            }
+        }
+
+        orders
     }
 
     pub fn find_or_new_position(

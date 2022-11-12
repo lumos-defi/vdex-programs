@@ -178,6 +178,12 @@ pub enum DexError {
 
     #[msg("Unclosing size too small")]
     UnclosingSizeTooSmall,
+
+    #[msg("Invalid order slot")]
+    InvalidOrderSlot,
+
+    #[msg("Cancel un-cranked order")]
+    CancelUncrankedOrder,
 }
 
 pub type DexResult<T = ()> = Result<T>;
