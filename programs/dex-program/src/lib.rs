@@ -165,6 +165,10 @@ pub mod dex_program {
     pub fn cancel_all_orders(ctx: Context<CancelAllOrders>) -> DexResult {
         order::cancel_all::handler(ctx)
     }
+
+    pub fn fill_order(ctx: Context<FillOrder>, market: u8) -> DexResult {
+        order::fill::handler(ctx, market)
+    }
 }
 
 #[derive(Accounts)]

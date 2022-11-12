@@ -554,19 +554,6 @@ impl UserListItem {
     }
 }
 
-pub struct MatchEvent {
-    pub user_state: [u8; 32],
-    pub price: u64,
-    pub fill_size: u64,
-    pub taker_pnl: i64,
-    pub taker_fee: i64,
-    pub order_slot: u32,
-    pub user_order_slot: u8,
-    pub open_or_close: u8,
-    pub long_or_short: u8,
-    _padding: [u8; 1],
-}
-
 pub trait GetOraclePrice {
     fn get_price(&self) -> Result<(u64, u8)>;
 }

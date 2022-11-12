@@ -182,8 +182,11 @@ pub enum DexError {
     #[msg("Invalid order slot")]
     InvalidOrderSlot,
 
-    #[msg("Cancel un-cranked order")]
-    CancelUncrankedOrder,
+    #[msg("Invalid match queue")]
+    InvalidMatchQueue,
+
+    #[msg("Fail to append match event")]
+    FailedAppendMatchEvent,
 }
 
 pub type DexResult<T = ()> = Result<T>;
