@@ -9,7 +9,7 @@ use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct FillOrder<'info> {
-    #[account(mut, owner = *program_id)]
+    #[account(owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
@@ -34,7 +34,7 @@ pub struct FillOrder<'info> {
 /// Layout of remaining counts:
 /// 1. Order pool remaining pages
 pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
-    let dex = &mut ctx.accounts.dex.load_mut()?;
+    let dex = &ctx.accounts.dex.load()?;
     require!(market < dex.markets_number, DexError::InvalidMarketIndex);
     require!(
         dex.match_queue == ctx.accounts.match_queue.key(),

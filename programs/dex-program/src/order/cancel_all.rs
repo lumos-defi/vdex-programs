@@ -12,7 +12,7 @@ use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct CancelAllOrders<'info> {
-    #[account(mut, owner = *program_id)]
+    #[account(owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
@@ -92,7 +92,7 @@ fn cancel_market_orders(
 ///   order pool remaining pages
 /// } )
 pub fn handler(ctx: Context<CancelAllOrders>) -> DexResult {
-    let dex = &mut ctx.accounts.dex.load_mut()?;
+    let dex = &ctx.accounts.dex.load()?;
 
     require_eq!(
         dex.markets

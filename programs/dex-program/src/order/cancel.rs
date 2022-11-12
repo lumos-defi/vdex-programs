@@ -10,7 +10,7 @@ use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct CancelOrder<'info> {
-    #[account(mut, owner = *program_id)]
+    #[account(owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
@@ -44,7 +44,7 @@ pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
         .unlink_order(user_order_slot)
         .map_err(|_| DexError::InvalidOrderSlot)?;
 
-    let dex = &mut ctx.accounts.dex.load_mut()?;
+    let dex = &ctx.accounts.dex.load()?;
     require!(market < dex.markets_number, DexError::InvalidMarketIndex);
 
     let mi = &dex.markets[market as usize];

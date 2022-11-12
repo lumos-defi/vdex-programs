@@ -104,6 +104,9 @@ pub enum DexError {
     #[msg("Failed mount event queue")]
     FailedMountEventQueue,
 
+    #[msg("Failed mount match queue")]
+    FailedMountMatchQueue,
+
     #[msg("Failed append to event queue")]
     FailedAppendEvent,
 
@@ -187,6 +190,12 @@ pub enum DexError {
 
     #[msg("Fail to append match event")]
     FailedAppendMatchEvent,
+
+    #[msg("User state mismatch")]
+    UserStateMismatch,
+
+    #[msg("Order slot mismatch")]
+    OrderSlotMismatch,
 }
 
 pub type DexResult<T = ()> = Result<T>;

@@ -169,6 +169,10 @@ pub mod dex_program {
     pub fn fill_order(ctx: Context<FillOrder>, market: u8) -> DexResult {
         order::fill::handler(ctx, market)
     }
+
+    pub fn crank(ctx: Context<Crank>) -> DexResult {
+        order::crank::handler(ctx)
+    }
 }
 
 #[derive(Accounts)]

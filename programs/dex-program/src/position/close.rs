@@ -1,13 +1,13 @@
 use crate::{
     collections::{EventQueue, MountMode, PagedList},
     dex::{
-        event::{PositionAct, PositionFilled},
+        event::{AppendEvent, PositionAct},
         get_oracle_price, Dex, UserListItem,
     },
     errors::{DexError, DexResult},
     position::update_user_serial_number,
     user::state::*,
-    utils::{SafeMath, USER_LIST_MAGIC_BYTE},
+    utils::USER_LIST_MAGIC_BYTE,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -79,7 +79,12 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
         DexError::InvalidMarketIndex
     );
 
-    let ai = &dex.assets[mi.asset_index as usize];
+    let ai = if long {
+        &dex.assets[mi.asset_index as usize]
+    } else {
+        &dex.assets[dex.usdc_asset_index as usize]
+    };
+
     require!(
         ai.valid
             && ai.mint == ctx.accounts.mint.key()
@@ -135,34 +140,20 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
         .map_err(|_| DexError::FailedMountEventQueue)?;
 
-    let fee = close_fee.safe_add(borrow_fee)?;
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
-    let event_seq = event_queue
-        .append(PositionFilled {
-            user_state: user_state_key,
-            price,
-            size,
-            collateral,
-            borrow: 0,
-            market,
-            action: PositionAct::Close as u8,
-            long_or_short: if long { 0 } else { 1 },
-            fee,
-            pnl,
-        })
-        .map_err(|_| DexError::FailedAppendEvent)?;
-
-    msg!(
-        "Position filled: close {:?} {} {} {} {} {} {} {}",
+    event_queue.fill_position(
         user_state_key,
+        market,
+        PositionAct::Close,
+        long,
         price,
         size,
         collateral,
-        market,
-        fee,
+        0,
+        close_fee,
+        borrow_fee,
         pnl,
-        event_seq
-    );
+    )?;
 
     // Update user list
     let user_list = PagedList::<UserListItem>::mount(

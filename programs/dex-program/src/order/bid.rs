@@ -11,7 +11,7 @@ use anchor_spl::token::{self, TokenAccount, Transfer};
 
 #[derive(Accounts)]
 pub struct LimitBid<'info> {
-    #[account(mut, owner = *program_id)]
+    #[account(owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
@@ -64,7 +64,7 @@ pub fn handler(
     amount: u64,
     leverage: u32,
 ) -> DexResult {
-    let dex = &mut ctx.accounts.dex.load_mut()?;
+    let dex = &ctx.accounts.dex.load()?;
     require!(market < dex.markets_number, DexError::InvalidMarketIndex);
 
     let mi = &dex.markets[market as usize];

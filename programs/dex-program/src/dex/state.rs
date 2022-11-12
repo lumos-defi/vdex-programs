@@ -31,14 +31,7 @@ pub struct Dex {
 }
 
 impl Dex {
-    pub fn borrow_fund(
-        &mut self,
-        market: usize,
-        long: bool,
-        collateral: u64,
-        borrow: u64,
-        open_fee: u64,
-    ) -> DexResult {
+    pub fn get_asset_info(&mut self, market: usize, long: bool) -> DexResult<&mut AssetInfo> {
         require!(
             market < self.markets_number as usize,
             DexError::InvalidMarketIndex
@@ -59,6 +52,28 @@ impl Dex {
         );
         let ai = &mut self.assets[asset_index];
         require!(ai.valid, DexError::InvalidMarketIndex);
+
+        Ok(ai)
+    }
+
+    pub fn has_sufficient_fund(&mut self, market: usize, long: bool, borrow: u64) -> DexResult {
+        let ai = self.get_asset_info(market, long)?;
+        if ai.liquidity_amount > borrow {
+            Ok(())
+        } else {
+            Err(error!(DexError::InsufficientLiquidity))
+        }
+    }
+
+    pub fn borrow_fund(
+        &mut self,
+        market: usize,
+        long: bool,
+        collateral: u64,
+        borrow: u64,
+        open_fee: u64,
+    ) -> DexResult {
+        let ai = self.get_asset_info(market, long)?;
 
         ai.fee_amount = ai.fee_amount.safe_add(open_fee)?;
         ai.liquidity_amount = ai
@@ -81,27 +96,7 @@ impl Dex {
         close_fee: u64,
         borrow_fee: u64,
     ) -> DexResult<u64> {
-        require!(
-            market < self.markets_number as usize,
-            DexError::InvalidMarketIndex
-        );
-
-        let mi = &mut self.markets[market];
-        require!(mi.valid, DexError::InvalidMarketIndex);
-
-        let asset_index = if long {
-            mi.asset_index
-        } else {
-            self.usdc_asset_index
-        } as usize;
-
-        require!(
-            asset_index < self.assets_number as usize,
-            DexError::InvalidMarketIndex
-        );
-
-        let ai = &mut self.assets[asset_index];
-        require!(ai.valid, DexError::InvalidMarketIndex);
+        let ai = self.get_asset_info(market, long)?;
 
         ai.liquidity_amount = ai.liquidity_amount.safe_add(borrow)?;
         ai.collateral_amount = ai.collateral_amount.safe_sub(collateral)?;
@@ -493,7 +488,7 @@ impl Position {
         self.size.safe_sub(self.closing_size)
     }
 
-    fn calc_collateral_and_fee(amount: u64, leverage: u32, rate: u16) -> DexResult<(u64, u64)> {
+    pub fn calc_collateral_and_fee(amount: u64, leverage: u32, rate: u16) -> DexResult<(u64, u64)> {
         let temp = (leverage as u64).safe_mul(rate as u64)? as u64;
 
         let dividend = amount.safe_mul(temp)?;

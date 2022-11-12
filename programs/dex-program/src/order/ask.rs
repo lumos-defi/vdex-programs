@@ -10,7 +10,7 @@ use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct LimitAsk<'info> {
-    #[account(mut, owner = *program_id)]
+    #[account(owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
@@ -36,7 +36,7 @@ pub struct LimitAsk<'info> {
 /// 1. Order pool remaining pages
 #[allow(clippy::too_many_arguments)]
 pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size: u64) -> DexResult {
-    let dex = &mut ctx.accounts.dex.load_mut()?;
+    let dex = &ctx.accounts.dex.load()?;
     require!(market < dex.markets_number, DexError::InvalidMarketIndex);
 
     let mi = &dex.markets[market as usize];

@@ -283,6 +283,18 @@ impl<'a> UserState<'a> {
         Ok(size)
     }
 
+    pub fn calc_borrow_fund(
+        &self,
+        amount: u64,
+        leverage: u32,
+        mfr: &MarketFeeRates,
+    ) -> DexResult<u64> {
+        let (collateral, _) =
+            Position::calc_collateral_and_fee(amount, leverage, mfr.open_fee_rate)?;
+
+        Ok(collateral.safe_mul(leverage as u64)? as u64)
+    }
+
     pub fn open_position(
         &mut self,
         market: u8,
@@ -357,6 +369,13 @@ impl<'a> UserState<'a> {
         }
 
         Ok(order.index)
+    }
+
+    pub fn get_order(&self, user_order_slot: u8) -> DexResult<UserOrder> {
+        let order = self.order_pool.from_index(user_order_slot)?;
+        require!(order.in_use(), DexError::InvalidIndex);
+
+        Ok(order.data)
     }
 
     pub fn get_order_info(&self, user_order_slot: u8) -> DexResult<u32> {
