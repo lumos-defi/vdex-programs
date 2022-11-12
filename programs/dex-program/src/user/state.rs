@@ -3,17 +3,10 @@ use std::mem::{self, ManuallyDrop};
 
 use crate::collections::small_list::*;
 use crate::dex::state::*;
-use crate::utils::{NIL32, USER_STATE_MAGIC_NUMBER};
+use crate::utils::{time::get_timestamp, SafeMath, NIL32, USER_STATE_MAGIC_NUMBER};
 use anchor_lang::prelude::*;
 
 use crate::errors::{DexError, DexResult};
-
-#[derive(Copy, Clone)]
-#[repr(u8)]
-pub enum FeeType {
-    MakerTaker = 0,
-    Funding = 1,
-}
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -29,10 +22,64 @@ pub struct MetaInfo {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct UserOrder {
-    pub common: Order,
+    pub list_time: i64,
+    pub size: u64,
+    pub price: u64,
+    pub loss_stop_price: u64,
+    pub profit_stop_price: u64,
     pub order_slot: u32,
-    pub position_slot: u8,
-    padding: [u8; 3],
+    pub leverage: u32,
+    pub long: bool,
+    pub open: bool,
+    pub decimals: u8,
+    pub market: u8,
+    padding: [u8; 4],
+}
+
+impl UserOrder {
+    pub fn init_as_bid(
+        &mut self,
+        order_slot: u32,
+        size: u64,
+        price: u64,
+        leverage: u32,
+        long: bool,
+        market: u8,
+        decimals: u8,
+    ) -> DexResult {
+        self.order_slot = order_slot;
+        self.size = size;
+        self.price = price;
+        self.leverage = leverage;
+        self.long = long;
+        self.market = market;
+        self.decimals = decimals;
+        self.open = true;
+
+        self.list_time = get_timestamp()?;
+        Ok(())
+    }
+
+    pub fn init_as_ask(
+        &mut self,
+        order_slot: u32,
+        size: u64,
+        price: u64,
+        long: bool,
+        market: u8,
+        decimals: u8,
+    ) -> DexResult {
+        self.order_slot = order_slot;
+        self.size = size;
+        self.price = price;
+        self.long = long;
+        self.market = market;
+        self.decimals = decimals;
+        self.open = false;
+
+        self.list_time = get_timestamp()?;
+        Ok(())
+    }
 }
 
 #[repr(C)]
@@ -81,6 +128,30 @@ impl UserPosition {
             self.long.close(size, price, mfr, liquidate)
         } else {
             self.short.close(size, price, mfr, liquidate)
+        }
+    }
+
+    pub fn sub_closing(&mut self, long: bool, closing_size: u64) -> DexResult {
+        if long {
+            self.long.sub_closing(closing_size)
+        } else {
+            self.short.sub_closing(closing_size)
+        }
+    }
+
+    pub fn add_closing(&mut self, long: bool, closing_size: u64) -> DexResult {
+        if long {
+            self.long.add_closing(closing_size)
+        } else {
+            self.short.add_closing(closing_size)
+        }
+    }
+
+    pub fn unclosing_size(&mut self, long: bool) -> DexResult<u64> {
+        if long {
+            self.long.unclosing_size()
+        } else {
+            self.short.unclosing_size()
         }
     }
 }
@@ -238,23 +309,68 @@ impl<'a> UserState<'a> {
         position.data.close(size, price, long, mfr, liquidate)
     }
 
-    pub fn new_order(
+    pub fn new_bid_order(
         &mut self,
+        order_slot: u32,
+        size: u64,
+        price: u64,
+        leverage: u32,
+        long: bool,
         market: u8,
+        decimals: u8,
+    ) -> DexResult<u8> {
+        let order = self.order_pool.new_slot()?;
+        order
+            .data
+            .init_as_bid(order_slot, size, price, leverage, long, market, decimals)?;
+
+        self.order_pool.add_to_tail(order)?;
+
+        Ok(order.index)
+    }
+
+    pub fn new_ask_order(
+        &mut self,
+        order_slot: u32,
         size: u64,
         price: u64,
         long: bool,
-        close: bool,
-    ) -> DexResult {
-        Ok(())
+        market: u8,
+        decimals: u8,
+    ) -> DexResult<u8> {
+        let order = self.order_pool.new_slot()?;
+        order
+            .data
+            .init_as_ask(order_slot, size, price, long, market, decimals)?;
+
+        self.order_pool.add_to_tail(order)?;
+
+        let position = self.find_or_new_position(market, false)?;
+        position.data.add_closing(long, size)?;
+
+        let unclosing_size = position.data.unclosing_size(long)?;
+        if unclosing_size > 0 {
+            require!(
+                unclosing_size.safe_mul(price)? as u64 > 1,
+                DexError::UnclosingSizeTooSmall
+            );
+        }
+
+        Ok(order.index)
     }
 
-    pub fn cancel_order(&mut self, order_slot: u8) -> DexResult {
-        Ok(())
-    }
+    pub fn unlink_order(&mut self, order_slot: u8) -> DexResult {
+        let order = self.order_pool.from_index(order_slot)?;
+        require!(order.in_use(), DexError::InvalidIndex);
 
-    pub fn fill_order(&mut self, order_slot: u8, price: u64) -> DexResult {
-        Ok(())
+        if !order.data.open {
+            let position = self.find_or_new_position(order.data.market, false)?;
+            position
+                .data
+                .sub_closing(order.data.long, order.data.size)?;
+        }
+
+        self.order_pool.remove(order_slot)
     }
 
     pub fn find_or_new_position(

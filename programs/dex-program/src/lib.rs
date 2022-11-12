@@ -4,12 +4,14 @@ use errors::*;
 pub mod collections;
 pub mod dex;
 pub mod errors;
+pub mod order;
 pub mod pool;
 pub mod position;
 pub mod user;
 pub mod utils;
 
 use dex::*;
+use order::*;
 use pool::*;
 use position::*;
 use user::*;
@@ -135,8 +137,25 @@ pub mod dex_program {
         Ok(())
     }
 
-    pub fn new_limit_order(_ctx: Context<NewLimitOrder>) -> DexResult {
-        Ok(())
+    pub fn limit_bid(
+        ctx: Context<LimitBid>,
+        market: u8,
+        long: bool,
+        price: u64,
+        amount: u64,
+        leverage: u32,
+    ) -> DexResult {
+        order::bid::handler(ctx, market, long, price, amount, leverage)
+    }
+
+    pub fn limit_ask(
+        ctx: Context<LimitAsk>,
+        market: u8,
+        long: bool,
+        price: u64,
+        size: u64,
+    ) -> DexResult {
+        order::ask::handler(ctx, market, long, price, size)
     }
 
     pub fn cancel_limit_order(_ctx: Context<CancelLimitOrder>) -> DexResult {
@@ -156,12 +175,6 @@ pub struct Swap<'info> {
 
 #[derive(Accounts)]
 pub struct CloseAllPositions<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct NewLimitOrder<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 }

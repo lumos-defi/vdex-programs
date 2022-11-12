@@ -231,8 +231,7 @@ pub struct MarketInfo {
     pub symbol: [u8; 16],
     pub oracle: Pubkey,
 
-    pub long_order_book: Pubkey,
-    pub short_order_book: Pubkey,
+    pub order_book: Pubkey,
 
     pub order_pool_entry_page: Pubkey,
     pub order_pool_remaining_pages: [Pubkey; 16],
@@ -250,7 +249,8 @@ pub struct MarketInfo {
     pub oracle_source: u8,
     pub asset_index: u8,
     pub significant_decimals: u8,
-    pub padding: [u8; 253],
+    pub order_pool_remaining_pages_number: u8,
+    pub padding: [u8; 252],
 }
 
 pub struct MarketFeeRates {
@@ -477,6 +477,22 @@ impl Position {
         ))
     }
 
+    pub fn sub_closing(&mut self, closing_size: u64) -> DexResult {
+        self.closing_size = self.closing_size.safe_sub(closing_size)?;
+        Ok(())
+    }
+
+    pub fn add_closing(&mut self, closing_size: u64) -> DexResult {
+        self.closing_size = self.closing_size.safe_add(closing_size)?;
+        require!(self.closing_size <= self.size, DexError::AskSizeTooLarge);
+
+        Ok(())
+    }
+
+    pub fn unclosing_size(&self) -> DexResult<u64> {
+        self.size.safe_sub(self.closing_size)
+    }
+
     fn calc_collateral_and_fee(amount: u64, leverage: u32, rate: u16) -> DexResult<(u64, u64)> {
         let temp = (leverage as u64).safe_mul(rate as u64)? as u64;
 
@@ -508,21 +524,6 @@ impl Position {
 
         Ok(pnl)
     }
-}
-
-#[zero_copy]
-pub struct Order {
-    pub size: u64,
-    pub filled_size: u64,
-    pub collateral: u64,
-    pub limit_price: u64,
-    pub list_time: u64,
-    pub loss_stop_price: u64,
-    pub profit_stop_price: u64,
-    pub long_or_short: u8,
-    pub open_or_close: u8,
-    pub market: u8,
-    pub position_index: u8,
 }
 
 #[account]

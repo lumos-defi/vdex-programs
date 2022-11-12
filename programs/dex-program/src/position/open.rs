@@ -68,7 +68,7 @@ pub fn handler(
 ) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
     require!(
-        (market < dex.markets.len() as u8)
+        market < dex.markets_number
             && dex.event_queue == ctx.accounts.event_queue.key()
             && dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
         DexError::InvalidMarketIndex

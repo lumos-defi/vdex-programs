@@ -3,8 +3,11 @@ use std::convert::TryFrom;
 use anchor_lang::prelude::*;
 
 use crate::{
+    collections::{MountMode, OrderBook, PagedList},
     dex::{MarketInfo, OracleSource, Position},
     errors::{DexError, DexResult},
+    order::Order,
+    utils::ORDER_POOL_MAGIC_BYTE,
 };
 
 use super::Dex;
@@ -21,12 +24,8 @@ pub struct AddMarket<'info> {
     pub oracle: UncheckedAccount<'info>,
 
     /// CHECK
-    #[account(mut, constraint= long_order_book.owner == program_id)]
-    pub long_order_book: UncheckedAccount<'info>,
-
-    /// CHECK
-    #[account(mut, constraint= short_order_book.owner == program_id)]
-    pub short_order_book: UncheckedAccount<'info>,
+    #[account(mut, constraint= order_book.owner == program_id)]
+    pub order_book: UncheckedAccount<'info>,
 
     /// CHECK
     #[account(mut, constraint= order_pool_entry_page.owner == program_id)]
@@ -57,8 +56,8 @@ pub fn handler(
     OracleSource::try_from(oracle_source).map_err(|_| DexError::InvalidOracleSource)?;
 
     //todo mount order book
-    let _long_order_book = &mut ctx.accounts.long_order_book;
-    let _order_pool_entry_page = &mut ctx.accounts.order_pool_entry_page;
+    let order_book = &mut ctx.accounts.order_book;
+    let order_pool_entry_page = &mut ctx.accounts.order_pool_entry_page;
 
     let dex = &mut ctx.accounts.dex.load_mut()?;
 
@@ -71,6 +70,15 @@ pub fn handler(
         return Err(error!(DexError::DuplicateMarketName));
     }
 
+    OrderBook::mount(order_book, false)?.initialize()?;
+    PagedList::<Order>::mount(
+        order_pool_entry_page,
+        &[],
+        ORDER_POOL_MAGIC_BYTE,
+        MountMode::Initialize,
+    )
+    .map_err(|_| DexError::FailedInitOrderPool)?;
+
     let market_index = dex.markets_number as usize;
     if market_index == dex.markets.len() {
         return Err(error!(DexError::InsufficientMarketIndex));
@@ -78,10 +86,9 @@ pub fn handler(
 
     let market = MarketInfo {
         symbol: market_symbol,
-        oracle: *ctx.accounts.oracle.key,
-        long_order_book: *ctx.accounts.long_order_book.key,
-        short_order_book: *ctx.accounts.short_order_book.key,
-        order_pool_entry_page: *ctx.accounts.order_pool_entry_page.key,
+        oracle: ctx.accounts.oracle.key(),
+        order_book: ctx.accounts.order_book.key(),
+        order_pool_entry_page: ctx.accounts.order_pool_entry_page.key(),
         order_pool_remaining_pages: [Pubkey::default(); 16],
         global_long: Position::new(true)?,
         global_short: Position::new(false)?,
@@ -95,7 +102,8 @@ pub fn handler(
         oracle_source,
         asset_index,
         significant_decimals,
-        padding: [0; 253],
+        order_pool_remaining_pages_number: 0,
+        padding: [0; 252],
     };
 
     dex.markets[market_index] = market;
