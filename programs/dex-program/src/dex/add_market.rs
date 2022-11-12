@@ -55,7 +55,6 @@ pub fn handler(
 
     OracleSource::try_from(oracle_source).map_err(|_| DexError::InvalidOracleSource)?;
 
-    //todo mount order book
     let order_book = &mut ctx.accounts.order_book;
     let order_pool_entry_page = &mut ctx.accounts.order_pool_entry_page;
 
