@@ -132,7 +132,7 @@ describe('Test Create Market', () => {
       orderBook: orderBook.publicKey,
       orderPoolEntryPage: orderPoolEntryPage.publicKey,
       oracle: mockOracle.publicKey,
-      minimumOpenAmount: expect.toBNEqual(100),
+      minimumPositionValue: expect.toBNEqual(100),
       chargeBorrowFeeInterval: expect.toBNEqual(CHARGE_BORROW_FEE_INTERVAL),
       openFeeRate: OPEN_FEE_RATE,
       closeFeeRate: CLOSE_FEE_RATE,
