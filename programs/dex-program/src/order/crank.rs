@@ -87,6 +87,7 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     let order = us.borrow().get_order(data.user_order_slot)?;
+    us.borrow_mut().unlink_order(data.user_order_slot)?;
 
     require_eq!(
         order.order_slot,
