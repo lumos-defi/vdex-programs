@@ -445,10 +445,22 @@ impl<'a> UserState<'a> {
 #[cfg(test)]
 #[allow(dead_code)]
 mod test {
-
     use super::*;
     use crate::utils::{test::*, FEE_RATE_BASE};
     use bumpalo::Bump;
+
+    impl<'a> UserState<'a> {
+        fn get_position(&self, market: u8, long: bool) -> DexResult<Position> {
+            let position = self.find_or_new_position(market, false)?;
+            let p = if long {
+                position.data.long
+            } else {
+                position.data.short
+            };
+
+            Ok(p)
+        }
+    }
 
     #[test]
     fn test_user_state_init() {
@@ -822,5 +834,280 @@ mod test {
         assert_eq!(borrow_fee, expected_borrow_fee);
         assert_eq!(close_fee, expected_close_fee as u64);
         assert_eq!(pnl, -(expected_pnl as i64));
+    }
+
+    #[test]
+    fn test_new_bid_order() {
+        let bump = Bump::new();
+        let max_order_count = 8u8;
+        let required_size = UserState::required_account_size(max_order_count, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+        for i in 0..max_order_count {
+            let user_order_slot = us
+                .borrow_mut()
+                .new_bid_order(
+                    0xff + i as u32,
+                    btc(0.1 + i as f64),
+                    usdc(20000. + i as f64),
+                    20 + i as u32,
+                    true,
+                    i,
+                    9,
+                )
+                .assert_unwrap();
+            assert_eq!(user_order_slot, i);
+        }
+
+        for i in 0..max_order_count {
+            let order = us.borrow().get_order(i).assert_unwrap();
+            assert_eq!(order.order_slot, 0xff + i as u32);
+            assert_eq!(order.size, btc(0.1 + i as f64));
+            assert_eq!(order.price, usdc(20000. + i as f64));
+            assert_eq!(order.leverage, 20 + i as u32);
+            assert_eq!(order.long, true);
+            assert_eq!(order.market, i);
+        }
+    }
+
+    #[test]
+    fn test_max_order_count() {
+        let bump = Bump::new();
+        let max_order_count = 8u8;
+        let required_size = UserState::required_account_size(max_order_count, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+
+        // Create bid orders
+        for _ in 0..max_order_count {
+            us.borrow_mut()
+                .new_bid_order(0xff, btc(0.1), usdc(20000.), 20, true, 0x0, 9)
+                .assert_unwrap();
+        }
+
+        us.borrow_mut()
+            .new_bid_order(0xff, btc(0.1), usdc(20000.), 20, true, 0x0, 9)
+            .assert_err();
+
+        // Release all bid orders
+        for i in 0..max_order_count {
+            us.borrow_mut().unlink_order(i).assert_unwrap();
+        }
+
+        // Mock position
+        let mfr = mock_mfr();
+        us.borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .assert_unwrap();
+
+        // Create ask orders
+        for _ in 0..max_order_count {
+            us.borrow_mut()
+                .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0, 9)
+                .assert_unwrap();
+        }
+        us.borrow_mut()
+            .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0, 9)
+            .assert_err();
+    }
+
+    #[test]
+    fn test_new_ask_order() {
+        let bump = Bump::new();
+        let max_order_count = 8u8;
+        let required_size = UserState::required_account_size(max_order_count, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+
+        // Mock position
+        let mfr = mock_mfr();
+        let (size, _, _, _) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .assert_unwrap();
+
+        let user_order_slot = us
+            .borrow_mut()
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .assert_unwrap();
+
+        let order = us.borrow().get_order(user_order_slot).assert_unwrap();
+        assert_eq!(order.order_slot, 0xff);
+        assert_eq!(order.size, size / 2);
+        assert_eq!(order.price, usdc(19000.));
+        assert_eq!(order.leverage, 0);
+        assert_eq!(order.long, false);
+        assert_eq!(order.market, 0);
+
+        let position = us.borrow().get_position(0, false).assert_unwrap();
+        assert_eq!(position.size, size);
+        assert_eq!(position.closing_size, size / 2);
+    }
+
+    #[test]
+    fn test_new_ask_order_size_error() {
+        let bump = Bump::new();
+        let max_order_count = 8u8;
+        let required_size = UserState::required_account_size(max_order_count, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+
+        // Mock position
+        let mfr = mock_mfr();
+        let (size, _, _, _) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .assert_unwrap();
+
+        us.borrow_mut()
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .assert_ok();
+
+        us.borrow_mut()
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .assert_ok();
+
+        // Can not place ask order with larger size
+        us.borrow_mut()
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .assert_err();
+    }
+
+    #[test]
+    fn test_collect_orders() {
+        let bump = Bump::new();
+        let max_order_count = 8u8;
+        let required_size = UserState::required_account_size(max_order_count, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+        us.borrow_mut()
+            .new_bid_order(0xff, btc(0.1), usdc(20000.), 20, true, 0x0, 9)
+            .assert_ok();
+
+        us.borrow_mut()
+            .new_bid_order(0xff, btc(0.01), usdc(22000.), 20, true, 0x0, 9)
+            .assert_unwrap();
+
+        let mfr = mock_mfr();
+        let (size, _, _, _) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .assert_unwrap();
+
+        us.borrow_mut()
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .assert_ok();
+
+        us.borrow_mut()
+            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0, 9)
+            .assert_ok();
+
+        let orders = us.borrow().collect_market_orders(0);
+        assert_eq!(orders.len(), 4);
+        assert_eq!(orders[0], 0);
+        assert_eq!(orders[1], 1);
+        assert_eq!(orders[2], 2);
+        assert_eq!(orders[3], 3);
+    }
+
+    #[test]
+    fn test_unlink_bid_order() {
+        let bump = Bump::new();
+        let max_order_count = 8u8;
+        let required_size = UserState::required_account_size(max_order_count, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+        us.borrow_mut()
+            .new_bid_order(0xff, btc(0.1), usdc(20000.), 20, true, 0x0, 9)
+            .assert_ok();
+
+        us.borrow_mut()
+            .new_bid_order(0xff, btc(0.01), usdc(22000.), 20, true, 0x0, 9)
+            .assert_unwrap();
+
+        let mfr = mock_mfr();
+        let (size, _, _, _) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .assert_unwrap();
+
+        us.borrow_mut()
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .assert_ok();
+
+        us.borrow_mut()
+            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0, 9)
+            .assert_ok();
+
+        let orders = us.borrow().collect_market_orders(0);
+        assert_eq!(orders.len(), 4);
+
+        us.borrow_mut().unlink_order(0).assert_ok();
+        us.borrow_mut().unlink_order(1).assert_ok();
+        us.borrow_mut().unlink_order(2).assert_ok();
+        us.borrow_mut().unlink_order(3).assert_ok();
+        let orders = us.borrow().collect_market_orders(0);
+        assert_eq!(orders.len(), 0);
+
+        us.borrow_mut().unlink_order(0).assert_err();
+        us.borrow_mut().unlink_order(1).assert_err();
+        us.borrow_mut().unlink_order(2).assert_err();
+        us.borrow_mut().unlink_order(3).assert_err();
+    }
+
+    #[test]
+    fn test_close_position_with_ask_order() {
+        let bump = Bump::new();
+        let max_order_count = 8u8;
+        let required_size = UserState::required_account_size(max_order_count, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+
+        // Mock position
+        let mfr = mock_mfr();
+        let (size, _, _, _) = us
+            .borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2010.), false, 10, &mfr)
+            .assert_unwrap();
+
+        us.borrow_mut()
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .assert_ok();
+
+        // It should be ok to close the other half size.
+        us.borrow_mut()
+            .close_position(0, size / 2, usdc(19500.), false, &mfr, false)
+            .assert_ok();
+
+        let position = us.borrow().get_position(0, false).assert_unwrap();
+        assert_eq!(position.size, size / 2);
+        assert_eq!(position.closing_size, size / 2);
+
+        // Fail to close the remained size.
+        us.borrow_mut()
+            .close_position(0, size / 2, usdc(19500.), false, &mfr, false)
+            .assert_err();
+
+        // Unlink the ask order
+        us.borrow_mut().unlink_order(0).assert_ok();
+
+        // Success to close
+        us.borrow_mut()
+            .close_position(0, size / 2, usdc(19500.), false, &mfr, false)
+            .assert_ok();
     }
 }

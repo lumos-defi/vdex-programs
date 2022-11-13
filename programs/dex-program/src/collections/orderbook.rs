@@ -341,7 +341,7 @@ impl<'a> OrderBook<'a> {
     fn is_red(&self, index: u16) -> bool {
         let n = self.from_index(index);
         match n {
-            Some(v) => (v.red > 0),
+            Some(v) => v.red > 0,
             None => false,
         }
     }
@@ -349,7 +349,7 @@ impl<'a> OrderBook<'a> {
     fn is_black(&self, index: u16) -> bool {
         let n = self.from_index(index);
         match n {
-            Some(v) => (v.red == 0),
+            Some(v) => v.red == 0,
             None => true,
         }
     }

@@ -388,6 +388,9 @@ impl Position {
         mfr: &MarketFeeRates,
         liquidate: bool,
     ) -> DexResult<(u64, u64, i64, u64, u64)> {
+        let unclosing_size = self.size.safe_sub(self.closing_size)?;
+        require!(unclosing_size >= size, DexError::CloseSizeTooLarge);
+
         let mut collateral_unlocked = size
             .safe_mul(self.collateral)?
             .safe_div(self.size as u128)? as u64;
@@ -431,9 +434,10 @@ impl Position {
         let pnl_with_fee = pnl.i_safe_sub(total_fee as i64)?;
 
         // Update the position
+        self.size = unclosing_size.safe_sub(size)?.safe_add(self.closing_size)?;
+
         self.borrowed_amount = self.borrowed_amount.safe_sub(fund_returned)?;
         self.collateral = self.collateral.safe_sub(collateral_unlocked)?;
-        self.size = self.size.safe_sub(size)?;
         self.cumulative_fund_fee = 0;
         self.last_fill_time = now;
 

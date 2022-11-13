@@ -196,6 +196,9 @@ pub enum DexError {
 
     #[msg("Order slot mismatch")]
     OrderSlotMismatch,
+
+    #[msg("Close size too large")]
+    CloseSizeTooLarge,
 }
 
 pub type DexResult<T = ()> = Result<T>;
