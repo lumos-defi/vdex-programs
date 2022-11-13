@@ -104,7 +104,7 @@ pub fn set_mock_price(account: &AccountInfo, price: u64) -> DexResult {
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use crate::utils::unit_test::{gen_account, TestResult};
+    use crate::utils::test::{gen_account, TestResult};
     use bumpalo::Bump;
 
     #[test]

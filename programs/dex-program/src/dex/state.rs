@@ -571,7 +571,7 @@ impl GetOraclePrice for OracleInfo<'_, '_> {
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use crate::utils::unit_test::*;
+    use crate::utils::test::*;
 
     impl Default for Dex {
         fn default() -> Dex {

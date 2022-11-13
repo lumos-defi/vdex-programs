@@ -156,7 +156,7 @@ mod test {
         collections::MountMode,
         errors::DexError,
         utils::{
-            unit_test::{gen_account, TestResult},
+            test::{gen_account, TestResult},
             ORDER_POOL_MAGIC_BYTE,
         },
     };

@@ -447,7 +447,7 @@ impl<'a> UserState<'a> {
 mod test {
 
     use super::*;
-    use crate::utils::{unit_test::*, FEE_RATE_BASE};
+    use crate::utils::{test::*, FEE_RATE_BASE};
     use bumpalo::Bump;
 
     #[test]

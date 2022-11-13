@@ -168,7 +168,7 @@ impl<'a, T> SingleEventQueue<'a, T> {
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use crate::utils::unit_test::*;
+    use crate::utils::test::*;
     use bumpalo::Bump;
 
     #[repr(C)]

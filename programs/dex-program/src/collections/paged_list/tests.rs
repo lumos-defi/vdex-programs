@@ -83,7 +83,7 @@ mod paged_linked_list_test_suite {
             },
             MountMode, PagedListSlot,
         },
-        utils::unit_test::gen_account,
+        utils::test::gen_account,
     };
 
     #[derive(Clone, PartialEq, Debug, Copy)]

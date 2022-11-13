@@ -142,7 +142,7 @@ pub fn get_timestamp() -> Result<i64> {
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use crate::{errors::DexResult, utils::unit_test::TestResult};
+    use crate::{errors::DexResult, utils::test::TestResult};
 
     fn test_safe_add() -> DexResult {
         let result = 1u64.safe_add(2u64)?;

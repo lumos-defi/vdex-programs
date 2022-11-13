@@ -29,7 +29,7 @@ mod test {
     use std::str::FromStr;
 
     use super::*;
-    use crate::{collections::SingleEvent, utils::unit_test::*};
+    use crate::{collections::SingleEvent, utils::test::*};
     use anchor_lang::prelude::Pubkey;
     use bumpalo::Bump;
 
