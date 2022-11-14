@@ -31,14 +31,7 @@ pub struct Dex {
 }
 
 impl Dex {
-    pub fn borrow_fund(
-        &mut self,
-        market: usize,
-        long: bool,
-        collateral: u64,
-        borrow: u64,
-        open_fee: u64,
-    ) -> DexResult {
+    pub fn get_asset_info(&mut self, market: usize, long: bool) -> DexResult<&mut AssetInfo> {
         require!(
             market < self.markets_number as usize,
             DexError::InvalidMarketIndex
@@ -59,6 +52,28 @@ impl Dex {
         );
         let ai = &mut self.assets[asset_index];
         require!(ai.valid, DexError::InvalidMarketIndex);
+
+        Ok(ai)
+    }
+
+    pub fn has_sufficient_fund(&mut self, market: usize, long: bool, borrow: u64) -> DexResult {
+        let ai = self.get_asset_info(market, long)?;
+        if ai.liquidity_amount > borrow {
+            Ok(())
+        } else {
+            Err(error!(DexError::InsufficientLiquidity))
+        }
+    }
+
+    pub fn borrow_fund(
+        &mut self,
+        market: usize,
+        long: bool,
+        collateral: u64,
+        borrow: u64,
+        open_fee: u64,
+    ) -> DexResult {
+        let ai = self.get_asset_info(market, long)?;
 
         ai.fee_amount = ai.fee_amount.safe_add(open_fee)?;
         ai.liquidity_amount = ai
@@ -81,27 +96,7 @@ impl Dex {
         close_fee: u64,
         borrow_fee: u64,
     ) -> DexResult<u64> {
-        require!(
-            market < self.markets_number as usize,
-            DexError::InvalidMarketIndex
-        );
-
-        let mi = &mut self.markets[market];
-        require!(mi.valid, DexError::InvalidMarketIndex);
-
-        let asset_index = if long {
-            mi.asset_index
-        } else {
-            self.usdc_asset_index
-        } as usize;
-
-        require!(
-            asset_index < self.assets_number as usize,
-            DexError::InvalidMarketIndex
-        );
-
-        let ai = &mut self.assets[asset_index];
-        require!(ai.valid, DexError::InvalidMarketIndex);
+        let ai = self.get_asset_info(market, long)?;
 
         ai.liquidity_amount = ai.liquidity_amount.safe_add(borrow)?;
         ai.collateral_amount = ai.collateral_amount.safe_sub(collateral)?;
@@ -231,8 +226,7 @@ pub struct MarketInfo {
     pub symbol: [u8; 16],
     pub oracle: Pubkey,
 
-    pub long_order_book: Pubkey,
-    pub short_order_book: Pubkey,
+    pub order_book: Pubkey,
 
     pub order_pool_entry_page: Pubkey,
     pub order_pool_remaining_pages: [Pubkey; 16],
@@ -250,7 +244,8 @@ pub struct MarketInfo {
     pub oracle_source: u8,
     pub asset_index: u8,
     pub significant_decimals: u8,
-    pub padding: [u8; 253],
+    pub order_pool_remaining_pages_number: u8,
+    pub padding: [u8; 252],
 }
 
 pub struct MarketFeeRates {
@@ -393,6 +388,9 @@ impl Position {
         mfr: &MarketFeeRates,
         liquidate: bool,
     ) -> DexResult<(u64, u64, i64, u64, u64)> {
+        let unclosing_size = self.size.safe_sub(self.closing_size)?;
+        require!(unclosing_size >= size, DexError::CloseSizeTooLarge);
+
         let mut collateral_unlocked = size
             .safe_mul(self.collateral)?
             .safe_div(self.size as u128)? as u64;
@@ -436,9 +434,10 @@ impl Position {
         let pnl_with_fee = pnl.i_safe_sub(total_fee as i64)?;
 
         // Update the position
+        self.size = unclosing_size.safe_sub(size)?.safe_add(self.closing_size)?;
+
         self.borrowed_amount = self.borrowed_amount.safe_sub(fund_returned)?;
         self.collateral = self.collateral.safe_sub(collateral_unlocked)?;
-        self.size = self.size.safe_sub(size)?;
         self.cumulative_fund_fee = 0;
         self.last_fill_time = now;
 
@@ -477,7 +476,23 @@ impl Position {
         ))
     }
 
-    fn calc_collateral_and_fee(amount: u64, leverage: u32, rate: u16) -> DexResult<(u64, u64)> {
+    pub fn sub_closing(&mut self, closing_size: u64) -> DexResult {
+        self.closing_size = self.closing_size.safe_sub(closing_size)?;
+        Ok(())
+    }
+
+    pub fn add_closing(&mut self, closing_size: u64) -> DexResult {
+        self.closing_size = self.closing_size.safe_add(closing_size)?;
+        require!(self.closing_size <= self.size, DexError::AskSizeTooLarge);
+
+        Ok(())
+    }
+
+    pub fn unclosing_size(&self) -> DexResult<u64> {
+        self.size.safe_sub(self.closing_size)
+    }
+
+    pub fn calc_collateral_and_fee(amount: u64, leverage: u32, rate: u16) -> DexResult<(u64, u64)> {
         let temp = (leverage as u64).safe_mul(rate as u64)? as u64;
 
         let dividend = amount.safe_mul(temp)?;
@@ -510,21 +525,6 @@ impl Position {
     }
 }
 
-#[zero_copy]
-pub struct Order {
-    pub size: u64,
-    pub filled_size: u64,
-    pub collateral: u64,
-    pub limit_price: u64,
-    pub list_time: u64,
-    pub loss_stop_price: u64,
-    pub profit_stop_price: u64,
-    pub long_or_short: u8,
-    pub open_or_close: u8,
-    pub market: u8,
-    pub position_index: u8,
-}
-
 #[account]
 #[repr(C)]
 pub struct MockOracle {
@@ -553,19 +553,6 @@ impl UserListItem {
     }
 }
 
-pub struct MatchEvent {
-    pub user_state: [u8; 32],
-    pub price: u64,
-    pub fill_size: u64,
-    pub taker_pnl: i64,
-    pub taker_fee: i64,
-    pub order_slot: u32,
-    pub user_order_slot: u8,
-    pub open_or_close: u8,
-    pub long_or_short: u8,
-    _padding: [u8; 1],
-}
-
 pub trait GetOraclePrice {
     fn get_price(&self) -> Result<(u64, u8)>;
 }
@@ -588,7 +575,7 @@ impl GetOraclePrice for OracleInfo<'_, '_> {
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use crate::utils::unit_test::*;
+    use crate::utils::test::*;
 
     impl Default for Dex {
         fn default() -> Dex {

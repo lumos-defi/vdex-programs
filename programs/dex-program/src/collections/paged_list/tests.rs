@@ -83,7 +83,7 @@ mod paged_linked_list_test_suite {
             },
             MountMode, PagedListSlot,
         },
-        utils::unit_test::gen_account,
+        utils::test::gen_account,
     };
 
     #[derive(Clone, PartialEq, Debug, Copy)]
@@ -408,7 +408,7 @@ mod paged_linked_list_test_suite {
             list.into_iter()
                 .map(|x| x.data.user_id)
                 .collect::<Vec<u64>>(),
-            vec![]
+            vec![1, 0]
         )
     }
 

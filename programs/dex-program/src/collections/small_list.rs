@@ -440,7 +440,7 @@ mod test {
     use std::cell::RefMut;
 
     use super::*;
-    use crate::utils::unit_test::*;
+    use crate::utils::test::*;
     use bumpalo::Bump;
 
     #[repr(C)]

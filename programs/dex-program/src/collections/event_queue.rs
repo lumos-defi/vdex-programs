@@ -358,7 +358,7 @@ impl<'a> EventQueue<'a> {
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use crate::utils::unit_test::*;
+    use crate::utils::test::*;
     use bumpalo::Bump;
 
     #[derive(AnchorSerialize, AnchorDeserialize)]

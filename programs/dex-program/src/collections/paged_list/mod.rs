@@ -227,6 +227,11 @@ impl<TSlot> PagedListSlot<TSlot> {
     pub fn prev(&self) -> u32 {
         self.prev.to_u32()
     }
+
+    #[inline]
+    pub fn in_use(&self) -> bool {
+        self.is_in_use
+    }
 }
 
 pub struct PagedListIter<'a, TSlot> {

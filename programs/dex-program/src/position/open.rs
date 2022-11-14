@@ -1,7 +1,7 @@
 use crate::{
     collections::{EventQueue, MountMode, PagedList},
     dex::{
-        event::{PositionAct, PositionFilled},
+        event::{AppendEvent, PositionAct},
         get_oracle_price, Dex, UserListItem,
     },
     errors::{DexError, DexResult},
@@ -58,7 +58,6 @@ pub struct OpenPosition<'info> {
 
 // Layout of remaining counts:
 //  offset 0 ~ n: user_list remaining pages
-#[allow(clippy::too_many_arguments)]
 pub fn handler(
     ctx: Context<OpenPosition>,
     market: u8,
@@ -68,7 +67,7 @@ pub fn handler(
 ) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
     require!(
-        (market < dex.markets.len() as u8)
+        market < dex.markets_number
             && dex.event_queue == ctx.accounts.event_queue.key()
             && dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
         DexError::InvalidMarketIndex
@@ -85,7 +84,12 @@ pub fn handler(
         DexError::InvalidMarketIndex
     );
 
-    let ai = &dex.assets[mi.asset_index as usize];
+    let ai = if long {
+        &dex.assets[mi.asset_index as usize]
+    } else {
+        &dex.assets[dex.usdc_asset_index as usize]
+    };
+
     require!(
         ai.valid
             && ai.mint == ctx.accounts.mint.key()
@@ -112,7 +116,7 @@ pub fn handler(
 
     // User open position
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let (size, collateral, borrow, fee) = us
+    let (size, collateral, borrow, open_fee) = us
         .borrow_mut()
         .open_position(market, price, amount, long, leverage, &mfr)?;
 
@@ -123,7 +127,7 @@ pub fn handler(
     );
 
     // Update asset info (collateral amount, borrow amount, fee)
-    dex.borrow_fund(market as usize, long, collateral, borrow, fee)?;
+    dex.borrow_fund(market as usize, long, collateral, borrow, open_fee)?;
 
     // Update market global position
     dex.increase_global_position(market as usize, long, price, size, collateral)?;
@@ -133,32 +137,19 @@ pub fn handler(
         .map_err(|_| DexError::FailedMountEventQueue)?;
 
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
-    let event_seq = event_queue
-        .append(PositionFilled {
-            user_state: user_state_key,
-            price,
-            size,
-            collateral,
-            borrow,
-            market,
-            action: PositionAct::Open as u8,
-            long_or_short: if long { 0 } else { 1 },
-            fee,
-            pnl: 0,
-        })
-        .map_err(|_| DexError::FailedAppendEvent)?;
-
-    msg!(
-        "Position filled: open {:?} {} {} {} {} {} {} {}",
+    event_queue.fill_position(
         user_state_key,
+        market,
+        PositionAct::Open,
+        long,
         price,
         size,
         collateral,
         borrow,
-        market,
-        fee,
-        event_seq
-    );
+        open_fee,
+        0,
+        0,
+    )?;
 
     // Update user list
     let user_list = PagedList::<UserListItem>::mount(

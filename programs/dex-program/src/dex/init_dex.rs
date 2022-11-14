@@ -5,6 +5,7 @@ use crate::{
     collections::{EventQueue, MountMode, PagedList, SingleEventQueue},
     dex::state::*,
     errors::{DexError, DexResult},
+    order::MatchEvent,
     utils::{DEX_MAGIC_NUMBER, USER_LIST_MAGIC_BYTE},
 };
 

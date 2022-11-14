@@ -104,6 +104,9 @@ pub enum DexError {
     #[msg("Failed mount event queue")]
     FailedMountEventQueue,
 
+    #[msg("Failed mount match queue")]
+    FailedMountMatchQueue,
+
     #[msg("Failed append to event queue")]
     FailedAppendEvent,
 
@@ -136,6 +139,66 @@ pub enum DexError {
 
     #[msg("Position not existed")]
     PositionNotExisted,
+
+    #[msg("Pice greater than market price")]
+    PriceGTMarketPrice,
+
+    #[msg("Pice less than market price")]
+    PriceLTMarketPrice,
+
+    #[msg("Invalid RBTree header")]
+    InvalidRBTHeader,
+
+    #[msg("No free RBTree node")]
+    NoFreeRBTNode,
+
+    #[msg("Exceed order size")]
+    ExceedOrderSize,
+
+    #[msg("No match order")]
+    NoMatchOrder,
+
+    #[msg("Invalid RBTree node")]
+    InvalidRBTNode,
+
+    #[msg("Page Linked List Error")]
+    PageLinkedListError,
+
+    #[msg("Zero size order")]
+    ZeroSizeOrder,
+
+    #[msg("Failed init order pool")]
+    FailedInitOrderPool,
+
+    #[msg("Failed mount order pool")]
+    FailedMountOrderPool,
+
+    #[msg("No free slot in order pool")]
+    NoFreeSlotInOrderPool,
+
+    #[msg("Ask size too large")]
+    AskSizeTooLarge,
+
+    #[msg("Unclosing size too small")]
+    UnclosingSizeTooSmall,
+
+    #[msg("Invalid order slot")]
+    InvalidOrderSlot,
+
+    #[msg("Invalid match queue")]
+    InvalidMatchQueue,
+
+    #[msg("Fail to append match event")]
+    FailedAppendMatchEvent,
+
+    #[msg("User state mismatch")]
+    UserStateMismatch,
+
+    #[msg("Order slot mismatch")]
+    OrderSlotMismatch,
+
+    #[msg("Close size too large")]
+    CloseSizeTooLarge,
 }
 
 pub type DexResult<T = ()> = Result<T>;

@@ -22,15 +22,13 @@ describe('Test Create Market', () => {
   const ASSET_INDEX = 0
 
   let dex: Keypair
-  let longOrderBook: Keypair
-  let shortOrderBook: Keypair
+  let orderBook: Keypair
   let orderPoolEntryPage: Keypair
   let authority: Keypair
   let mockOracle: Keypair
 
   beforeEach(async () => {
-    longOrderBook = Keypair.generate()
-    shortOrderBook = Keypair.generate()
+    orderBook = Keypair.generate()
     orderPoolEntryPage = Keypair.generate()
     authority = Keypair.generate()
     ;({ dex } = await createDex(authority))
@@ -53,18 +51,16 @@ describe('Test Create Market', () => {
       )
       .accounts({
         dex: dex.publicKey,
-        longOrderBook: longOrderBook.publicKey,
-        shortOrderBook: shortOrderBook.publicKey,
+        orderBook: orderBook.publicKey,
         orderPoolEntryPage: orderPoolEntryPage.publicKey,
         authority: authority.publicKey,
         oracle: mockOracle.publicKey,
       })
       .preInstructions([
-        await createAccountInstruction(longOrderBook, 128 * 1024),
-        await createAccountInstruction(shortOrderBook, 128 * 1024),
+        await createAccountInstruction(orderBook, 128 * 1024),
         await createAccountInstruction(orderPoolEntryPage, 128 * 1024),
       ])
-      .signers([authority, longOrderBook, shortOrderBook, orderPoolEntryPage])
+      .signers([authority, orderBook, orderPoolEntryPage])
       .rpc()
 
     expect(async () => {
@@ -83,8 +79,7 @@ describe('Test Create Market', () => {
         )
         .accounts({
           dex: dex.publicKey,
-          longOrderBook: longOrderBook.publicKey,
-          shortOrderBook: shortOrderBook.publicKey,
+          orderBook: orderBook.publicKey,
           orderPoolEntryPage: orderPoolEntryPage.publicKey,
           authority: authority.publicKey,
           oracle: mockOracle.publicKey,
@@ -110,18 +105,16 @@ describe('Test Create Market', () => {
       )
       .accounts({
         dex: dex.publicKey,
-        longOrderBook: longOrderBook.publicKey,
-        shortOrderBook: shortOrderBook.publicKey,
+        orderBook: orderBook.publicKey,
         orderPoolEntryPage: orderPoolEntryPage.publicKey,
         authority: authority.publicKey,
         oracle: mockOracle.publicKey,
       })
       .preInstructions([
-        await createAccountInstruction(longOrderBook, 128 * 1024),
-        await createAccountInstruction(shortOrderBook, 128 * 1024),
+        await createAccountInstruction(orderBook, 128 * 1024),
         await createAccountInstruction(orderPoolEntryPage, 128 * 1024),
       ])
-      .signers([authority, longOrderBook, shortOrderBook, orderPoolEntryPage])
+      .signers([authority, orderBook, orderPoolEntryPage])
       .rpc()
 
     const dexInfo = await program.account.dex.fetch(dex.publicKey)
@@ -131,20 +124,21 @@ describe('Test Create Market', () => {
       marketsNumber: 1,
     })
 
-    expect(dexInfo.markets[0]).toMatchObject({
+    const marketInfo = dexInfo.markets[0]
+    expect(marketInfo).toMatchObject({
       valid: true,
       symbol: Buffer.from('BTC/USDC\0\0\0\0\0\0\0\0'),
       decimals: DECIMALS,
-      longOrderBook: longOrderBook.publicKey,
-      shortOrderBook: shortOrderBook.publicKey,
+      orderBook: orderBook.publicKey,
       orderPoolEntryPage: orderPoolEntryPage.publicKey,
       oracle: mockOracle.publicKey,
-      minimumOpenAmount: expect.toBNEqual(100),
+      minimumPositionValue: expect.toBNEqual(100),
       chargeBorrowFeeInterval: expect.toBNEqual(CHARGE_BORROW_FEE_INTERVAL),
       openFeeRate: OPEN_FEE_RATE,
       closeFeeRate: CLOSE_FEE_RATE,
       liquidateFeeRate: LIQUIDATE_FEE_RATE,
       significantDecimals: SIGNIFICANT_DECIMALS,
+      orderPoolRemainingPagesNumber: 0,
     })
   })
 })

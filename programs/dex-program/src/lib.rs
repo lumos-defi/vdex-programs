@@ -4,12 +4,14 @@ use errors::*;
 pub mod collections;
 pub mod dex;
 pub mod errors;
+pub mod order;
 pub mod pool;
 pub mod position;
 pub mod user;
 pub mod utils;
 
 use dex::*;
+use order::*;
 use pool::*;
 use position::*;
 use user::*;
@@ -135,16 +137,41 @@ pub mod dex_program {
         Ok(())
     }
 
-    pub fn new_limit_order(_ctx: Context<NewLimitOrder>) -> DexResult {
-        Ok(())
+    pub fn limit_bid(
+        ctx: Context<LimitBid>,
+        market: u8,
+        long: bool,
+        price: u64,
+        amount: u64,
+        leverage: u32,
+    ) -> DexResult {
+        order::bid::handler(ctx, market, long, price, amount, leverage)
     }
 
-    pub fn cancel_limit_order(_ctx: Context<CancelLimitOrder>) -> DexResult {
-        Ok(())
+    pub fn limit_ask(
+        ctx: Context<LimitAsk>,
+        market: u8,
+        long: bool,
+        price: u64,
+        size: u64,
+    ) -> DexResult {
+        order::ask::handler(ctx, market, long, price, size)
     }
 
-    pub fn cancel_all_limit_orders(_ctx: Context<CancelAllLimitOrders>) -> DexResult {
-        Ok(())
+    pub fn cancel_order(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
+        order::cancel::handler(ctx, user_order_slot)
+    }
+
+    pub fn cancel_all_orders(ctx: Context<CancelAllOrders>) -> DexResult {
+        order::cancel_all::handler(ctx)
+    }
+
+    pub fn fill_order(ctx: Context<FillOrder>, market: u8) -> DexResult {
+        order::fill::handler(ctx, market)
+    }
+
+    pub fn crank(ctx: Context<Crank>) -> DexResult {
+        order::crank::handler(ctx)
     }
 }
 
@@ -156,24 +183,6 @@ pub struct Swap<'info> {
 
 #[derive(Accounts)]
 pub struct CloseAllPositions<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct NewLimitOrder<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct CancelLimitOrder<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct CancelAllLimitOrders<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 }

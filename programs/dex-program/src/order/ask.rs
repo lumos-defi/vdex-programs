@@ -1,17 +1,20 @@
 use crate::{
-    collections::{MountMode, OrderBook, PagedList},
-    dex::Dex,
+    collections::{MountMode, OrderBook, OrderSide, PagedList},
+    dex::{get_oracle_price, Dex},
     errors::{DexError, DexResult},
-    order::{select_side, Order},
+    order::Order,
     user::state::*,
-    utils::ORDER_POOL_MAGIC_BYTE,
+    utils::{SafeMath, ORDER_POOL_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
-pub struct CancelOrder<'info> {
+pub struct LimitAsk<'info> {
     #[account(owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
+
+    /// CHECK
+    pub oracle: AccountInfo<'info>,
 
     /// CHECK
     #[account(mut, constraint= order_book.owner == program_id)]
@@ -31,25 +34,14 @@ pub struct CancelOrder<'info> {
 
 /// Layout of remaining counts:
 /// 1. Order pool remaining pages
-pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
-    // Mount user state
-    let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let order_slot = us
-        .borrow_mut()
-        .get_order_info(user_order_slot)
-        .map_err(|_| DexError::InvalidOrderSlot)?;
-
-    let (market, open, long) = us
-        .borrow_mut()
-        .unlink_order(user_order_slot)
-        .map_err(|_| DexError::InvalidOrderSlot)?;
-
+pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size: u64) -> DexResult {
     let dex = &ctx.accounts.dex.load()?;
     require!(market < dex.markets_number, DexError::InvalidMarketIndex);
 
     let mi = &dex.markets[market as usize];
     require!(
         mi.valid
+            && mi.oracle == ctx.accounts.oracle.key()
             && mi.order_book == ctx.accounts.order_book.key()
             && mi.order_pool_entry_page == ctx.accounts.order_pool_entry_page.key(),
         DexError::InvalidMarketIndex
@@ -72,6 +64,22 @@ pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
     let ai = &dex.assets[mi.asset_index as usize];
     require!(ai.valid, DexError::InvalidMarketIndex);
 
+    require!(
+        (size.safe_mul(price)? as u64) > mi.minimum_position_value,
+        DexError::InvalidAmount
+    );
+
+    // Check price
+    let market_price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
+    if long {
+        require!(market_price < price, DexError::PriceLTMarketPrice)
+    } else {
+        require!(market_price > price, DexError::PriceGTMarketPrice)
+    }
+
+    // Mount user state
+    let us = UserState::mount(&ctx.accounts.user_state, true)?;
+
     // Mount order book & order pool
     let order_book = OrderBook::mount(&ctx.accounts.order_book, true)?;
     let order_pool = PagedList::<Order>::mount(
@@ -82,17 +90,23 @@ pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
     )
     .map_err(|_| DexError::FailedMountOrderPool)?;
 
+    // Try to allocate from center order pool
     let order = order_pool
-        .from_index(order_slot)
-        .map_err(|_| DexError::InvalidOrderSlot)?;
+        .new_slot()
+        .map_err(|_| DexError::NoFreeSlotInOrderPool)?;
+    order
+        .data
+        .init(price, size, ctx.accounts.user_state.key().to_bytes());
 
-    require!(order.in_use(), DexError::InvalidOrderSlot);
+    // Save order in user state
+    let user_order_slot =
+        us.borrow_mut()
+            .new_ask_order(order.index(), size, price, long, market, mi.decimals)?;
 
-    require_eq!(
-        order.data.user_order_slot,
-        user_order_slot,
-        DexError::InvalidOrderSlot
-    );
+    // Link order to order book
+    let side = if long { OrderSide::BID } else { OrderSide::ASK };
+    let price_node = order_book.link_order(side, order, &order_pool)?;
+    order.data.set_extra_slot(price_node, user_order_slot);
 
-    order_book.unlink_order(select_side(open, long), order, &order_pool)
+    Ok(())
 }
