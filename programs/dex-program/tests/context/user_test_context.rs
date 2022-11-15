@@ -335,17 +335,17 @@ impl UserTestContext {
     }
 
     pub async fn assert_btc_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_mint_acc, DexAsset::USDC as usize, amount)
+        self.assert_asset_amount(user_mint_acc, DexAsset::BTC as usize, amount)
             .await;
     }
 
     pub async fn assert_eth_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_mint_acc, DexAsset::USDC as usize, amount)
+        self.assert_asset_amount(user_mint_acc, DexAsset::ETH as usize, amount)
             .await;
     }
 
     pub async fn assert_sol_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_mint_acc, DexAsset::USDC as usize, amount)
+        self.assert_asset_amount(user_mint_acc, DexAsset::SOL as usize, amount)
             .await;
     }
 
@@ -375,6 +375,32 @@ impl UserTestContext {
     pub async fn get_user_vlp_token_pubkey(&self) -> Pubkey {
         let user_mint_acc =
             get_associated_token_address(&self.user.pubkey(), &self.dex_info.borrow().vlp_mint);
+        user_mint_acc
+    }
+
+    pub async fn get_user_usdc_token_pubkey(&self) -> Pubkey {
+        self.get_user_asset_token_pubkey(DexAsset::USDC as usize)
+            .await
+    }
+
+    pub async fn get_user_btc_token_pubkey(&self) -> Pubkey {
+        self.get_user_asset_token_pubkey(DexAsset::BTC as usize)
+            .await
+    }
+
+    pub async fn get_user_eth_token_pubkey(&self) -> Pubkey {
+        self.get_user_asset_token_pubkey(DexAsset::ETH as usize)
+            .await
+    }
+
+    pub async fn get_user_sol_token_pubkey(&self) -> Pubkey {
+        self.get_user_asset_token_pubkey(DexAsset::SOL as usize)
+            .await
+    }
+
+    pub async fn get_user_asset_token_pubkey(&self, asset: usize) -> Pubkey {
+        let asset_info = self.dex_info.borrow().assets[asset];
+        let user_mint_acc = get_associated_token_address(&self.user.pubkey(), &asset_info.mint);
         user_mint_acc
     }
 }
