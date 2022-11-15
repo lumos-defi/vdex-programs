@@ -59,13 +59,13 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
 
     require_eq!(
-        dex.vlp_mint,
+        dex.vlp_pool.mint,
         ctx.accounts.vlp_mint.key(),
         DexError::InvalidVlpMint
     );
 
     require_eq!(
-        dex.vlp_mint_authority,
+        dex.vlp_pool.program_signer,
         ctx.accounts.vlp_mint_authority.key(),
         DexError::InvalidVlpMintAuthority
     );
@@ -81,7 +81,7 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
 
     let asset_sum = get_asset_aum(&dex, &ctx.remaining_accounts)?;
 
-    let vlp_mint_nonce = dex.vlp_mint_nonce;
+    let vlp_mint_nonce = dex.vlp_pool.nonce;
     let assets = &mut dex.assets;
 
     let asset_index = assets

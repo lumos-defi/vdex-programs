@@ -5,9 +5,12 @@ use crate::{
     utils::{SafeMath, REWARD_SHARE_POW_DECIMALS},
 };
 
+#[account(zero_copy)]
 pub struct StakingPool {
+    pub mint: Pubkey,
     pub vault: Pubkey,
     pub program_signer: Pubkey,
+    pub reward_mint: Pubkey,
     pub reward_total: u64,
     pub staked_total: u64,
     pub accumulate_reward_per_share: u64,
@@ -20,14 +23,18 @@ pub struct StakingPool {
 impl StakingPool {
     pub fn init(
         &mut self,
+        mint: Pubkey,
         vault: Pubkey,
         program_signer: Pubkey,
+        reward_mint: Pubkey,
         nonce: u8,
         decimals: u8,
         reward_asset_index: u8,
     ) {
+        self.mint = mint;
         self.vault = vault;
         self.program_signer = program_signer;
+        self.reward_mint = reward_mint;
         self.decimals = decimals;
         self.nonce = nonce;
         self.decimals = decimals;

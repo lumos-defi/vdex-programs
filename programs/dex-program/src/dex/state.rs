@@ -7,27 +7,25 @@ use crate::{
     },
 };
 
-use super::get_oracle_price;
+use super::{get_oracle_price, StakingPool};
 
 #[account(zero_copy)]
 pub struct Dex {
     pub magic: u64,
     pub assets: [AssetInfo; 16],
     pub markets: [MarketInfo; 16],
+    pub vlp_pool: StakingPool,
     pub authority: Pubkey,
     pub event_queue: Pubkey,
     pub match_queue: Pubkey,
     pub usdc_mint: Pubkey,
-    pub vlp_mint: Pubkey,
-    pub vlp_mint_authority: Pubkey,
     pub user_list_entry_page: Pubkey,
     pub user_list_remaining_pages: [Pubkey; 8],
     pub user_list_remaining_pages_number: u8,
     pub assets_number: u8,
     pub markets_number: u8,
-    pub vlp_mint_nonce: u8,
     pub usdc_asset_index: u8,
-    pub padding: [u8; 251],
+    pub padding: [u8; 252],
 }
 
 impl Dex {

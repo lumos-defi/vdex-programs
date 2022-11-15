@@ -58,7 +58,7 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
 
     require_eq!(
-        dex.vlp_mint,
+        dex.vlp_pool.mint,
         ctx.accounts.vlp_mint.key(),
         DexError::InvalidVlpMint
     );
