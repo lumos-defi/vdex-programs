@@ -31,7 +31,7 @@ pub async fn setup(
     let user_mint_acc = get_associated_token_address(&user.pubkey(), mint);
     let user_vlp_account = get_associated_token_address(&user.pubkey(), vlp_mint);
 
-    //create user asset associated token account
+    //create user vlp associated token account
     match context.banks_client.get_account(user_vlp_account).await {
         Ok(None) => create_associated_token_account(context, &user, &user.pubkey(), vlp_mint).await,
         Ok(Some(_)) => {} //if exists do nothing

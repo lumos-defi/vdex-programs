@@ -40,7 +40,7 @@ pub const TEST_ETH_TARGET_WEIGHT: u16 = 200; //1-1000 //20%
 //SOL asset
 pub const TEST_SOL_SYMBOL: &str = "SOL";
 pub const TEST_SOL_DECIMALS: u8 = 9;
-pub const TEST_SOL_ORACLE_PRICE: f64 = 2_000.0;
+pub const TEST_SOL_ORACLE_PRICE: f64 = 2_00.0;
 pub const TEST_SOL_ORACLE_EXPO: u8 = 8;
 
 pub const TEST_SOL_BORROW_FEE_RATE: u16 = 10; //1-10_000  0.1%

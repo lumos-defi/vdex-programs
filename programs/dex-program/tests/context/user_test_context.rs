@@ -14,7 +14,7 @@ use anchor_client::{
     Program,
 };
 use anchor_lang::{
-    prelude::{AccountInfo, AccountMeta, Pubkey},
+    prelude::{AccountMeta, Pubkey},
     AccountDeserialize,
 };
 
@@ -290,19 +290,19 @@ impl UserTestContext {
     }
 
     pub async fn add_liquidity_with_usdc(&self, amount: f64) {
-        self.add_liquidity(0, amount).await;
+        self.add_liquidity(DexAsset::USDC as u8, amount).await;
     }
 
     pub async fn add_liquidity_with_btc(&self, amount: f64) {
-        self.add_liquidity(1, amount).await;
+        self.add_liquidity(DexAsset::BTC as u8, amount).await;
     }
 
     pub async fn add_liquidity_with_eth(&self, amount: f64) {
-        self.add_liquidity(2, amount).await;
+        self.add_liquidity(DexAsset::ETH as u8, amount).await;
     }
 
     pub async fn add_liquidity_with_sol(&self, amount: f64) {
-        self.add_liquidity(3, amount).await;
+        self.add_liquidity(DexAsset::SOL as u8, amount).await;
     }
 
     async fn add_liquidity(&self, asset: u8, amount: f64) {
@@ -329,17 +329,52 @@ impl UserTestContext {
         .unwrap();
     }
 
-    pub async fn assert_btc_usdc_size(&self, amount: f64) {
-        let asset_info = self.dex_info.borrow().assets[DexAsset::USDC as usize];
-        let asset_amount = get_token_balance(
-            &mut self.context.borrow_mut().banks_client,
-            &asset_info.mint,
-        )
-        .await;
+    pub async fn assert_usdc_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
+        self.assert_asset_amount(user_mint_acc, DexAsset::USDC as usize, amount)
+            .await;
+    }
+
+    pub async fn assert_btc_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
+        self.assert_asset_amount(user_mint_acc, DexAsset::USDC as usize, amount)
+            .await;
+    }
+
+    pub async fn assert_eth_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
+        self.assert_asset_amount(user_mint_acc, DexAsset::USDC as usize, amount)
+            .await;
+    }
+
+    pub async fn assert_sol_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
+        self.assert_asset_amount(user_mint_acc, DexAsset::USDC as usize, amount)
+            .await;
+    }
+
+    pub async fn assert_asset_amount(&self, user_mint_acc: &Pubkey, asset: usize, amount: f64) {
+        let asset_info = self.dex_info.borrow().assets[asset];
+        let asset_amount =
+            get_token_balance(&mut self.context.borrow_mut().banks_client, user_mint_acc).await;
 
         assert_eq!(
             asset_amount,
             convert_to_big_number(amount.into(), asset_info.decimals)
         );
+    }
+
+    pub async fn assert_vlp_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
+        let vlp_account = self.get_account(self.dex_info.borrow().vlp_mint).await;
+        let vlp_mint_info = Mint::try_deserialize(&mut vlp_account.data.as_ref()).unwrap();
+        let asset_amount =
+            get_token_balance(&mut self.context.borrow_mut().banks_client, user_mint_acc).await;
+
+        assert_eq!(
+            asset_amount,
+            convert_to_big_number(amount.into(), vlp_mint_info.decimals)
+        );
+    }
+
+    pub async fn get_user_vlp_token_pubkey(&self) -> Pubkey {
+        let user_mint_acc =
+            get_associated_token_address(&self.user.pubkey(), &self.dex_info.borrow().vlp_mint);
+        user_mint_acc
     }
 }

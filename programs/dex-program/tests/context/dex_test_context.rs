@@ -317,7 +317,7 @@ impl DexTestContext {
         let dex_info = get_dex_info(&mut context.borrow_mut().banks_client, dex.pubkey()).await;
 
         let mut users: Vec<UserTestContext> = vec![];
-        for _ in 0..64 {
+        for _ in 0..5 {
             let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
             //mint to user
             user.mint_usdc(INIT_WALLET_USDC_ASSET_AMOUNT).await;
@@ -504,13 +504,13 @@ pub async fn init_dex(
     let user_list_entry_page = Keypair::new();
 
     let vlp_decimals = 8;
-    let (vlp_mint, vlp_mint_nonce) =
+    let (vlp_mint, nonce) =
         Pubkey::find_program_address(&[&dex.pubkey().to_bytes(), b"vlp"], &program.id());
 
     println!("vlp mint account:{:?}", &vlp_mint);
 
     //get vlp_authority
-    let (vlp_mint_authority, nonce) = Pubkey::find_program_address(
+    let (vlp_mint_authority, vlp_mint_nonce) = Pubkey::find_program_address(
         &[&dex.pubkey().to_bytes(), &vlp_mint.to_bytes()],
         &program.id(),
     );
