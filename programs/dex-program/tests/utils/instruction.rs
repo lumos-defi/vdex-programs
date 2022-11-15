@@ -8,10 +8,11 @@ use anchor_client::{
     },
     Program,
 };
-use anchor_lang::prelude::Pubkey;
+use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
     accounts::{
-        AddAsset, AddMarket, CreateUserState, FeedMockOraclePrice, InitDex, InitMockOracle,
+        AddAsset, AddLiquidity, AddMarket, CreateUserState, FeedMockOraclePrice, InitDex,
+        InitMockOracle,
     },
     dex::Dex,
 };
@@ -280,4 +281,42 @@ pub async fn compose_init_user_state_ixs(
         .unwrap();
 
     init_user_state_ixs
+}
+
+pub async fn compose_add_liquidity_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    mint: &Pubkey,
+    vault: &Pubkey,
+    program_signer: &Pubkey,
+    user_mint_acc: &Pubkey,
+    vlp_mint: &Pubkey,
+    vlp_mint_authority: &Pubkey,
+    user_vlp_account: &Pubkey,
+    amount: u64,
+    remaining_accounts: Vec<AccountMeta>,
+) -> Instruction {
+    let add_liquidity_ix = program
+        .request()
+        .accounts(AddLiquidity {
+            dex: *dex,
+            mint: *mint,
+            vault: *vault,
+            program_signer: *program_signer,
+            user_mint_acc: *user_mint_acc,
+            vlp_mint: *vlp_mint,
+            vlp_mint_authority: *vlp_mint_authority,
+            user_vlp_account: *user_vlp_account,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::AddLiquidity { amount })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    add_liquidity_ix
 }

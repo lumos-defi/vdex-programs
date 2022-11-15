@@ -1,9 +1,33 @@
-use std::{cell::RefCell, convert::TryInto, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::utils::{
-    compose_add_asset_ix, compose_add_market_ixs, compose_init_dex_ixs, convert_to_big_number,
-    create_mint, create_token_account, get_context, get_dex_info, get_keypair_from_file,
-    get_program, set_mock_oracle,
+    compose_add_asset_ix, compose_add_market_ixs, compose_init_dex_ixs,
+    constant::{
+        INIT_WALLET_BTC_ASSET_AMOUNT, INIT_WALLET_ETH_ASSET_AMOUNT, INIT_WALLET_SOL_ASSET_AMOUNT,
+        INIT_WALLET_USDC_ASSET_AMOUNT, TEST_BTC_ADD_LIQUIDITY_FEE_RATE, TEST_BTC_ASSET_INDEX,
+        TEST_BTC_BORROW_FEE_RATE, TEST_BTC_CHARGE_BORROW_FEE_INTERVAL, TEST_BTC_CLOSE_FEE_RATE,
+        TEST_BTC_DECIMALS, TEST_BTC_LIQUIDITY_FEE_RATE, TEST_BTC_MARKET_DECIMALS,
+        TEST_BTC_MARKET_SYMBOL, TEST_BTC_MINIMUM_POSITION_VALUE, TEST_BTC_OPEN_FEE_RATE,
+        TEST_BTC_ORACLE_EXPO, TEST_BTC_ORACLE_PRICE, TEST_BTC_ORACLE_SOURCE,
+        TEST_BTC_REMOVE_LIQUIDITY_FEE_RATE, TEST_BTC_SIGNIFICANT_DECIMALS, TEST_BTC_SYMBOL,
+        TEST_BTC_TARGET_WEIGHT, TEST_ETH_ADD_LIQUIDITY_FEE_RATE, TEST_ETH_ASSET_INDEX,
+        TEST_ETH_BORROW_FEE_RATE, TEST_ETH_CHARGE_BORROW_FEE_INTERVAL, TEST_ETH_CLOSE_FEE_RATE,
+        TEST_ETH_DECIMALS, TEST_ETH_LIQUIDITY_FEE_RATE, TEST_ETH_MARKET_DECIMALS,
+        TEST_ETH_MARKET_SYMBOL, TEST_ETH_MINIMUM_POSITION_VALUE, TEST_ETH_OPEN_FEE_RATE,
+        TEST_ETH_ORACLE_EXPO, TEST_ETH_ORACLE_PRICE, TEST_ETH_ORACLE_SOURCE,
+        TEST_ETH_REMOVE_LIQUIDITY_FEE_RATE, TEST_ETH_SIGNIFICANT_DECIMALS, TEST_ETH_SYMBOL,
+        TEST_ETH_TARGET_WEIGHT, TEST_SOL_ADD_LIQUIDITY_FEE_RATE, TEST_SOL_ASSET_INDEX,
+        TEST_SOL_BORROW_FEE_RATE, TEST_SOL_CHARGE_BORROW_FEE_INTERVAL, TEST_SOL_CLOSE_FEE_RATE,
+        TEST_SOL_DECIMALS, TEST_SOL_LIQUIDITY_FEE_RATE, TEST_SOL_MARKET_DECIMALS,
+        TEST_SOL_MARKET_SYMBOL, TEST_SOL_MINIMUM_POSITION_VALUE, TEST_SOL_OPEN_FEE_RATE,
+        TEST_SOL_ORACLE_EXPO, TEST_SOL_ORACLE_PRICE, TEST_SOL_ORACLE_SOURCE,
+        TEST_SOL_REMOVE_LIQUIDITY_FEE_RATE, TEST_SOL_SIGNIFICANT_DECIMALS, TEST_SOL_SYMBOL,
+        TEST_SOL_TARGET_WEIGHT, TEST_USDC_ADD_LIQUIDITY_FEE_RATE, TEST_USDC_BORROW_FEE_RATE,
+        TEST_USDC_DECIMALS, TEST_USDC_ORACLE_EXPO, TEST_USDC_ORACLE_PRICE,
+        TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE, TEST_USDC_SYMBOL, TEST_USDC_TARGET_WEIGHT,
+    },
+    convert_to_big_number, create_mint, create_token_account, get_context, get_dex_info,
+    get_keypair_from_file, get_program, set_mock_oracle,
 };
 
 use anchor_client::{
@@ -11,10 +35,7 @@ use anchor_client::{
     Program,
 };
 use anchor_lang::prelude::Pubkey;
-use dex_program::{
-    dex::{oracle, Dex},
-    pool::{add_liquidity, remove_liquidity},
-};
+use dex_program::dex::Dex;
 use solana_program_test::ProgramTestContext;
 
 use crate::context::UserTestContext;
@@ -69,15 +90,15 @@ impl DexTestContext {
 
         //2. add USDC asset
         {
-            let symbol: &str = "USDC";
-            let decimals: u8 = 6;
-            let oracle_price: f64 = 1.0;
-            let oracle_expo: u8 = 5;
+            let symbol: &str = TEST_USDC_SYMBOL;
+            let decimals: u8 = TEST_USDC_DECIMALS;
+            let oracle_price: f64 = TEST_USDC_ORACLE_PRICE;
+            let oracle_expo: u8 = TEST_USDC_ORACLE_EXPO;
 
-            let borrow_fee_rate: u16 = 10; //1-10_000  0.1%
-            let add_liquidity_fee_rate: u16 = 10; //0.1%
-            let remove_liquidity_fee_rate: u16 = 10; //0.1%
-            let target_weight: u16 = 400; //1-1000 //40%
+            let borrow_fee_rate: u16 = TEST_USDC_BORROW_FEE_RATE;
+            let add_liquidity_fee_rate: u16 = TEST_USDC_ADD_LIQUIDITY_FEE_RATE;
+            let remove_liquidity_fee_rate: u16 = TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE;
+            let target_weight: u16 = TEST_USDC_TARGET_WEIGHT;
 
             add_asset(
                 &mut context.borrow_mut(),
@@ -100,16 +121,16 @@ impl DexTestContext {
 
         //3. add BTC asset
         {
-            let symbol: &str = "BTC";
-            let decimals: u8 = 9;
-            let oracle_price: f64 = 20_000.0;
-            let oracle_expo: u8 = 8;
+            let symbol: &str = TEST_BTC_SYMBOL;
+            let decimals: u8 = TEST_BTC_DECIMALS;
+            let oracle_price: f64 = TEST_BTC_ORACLE_PRICE;
+            let oracle_expo: u8 = TEST_BTC_ORACLE_EXPO;
 
             let mint = Keypair::new();
-            let borrow_fee_rate: u16 = 10; //1-10_000  0.1%
-            let add_liquidity_fee_rate: u16 = 10; //0.1%
-            let remove_liquidity_fee_rate: u16 = 10; //0.1%
-            let target_weight: u16 = 300; //1-1000 //30%
+            let borrow_fee_rate: u16 = TEST_BTC_BORROW_FEE_RATE;
+            let add_liquidity_fee_rate: u16 = TEST_BTC_ADD_LIQUIDITY_FEE_RATE;
+            let remove_liquidity_fee_rate: u16 = TEST_BTC_REMOVE_LIQUIDITY_FEE_RATE;
+            let target_weight: u16 = TEST_BTC_TARGET_WEIGHT;
 
             add_asset(
                 &mut context.borrow_mut(),
@@ -132,16 +153,16 @@ impl DexTestContext {
 
         //4. add ETH asset
         {
-            let symbol: &str = "ETH";
-            let decimals: u8 = 9;
-            let oracle_price: f64 = 2_000.0;
-            let oracle_expo: u8 = 8;
+            let symbol: &str = TEST_ETH_SYMBOL;
+            let decimals: u8 = TEST_ETH_DECIMALS;
+            let oracle_price: f64 = TEST_ETH_ORACLE_PRICE;
+            let oracle_expo: u8 = TEST_ETH_ORACLE_EXPO;
 
             let mint = Keypair::new();
-            let borrow_fee_rate: u16 = 10; //1-10_000  0.1%
-            let add_liquidity_fee_rate: u16 = 10; //0.1%
-            let remove_liquidity_fee_rate: u16 = 10; //0.1%
-            let target_weight: u16 = 200; //1-1000 //20%
+            let borrow_fee_rate: u16 = TEST_ETH_BORROW_FEE_RATE;
+            let add_liquidity_fee_rate: u16 = TEST_ETH_ADD_LIQUIDITY_FEE_RATE;
+            let remove_liquidity_fee_rate: u16 = TEST_ETH_REMOVE_LIQUIDITY_FEE_RATE;
+            let target_weight: u16 = TEST_ETH_TARGET_WEIGHT;
 
             add_asset(
                 &mut context.borrow_mut(),
@@ -164,16 +185,16 @@ impl DexTestContext {
 
         //5. add SOL asset
         {
-            let symbol: &str = "SOL";
-            let decimals: u8 = 9;
-            let oracle_price: f64 = 20.0;
-            let oracle_expo: u8 = 8;
+            let symbol: &str = TEST_SOL_SYMBOL;
+            let decimals: u8 = TEST_SOL_DECIMALS;
+            let oracle_price: f64 = TEST_SOL_ORACLE_PRICE;
+            let oracle_expo: u8 = TEST_SOL_ORACLE_EXPO;
 
             let mint = Keypair::new();
-            let borrow_fee_rate: u16 = 10; //1-10_000  0.1%
-            let add_liquidity_fee_rate: u16 = 10; //0.1%
-            let remove_liquidity_fee_rate: u16 = 10; //0.1%
-            let target_weight: u16 = 200; //1-1000 //20%
+            let borrow_fee_rate: u16 = TEST_SOL_BORROW_FEE_RATE;
+            let add_liquidity_fee_rate: u16 = TEST_SOL_ADD_LIQUIDITY_FEE_RATE;
+            let remove_liquidity_fee_rate: u16 = TEST_SOL_REMOVE_LIQUIDITY_FEE_RATE;
+            let target_weight: u16 = TEST_SOL_TARGET_WEIGHT;
 
             add_asset(
                 &mut context.borrow_mut(),
@@ -196,16 +217,16 @@ impl DexTestContext {
 
         //6. add BTC market
         {
-            let symbol: &str = "BTC";
-            let minimum_position_value: u64 = 10000;
-            let charge_borrow_fee_interval: u64 = 3600;
-            let open_fee_rate: u16 = 30; // 0.3% (30 / 10000)
-            let close_fee_rate: u16 = 50; // 0.5%   (50 /  10000)
-            let liquidate_fee_rate: u16 = 80; // 0.8%   (80 /  10000)
-            let decimals: u8 = 9;
-            let oracle_source: u8 = 0; // 0: mock,1: pyth
-            let asset_index: u8 = 1; // 0:usdc, 1:btc, 2:eth, 3:sol
-            let significant_decimals: u8 = 2;
+            let symbol: &str = TEST_BTC_MARKET_SYMBOL;
+            let minimum_position_value: u64 = TEST_BTC_MINIMUM_POSITION_VALUE;
+            let charge_borrow_fee_interval: u64 = TEST_BTC_CHARGE_BORROW_FEE_INTERVAL;
+            let open_fee_rate: u16 = TEST_BTC_OPEN_FEE_RATE;
+            let close_fee_rate: u16 = TEST_BTC_CLOSE_FEE_RATE;
+            let liquidate_fee_rate: u16 = TEST_BTC_LIQUIDITY_FEE_RATE;
+            let decimals: u8 = TEST_BTC_MARKET_DECIMALS;
+            let oracle_source: u8 = TEST_BTC_ORACLE_SOURCE;
+            let asset_index: u8 = TEST_BTC_ASSET_INDEX;
+            let significant_decimals: u8 = TEST_BTC_SIGNIFICANT_DECIMALS;
 
             add_market(
                 &mut context.borrow_mut(),
@@ -229,16 +250,16 @@ impl DexTestContext {
 
         //7. add ETH market
         {
-            let symbol: &str = "ETH";
-            let minimum_position_value: u64 = 10000;
-            let charge_borrow_fee_interval: u64 = 3600;
-            let open_fee_rate: u16 = 30; // 0.3% (30 / 10000)
-            let close_fee_rate: u16 = 50; // 0.5%   (50 /  10000)
-            let liquidate_fee_rate: u16 = 80; // 0.8%   (80 /  10000)
-            let decimals: u8 = 9;
-            let oracle_source: u8 = 0; // 0: mock,1: pyth
-            let asset_index: u8 = 2; // 0:usdc, 1:btc, 2:eth, 3:sol
-            let significant_decimals: u8 = 2;
+            let symbol: &str = TEST_ETH_MARKET_SYMBOL;
+            let minimum_position_value: u64 = TEST_ETH_MINIMUM_POSITION_VALUE;
+            let charge_borrow_fee_interval: u64 = TEST_ETH_CHARGE_BORROW_FEE_INTERVAL;
+            let open_fee_rate: u16 = TEST_ETH_OPEN_FEE_RATE;
+            let close_fee_rate: u16 = TEST_ETH_CLOSE_FEE_RATE;
+            let liquidate_fee_rate: u16 = TEST_ETH_LIQUIDITY_FEE_RATE;
+            let decimals: u8 = TEST_ETH_MARKET_DECIMALS;
+            let oracle_source: u8 = TEST_ETH_ORACLE_SOURCE;
+            let asset_index: u8 = TEST_ETH_ASSET_INDEX;
+            let significant_decimals: u8 = TEST_ETH_SIGNIFICANT_DECIMALS;
 
             add_market(
                 &mut context.borrow_mut(),
@@ -262,16 +283,16 @@ impl DexTestContext {
 
         //8. add SOL market
         {
-            let symbol: &str = "SOL";
-            let minimum_position_value: u64 = 10000;
-            let charge_borrow_fee_interval: u64 = 3600;
-            let open_fee_rate: u16 = 30; // 0.3% (30 / 10000)
-            let close_fee_rate: u16 = 50; // 0.5%   (50 /  10000)
-            let liquidate_fee_rate: u16 = 80; // 0.8%   (80 /  10000)
-            let decimals: u8 = 9;
-            let oracle_source: u8 = 0; // 0: mock,1: pyth
-            let asset_index: u8 = 3; // 0:usdc, 1:btc, 2:eth, 3:sol
-            let significant_decimals: u8 = 2;
+            let symbol: &str = TEST_SOL_MARKET_SYMBOL;
+            let minimum_position_value: u64 = TEST_SOL_MINIMUM_POSITION_VALUE;
+            let charge_borrow_fee_interval: u64 = TEST_SOL_CHARGE_BORROW_FEE_INTERVAL;
+            let open_fee_rate: u16 = TEST_SOL_OPEN_FEE_RATE; // 0.3% (30 / 10000)
+            let close_fee_rate: u16 = TEST_SOL_CLOSE_FEE_RATE; // 0.5%   (50 /  10000)
+            let liquidate_fee_rate: u16 = TEST_SOL_LIQUIDITY_FEE_RATE; // 0.8%   (80 /  10000)
+            let decimals: u8 = TEST_SOL_MARKET_DECIMALS;
+            let oracle_source: u8 = TEST_SOL_ORACLE_SOURCE; // 0: mock,1: pyth
+            let asset_index: u8 = TEST_SOL_ASSET_INDEX; // 0:usdc, 1:btc, 2:eth, 3:sol
+            let significant_decimals: u8 = TEST_SOL_SIGNIFICANT_DECIMALS;
 
             add_market(
                 &mut context.borrow_mut(),
@@ -298,6 +319,11 @@ impl DexTestContext {
         let mut users: Vec<UserTestContext> = vec![];
         for _ in 0..64 {
             let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
+            //mint to user
+            user.mint_usdc(INIT_WALLET_USDC_ASSET_AMOUNT).await;
+            user.mint_btc(INIT_WALLET_BTC_ASSET_AMOUNT).await;
+            user.mint_eth(INIT_WALLET_ETH_ASSET_AMOUNT).await;
+            user.mint_sol(INIT_WALLET_SOL_ASSET_AMOUNT).await;
             users.push(user);
         }
 
@@ -485,7 +511,7 @@ pub async fn init_dex(
 
     //get vlp_authority
     let (vlp_mint_authority, nonce) = Pubkey::find_program_address(
-        &[&vlp_mint.to_bytes(), &dex.pubkey().to_bytes()],
+        &[&dex.pubkey().to_bytes(), &vlp_mint.to_bytes()],
         &program.id(),
     );
 

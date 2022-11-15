@@ -5,3 +5,10 @@ pub enum DexMarket {
     ETH = 1,
     SOL = 2,
 }
+
+pub enum DexAsset {
+    USDC = 0,
+    BTC = 1,
+    ETH = 2,
+    SOL = 3,
+}

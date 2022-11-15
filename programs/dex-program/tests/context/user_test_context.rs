@@ -5,19 +5,26 @@ use std::{
 };
 
 use crate::utils::{
-    convert_to_big_number, get_dex_info, get_keypair, get_program, set_feed_mock_oracle,
-    set_user_state, transfer, DexMarket,
+    convert_to_big_number, convert_to_big_number_i, create_associated_token_account, get_dex_info,
+    get_keypair, get_program, get_token_balance, mint_tokens, set_add_liquidity,
+    set_feed_mock_oracle, set_user_state, transfer, DexAsset, DexMarket,
 };
 use anchor_client::{
     solana_sdk::{account::Account, signature::Keypair, signer::Signer},
     Program,
 };
-use anchor_lang::prelude::{AccountMeta, Pubkey};
+use anchor_lang::{
+    prelude::{AccountInfo, AccountMeta, Pubkey},
+    AccountDeserialize,
+};
+
+use anchor_spl::token::Mint;
 use dex_program::{
     dex::{Dex, MockOracle},
     utils::USDC_POW_DECIMALS,
 };
 use solana_program_test::ProgramTestContext;
+use spl_associated_token_account::get_associated_token_address;
 
 pub struct UserTestContext {
     pub context: Rc<RefCell<ProgramTestContext>>,
@@ -199,7 +206,7 @@ impl UserTestContext {
             }
         }
 
-        //process perp market oracle account
+        //process dex market oracle account
         for market in &self.dex_info.borrow().markets {
             if market.valid {
                 remaining_accounts.append(&mut vec![AccountMeta::new(market.oracle, false)])
@@ -220,5 +227,119 @@ impl UserTestContext {
         }
 
         remaining_accounts
+    }
+
+    pub async fn mint_usdc(&self, amount: f64) {
+        let usdc_asset = self.dex_info.borrow().assets[DexAsset::USDC as usize];
+        let mint_amount = convert_to_big_number(amount, usdc_asset.decimals);
+
+        self.mint_asset(&usdc_asset.mint, &self.admin, mint_amount)
+            .await;
+    }
+
+    pub async fn mint_btc(&self, amount: f64) {
+        let btc_asset = self.dex_info.borrow().assets[DexAsset::BTC as usize];
+        let mint_amount = convert_to_big_number(amount, btc_asset.decimals);
+
+        self.mint_asset(&btc_asset.mint, &self.admin, mint_amount)
+            .await;
+    }
+
+    pub async fn mint_eth(&self, amount: f64) {
+        let eth_asset = self.dex_info.borrow().assets[DexAsset::ETH as usize];
+        let mint_amount = convert_to_big_number(amount, eth_asset.decimals);
+
+        self.mint_asset(&eth_asset.mint, &self.admin, mint_amount)
+            .await;
+    }
+
+    pub async fn mint_sol(&self, amount: f64) {
+        let sol_asset = self.dex_info.borrow().assets[DexAsset::SOL as usize];
+        let mint_amount = convert_to_big_number(amount, sol_asset.decimals);
+
+        self.mint_asset(&sol_asset.mint, &self.admin, mint_amount)
+            .await;
+    }
+
+    async fn mint_asset(&self, mint: &Pubkey, mint_authority: &Keypair, amount: u64) {
+        let user_mint_acc = get_associated_token_address(&self.user.pubkey(), &mint);
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        //create user asset associated token account
+        match context.banks_client.get_account(user_mint_acc).await {
+            Ok(None) => {
+                create_associated_token_account(context, &self.user, &self.user.pubkey(), mint)
+                    .await
+            }
+            Ok(Some(_)) => {} //if exists do nothing
+            Err(_) => {}
+        }
+
+        {
+            mint_tokens(
+                context,
+                &self.admin,
+                mint,
+                &user_mint_acc,
+                mint_authority,
+                amount,
+            )
+            .await
+            .unwrap();
+        }
+    }
+
+    pub async fn add_liquidity_with_usdc(&self, amount: f64) {
+        self.add_liquidity(0, amount).await;
+    }
+
+    pub async fn add_liquidity_with_btc(&self, amount: f64) {
+        self.add_liquidity(1, amount).await;
+    }
+
+    pub async fn add_liquidity_with_eth(&self, amount: f64) {
+        self.add_liquidity(2, amount).await;
+    }
+
+    pub async fn add_liquidity_with_sol(&self, amount: f64) {
+        self.add_liquidity(3, amount).await;
+    }
+
+    async fn add_liquidity(&self, asset: u8, amount: f64) {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+        let asset_info = self.dex_info.borrow().assets[asset as usize];
+        let deposit_amount = convert_to_big_number(amount, asset_info.decimals);
+        let remaining_accounts = self.get_oracle_remaining_accounts().await;
+
+        set_add_liquidity::setup(
+            context,
+            &self.program,
+            &self.admin,
+            &self.user,
+            &self.dex,
+            &asset_info.mint,
+            &asset_info.vault,
+            &asset_info.program_signer,
+            &self.dex_info.borrow().vlp_mint,
+            &self.dex_info.borrow().vlp_mint_authority,
+            deposit_amount,
+            remaining_accounts,
+        )
+        .await
+        .unwrap();
+    }
+
+    pub async fn assert_btc_usdc_size(&self, amount: f64) {
+        let asset_info = self.dex_info.borrow().assets[DexAsset::USDC as usize];
+        let asset_amount = get_token_balance(
+            &mut self.context.borrow_mut().banks_client,
+            &asset_info.mint,
+        )
+        .await;
+
+        assert_eq!(
+            asset_amount,
+            convert_to_big_number(amount.into(), asset_info.decimals)
+        );
     }
 }
