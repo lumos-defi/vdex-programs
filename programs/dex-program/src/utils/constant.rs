@@ -16,3 +16,5 @@ pub const USDC_DECIMALS: u8 = 6;
 pub const USDC_POW_DECIMALS: u64 = 10u64.pow(USDC_DECIMALS as u32);
 
 pub const MAX_FILLED_PER_INSTRUCTION: u32 = 20;
+
+pub const REWARD_SHARE_POW_DECIMALS: u64 = 10u64.pow(12 as u32);

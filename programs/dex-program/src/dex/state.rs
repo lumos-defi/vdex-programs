@@ -531,7 +531,7 @@ pub struct MockOracle {
     pub magic: u64,
     pub price: u64,
     pub expo: u8,
-    pub padding1: [u8; 7],
+    pub padding: [u8; 7],
 }
 pub struct UserListItem {
     pub user_state: [u8; 32],
