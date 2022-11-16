@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+
+//vlp decimals
 pub const TEST_VLP_DECIMALS: u8 = 8;
 
 //init user wallet asset amount

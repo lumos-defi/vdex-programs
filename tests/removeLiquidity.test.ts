@@ -1,12 +1,10 @@
 import { Keypair, PublicKey, AccountMeta } from '@solana/web3.js'
 import { airdrop, getProviderAndProgram } from './utils/getProvider'
 import { TOKEN_PROGRAM_ID, Token } from '@solana/spl-token'
-import { createTokenAccount } from './utils/createTokenAccount'
 import { BN } from '@project-serum/anchor'
 import { createDexFull } from './utils/createDexFull'
 import { getOracleAccounts } from './utils/getOracleAccounts'
 import { createUserState } from './utils/createUserState'
-import { createAccountInstruction } from './utils/createAccountInstruction'
 
 describe('Test Remove Liquidity', () => {
   const { program, provider } = getProviderAndProgram()

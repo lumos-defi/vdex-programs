@@ -6,8 +6,8 @@ use std::{
 
 use crate::utils::{
     convert_to_big_number, create_associated_token_account, get_dex_info, get_keypair, get_program,
-    get_token_balance, mint_tokens, set_add_liquidity, set_feed_mock_oracle, set_user_state,
-    transfer, DexAsset, DexMarket,
+    get_token_balance, mint_tokens, set_add_liquidity, set_feed_mock_oracle, set_remove_liquidity,
+    set_user_state, transfer, DexAsset, DexMarket,
 };
 use anchor_client::{
     solana_sdk::{account::Account, signature::Keypair, signer::Signer},
@@ -327,30 +327,71 @@ impl UserTestContext {
         .unwrap();
     }
 
-    pub async fn assert_usdc_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_mint_acc, DexAsset::USDC as usize, amount)
+    pub async fn remove_liquidity_with_usdc(&self, vlp_amount: f64) {
+        self.remove_liquidity(DexAsset::USDC as u8, vlp_amount)
             .await;
     }
 
-    pub async fn assert_btc_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_mint_acc, DexAsset::BTC as usize, amount)
+    pub async fn remove_liquidity_with_btc(&self, vlp_amount: f64) {
+        self.remove_liquidity(DexAsset::BTC as u8, vlp_amount).await;
+    }
+
+    pub async fn remove_liquidity_with_eth(&self, vlp_amount: f64) {
+        self.remove_liquidity(DexAsset::ETH as u8, vlp_amount).await;
+    }
+
+    pub async fn remove_liquidity_with_sol(&self, vlp_amount: f64) {
+        self.remove_liquidity(DexAsset::SOL as u8, vlp_amount).await;
+    }
+
+    async fn remove_liquidity(&self, asset: u8, vlp_amount: f64) {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+        let asset_info = self.dex_info.borrow().assets[asset as usize];
+        let withdraw_vlp_amount = convert_to_big_number(vlp_amount, TEST_VLP_DECIMALS);
+        let remaining_accounts = self.get_oracle_remaining_accounts().await;
+
+        set_remove_liquidity::setup(
+            context,
+            &self.program,
+            &self.admin,
+            &self.user,
+            &self.dex,
+            &asset_info.mint,
+            &asset_info.vault,
+            &asset_info.program_signer,
+            &self.dex_info.borrow().event_queue,
+            &self.user_state,
+            withdraw_vlp_amount,
+            remaining_accounts,
+        )
+        .await
+        .unwrap();
+    }
+
+    pub async fn assert_usdc_amount(&self, user_asset_acc: &Pubkey, amount: f64) {
+        self.assert_asset_amount(user_asset_acc, DexAsset::USDC as usize, amount)
             .await;
     }
 
-    pub async fn assert_eth_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_mint_acc, DexAsset::ETH as usize, amount)
+    pub async fn assert_btc_amount(&self, user_asset_acc: &Pubkey, amount: f64) {
+        self.assert_asset_amount(user_asset_acc, DexAsset::BTC as usize, amount)
             .await;
     }
 
-    pub async fn assert_sol_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_mint_acc, DexAsset::SOL as usize, amount)
+    pub async fn assert_eth_amount(&self, user_asset_acc: &Pubkey, amount: f64) {
+        self.assert_asset_amount(user_asset_acc, DexAsset::ETH as usize, amount)
             .await;
     }
 
-    pub async fn assert_asset_amount(&self, user_mint_acc: &Pubkey, asset: usize, amount: f64) {
+    pub async fn assert_sol_amount(&self, user_asset_acc: &Pubkey, amount: f64) {
+        self.assert_asset_amount(user_asset_acc, DexAsset::SOL as usize, amount)
+            .await;
+    }
+
+    pub async fn assert_asset_amount(&self, user_asset_acc: &Pubkey, asset: usize, amount: f64) {
         let asset_info = self.dex_info.borrow().assets[asset];
         let asset_amount =
-            get_token_balance(&mut self.context.borrow_mut().banks_client, user_mint_acc).await;
+            get_token_balance(&mut self.context.borrow_mut().banks_client, user_asset_acc).await;
 
         assert_eq!(
             asset_amount,
@@ -362,6 +403,7 @@ impl UserTestContext {
         let mut user_state_account = self.get_account(self.user_state).await;
         let user_state_account_info: AccountInfo =
             (&self.user_state, true, &mut user_state_account).into();
+
         let us = UserState::mount(&user_state_account_info, true).unwrap();
         let ref_us = us.borrow();
 

@@ -217,7 +217,6 @@ impl DexTestContext {
             .await;
         }
 
-        println!("=======>");
         //6. add BTC market
         {
             let symbol: &str = TEST_BTC_MARKET_SYMBOL;

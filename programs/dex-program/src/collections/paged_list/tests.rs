@@ -408,7 +408,7 @@ mod paged_linked_list_test_suite {
             list.into_iter()
                 .map(|x| x.data.user_id)
                 .collect::<Vec<u64>>(),
-            vec![1, 0]
+            vec![]
         )
     }
 

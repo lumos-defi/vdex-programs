@@ -17,12 +17,22 @@ async fn test_remove_liquidity_with_usdc() {
     let alice = &dtc.user_context[0];
 
     alice.add_liquidity_with_usdc(10_000.0).await;
-    let user_vlp_acc = alice.get_user_vlp_token_pubkey().await;
     let user_asset_acc = alice.get_user_usdc_token_pubkey().await;
 
     //0.1% add liquidity fee
-    alice.assert_vlp_amount(&user_vlp_acc, 9_990.0).await;
+    alice.assert_user_vlp_amount(9_990.0).await;
     alice
         .assert_usdc_amount(&user_asset_acc, INIT_WALLET_USDC_ASSET_AMOUNT - 10_000.0)
-        .await
+        .await;
+
+    //0.1% remove liquidity fee
+    alice.remove_liquidity_with_usdc(9_990.0).await;
+
+    alice.assert_user_vlp_amount(0.0).await;
+    // alice
+    //     .assert_usdc_amount(
+    //         &user_asset_acc,
+    //         INIT_WALLET_USDC_ASSET_AMOUNT - 10_000.0 + 9_980.01,
+    //     )
+    //     .await;
 }

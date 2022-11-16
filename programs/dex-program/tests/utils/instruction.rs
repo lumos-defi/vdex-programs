@@ -10,7 +10,7 @@ use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
     accounts::{
         AddAsset, AddLiquidity, AddMarket, CreateUserState, FeedMockOraclePrice, InitDex,
-        InitMockOracle,
+        InitMockOracle, RemoveLiquidity,
     },
     dex::Dex,
 };
@@ -297,4 +297,40 @@ pub async fn compose_add_liquidity_ix(
         .unwrap();
 
     add_liquidity_ix
+}
+
+pub async fn compose_remove_liquidity_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    mint: &Pubkey,
+    vault: &Pubkey,
+    program_signer: &Pubkey,
+    user_mint_acc: &Pubkey,
+    event_queue: &Pubkey,
+    user_state: &Pubkey,
+    amount: u64,
+    remaining_accounts: Vec<AccountMeta>,
+) -> Instruction {
+    let remove_liquidity_ix = program
+        .request()
+        .accounts(RemoveLiquidity {
+            dex: *dex,
+            mint: *mint,
+            vault: *vault,
+            program_signer: *program_signer,
+            user_mint_acc: *user_mint_acc,
+            event_queue: *event_queue,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+            user_state: *user_state,
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::RemoveLiquidity { amount })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    remove_liquidity_ix
 }

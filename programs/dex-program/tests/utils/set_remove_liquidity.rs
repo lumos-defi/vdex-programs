@@ -9,7 +9,7 @@ use anchor_lang::prelude::{AccountMeta, Pubkey};
 use solana_program_test::ProgramTestContext;
 use spl_associated_token_account::get_associated_token_address;
 
-use super::compose_add_liquidity_ix;
+use super::compose_remove_liquidity_ix;
 
 #[allow(clippy::too_many_arguments)]
 pub async fn setup(
@@ -23,12 +23,12 @@ pub async fn setup(
     program_signer: &Pubkey,
     event_queue: &Pubkey,
     user_state: &Pubkey,
-    amount: u64,
+    vlp_amount: u64,
     remaining_accounts: Vec<AccountMeta>,
 ) -> Result<(), TransportError> {
     let user_mint_acc = get_associated_token_address(&user.pubkey(), mint);
 
-    let add_liquidity_ix = compose_add_liquidity_ix(
+    let remove_liquidity_ix = compose_remove_liquidity_ix(
         program,
         user,
         dex,
@@ -38,13 +38,13 @@ pub async fn setup(
         &user_mint_acc,
         event_queue,
         &user_state,
-        amount,
+        vlp_amount,
         remaining_accounts,
     )
     .await;
 
     let transaction = Transaction::new_signed_with_payer(
-        &[add_liquidity_ix],
+        &[remove_liquidity_ix],
         Some(&user.pubkey()),
         &[user],
         context.banks_client.get_latest_blockhash().await.unwrap(),

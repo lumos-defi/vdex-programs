@@ -1,4 +1,5 @@
-#[allow(dead_code)]
+#![allow(dead_code)]
+
 #[derive(Clone, Copy, Debug)]
 pub enum DexMarket {
     BTC = 0,
