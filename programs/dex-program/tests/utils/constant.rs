@@ -1,3 +1,5 @@
+pub const TEST_VLP_DECIMALS: u8 = 8;
+
 //init user wallet asset amount
 pub const INIT_WALLET_BTC_ASSET_AMOUNT: f64 = 10.0;
 pub const INIT_WALLET_ETH_ASSET_AMOUNT: f64 = 100.0;

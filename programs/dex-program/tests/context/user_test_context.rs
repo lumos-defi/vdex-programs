@@ -5,22 +5,20 @@ use std::{
 };
 
 use crate::utils::{
-    convert_to_big_number, convert_to_big_number_i, create_associated_token_account, get_dex_info,
-    get_keypair, get_program, get_token_balance, mint_tokens, set_add_liquidity,
-    set_feed_mock_oracle, set_user_state, transfer, DexAsset, DexMarket,
+    convert_to_big_number, create_associated_token_account, get_dex_info, get_keypair, get_program,
+    get_token_balance, mint_tokens, set_add_liquidity, set_feed_mock_oracle, set_user_state,
+    transfer, DexAsset, DexMarket,
 };
 use anchor_client::{
     solana_sdk::{account::Account, signature::Keypair, signer::Signer},
     Program,
 };
-use anchor_lang::{
-    prelude::{AccountMeta, Pubkey},
-    AccountDeserialize,
-};
+use anchor_lang::prelude::{AccountInfo, AccountMeta, Pubkey};
 
-use anchor_spl::token::Mint;
+use crate::utils::constant::TEST_VLP_DECIMALS;
 use dex_program::{
     dex::{Dex, MockOracle},
+    user::UserState,
     utils::USDC_POW_DECIMALS,
 };
 use solana_program_test::ProgramTestContext;
@@ -320,8 +318,8 @@ impl UserTestContext {
             &asset_info.mint,
             &asset_info.vault,
             &asset_info.program_signer,
-            &self.dex_info.borrow().vlp_mint,
-            &self.dex_info.borrow().vlp_mint_authority,
+            &self.dex_info.borrow().event_queue,
+            &self.user_state,
             deposit_amount,
             remaining_accounts,
         )
@@ -360,23 +358,35 @@ impl UserTestContext {
         );
     }
 
-    pub async fn assert_vlp_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
-        let vlp_account = self.get_account(self.dex_info.borrow().vlp_mint).await;
-        let vlp_mint_info = Mint::try_deserialize(&mut vlp_account.data.as_ref()).unwrap();
-        let asset_amount =
-            get_token_balance(&mut self.context.borrow_mut().banks_client, user_mint_acc).await;
+    pub async fn assert_user_vlp_amount(&self, amount: f64) {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
 
-        assert_eq!(
-            asset_amount,
-            convert_to_big_number(amount.into(), vlp_mint_info.decimals)
-        );
+        let vlp_amount = ref_us.meta.vlp.staked;
+
+        assert_eq!(vlp_amount, convert_to_big_number(amount, TEST_VLP_DECIMALS));
     }
 
-    pub async fn get_user_vlp_token_pubkey(&self) -> Pubkey {
-        let user_mint_acc =
-            get_associated_token_address(&self.user.pubkey(), &self.dex_info.borrow().vlp_mint);
-        user_mint_acc
-    }
+    // pub async fn assert_vlp_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
+    //     let vlp_account = self.get_account(self.dex_info.borrow().vlp_mint).await;
+    //     let vlp_mint_info = Mint::try_deserialize(&mut vlp_account.data.as_ref()).unwrap();
+    //     let asset_amount =
+    //         get_token_balance(&mut self.context.borrow_mut().banks_client, user_mint_acc).await;
+
+    //     assert_eq!(
+    //         asset_amount,
+    //         convert_to_big_number(amount.into(), vlp_mint_info.decimals)
+    //     );
+    // }
+
+    // pub async fn get_user_vlp_token_pubkey(&self) -> Pubkey {
+    //     let user_mint_acc =
+    //         get_associated_token_address(&self.user.pubkey(), &self.dex_info.borrow().vlp_mint);
+    //     user_mint_acc
+    // }
 
     pub async fn get_user_usdc_token_pubkey(&self) -> Pubkey {
         self.get_user_asset_token_pubkey(DexAsset::USDC as usize)

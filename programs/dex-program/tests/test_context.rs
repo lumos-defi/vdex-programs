@@ -27,16 +27,11 @@ async fn test_get_order_book_account() {
     let dtc = DexTestContext::new().await;
     let alice = &dtc.user_context[0];
 
-    let long_order_book = alice
-        .get_account(alice.dex_info.borrow().markets[market as usize].long_order_book)
+    let order_book = alice
+        .get_account(alice.dex_info.borrow().markets[market as usize].order_book)
         .await;
 
-    let short_order_book = alice
-        .get_account(alice.dex_info.borrow().markets[market as usize].short_order_book)
-        .await;
-
-    assert!(long_order_book.lamports() > 0);
-    assert!(short_order_book.lamports() > 0);
+    assert!(order_book.lamports() > 0);
 }
 
 #[tokio::test]

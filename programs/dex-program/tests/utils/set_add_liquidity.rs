@@ -9,7 +9,7 @@ use anchor_lang::prelude::{AccountMeta, Pubkey};
 use solana_program_test::ProgramTestContext;
 use spl_associated_token_account::get_associated_token_address;
 
-use crate::utils::create_associated_token_account;
+use crate::utils::set_user_state;
 
 use super::compose_add_liquidity_ix;
 
@@ -23,22 +23,14 @@ pub async fn setup(
     mint: &Pubkey,
     vault: &Pubkey,
     program_signer: &Pubkey,
-    vlp_mint: &Pubkey,
-    vlp_mint_authority: &Pubkey,
+    event_queue: &Pubkey,
+    user_state: &Pubkey,
     amount: u64,
     remaining_accounts: Vec<AccountMeta>,
 ) -> Result<(), TransportError> {
+    println!("user state:{:?}", user_state);
+
     let user_mint_acc = get_associated_token_address(&user.pubkey(), mint);
-    let user_vlp_account = get_associated_token_address(&user.pubkey(), vlp_mint);
-
-    //create user vlp associated token account
-    match context.banks_client.get_account(user_vlp_account).await {
-        Ok(None) => create_associated_token_account(context, &user, &user.pubkey(), vlp_mint).await,
-        Ok(Some(_)) => {} //if exists do nothing
-        Err(_) => {}
-    }
-
-    println!("user vlp ata:{}", user_vlp_account);
 
     let add_liquidity_ix = compose_add_liquidity_ix(
         program,
@@ -48,9 +40,8 @@ pub async fn setup(
         vault,
         program_signer,
         &user_mint_acc,
-        vlp_mint,
-        vlp_mint_authority,
-        &user_vlp_account,
+        event_queue,
+        &user_state,
         amount,
         remaining_accounts,
     )

@@ -29,10 +29,9 @@ describe('Test Remove Liquidity', () => {
   beforeEach(async () => {
     authority = Keypair.generate()
     alice = Keypair.generate()
-    eventQueue = Keypair.generate()
 
     await airdrop(provider, alice.publicKey, 10000000000)
-    ;({ dex, assetMint, assetVault, programSigner } = await createDexFull(authority))
+    ;({ dex, assetMint, assetVault, programSigner, eventQueue } = await createDexFull(authority))
 
     //create alice asset associatedTokenAccount
     aliceAssetToken = await assetMint.createAssociatedTokenAccount(alice.publicKey)
@@ -65,8 +64,7 @@ describe('Test Remove Liquidity', () => {
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .remainingAccounts(oracleAccounts)
-      .preInstructions([await createAccountInstruction(eventQueue, 128 * 1024)])
-      .signers([alice, eventQueue])
+      .signers([alice])
       .rpc()
   })
 
@@ -100,7 +98,6 @@ describe('Test Remove Liquidity', () => {
       liquidityAmount: expect.toBNEqual(0),
     })
 
-    console.log(999, aliceAssetTokenAccount, MINT_AMOUNT)
     expect(aliceAssetTokenAccount).toMatchObject({
       amount: (MINT_AMOUNT - 19_900_000).toString(), //fee:{add_liquidity:0.01,remove_liquidity:0.0099}
     })

@@ -135,8 +135,7 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
         .enter_staking_vlp(&mut dex.vlp_pool, vlp_amount)?;
 
     // TODO: save to event queue
-    let mut _event_queue = EventQueue::mount(&ctx.accounts.event_queue, false)?
-        .initialize(true)
+    let mut _event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
         .map_err(|_| DexError::FailedMountEventQueue)?;
 
     Ok(())

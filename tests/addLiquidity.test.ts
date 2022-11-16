@@ -27,10 +27,9 @@ describe('Test Add Liquidity', () => {
   beforeEach(async () => {
     authority = Keypair.generate()
     alice = Keypair.generate()
-    eventQueue = Keypair.generate()
 
     await airdrop(provider, alice.publicKey, 10000000000)
-    ;({ dex, assetMint, assetVault, programSigner } = await createDexFull(authority))
+    ;({ dex, assetMint, assetVault, programSigner, eventQueue } = await createDexFull(authority))
 
     //create alice asset associatedTokenAccount
     aliceAssetToken = await assetMint.createAssociatedTokenAccount(alice.publicKey)
@@ -63,8 +62,7 @@ describe('Test Add Liquidity', () => {
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .remainingAccounts(oracleAccounts)
-      .preInstructions([await createAccountInstruction(eventQueue, 128 * 1024)])
-      .signers([alice, eventQueue])
+      .signers([alice])
       .rpc()
 
     const aliceAssetTokenAccount = await (

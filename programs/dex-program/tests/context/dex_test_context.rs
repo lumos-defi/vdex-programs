@@ -25,6 +25,7 @@ use crate::utils::{
         TEST_SOL_TARGET_WEIGHT, TEST_USDC_ADD_LIQUIDITY_FEE_RATE, TEST_USDC_BORROW_FEE_RATE,
         TEST_USDC_DECIMALS, TEST_USDC_ORACLE_EXPO, TEST_USDC_ORACLE_PRICE,
         TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE, TEST_USDC_SYMBOL, TEST_USDC_TARGET_WEIGHT,
+        TEST_VLP_DECIMALS,
     },
     convert_to_big_number, create_mint, create_token_account, get_context, get_dex_info,
     get_keypair_from_file, get_program, set_mock_oracle,
@@ -71,6 +72,7 @@ impl DexTestContext {
 
         let dex = Keypair::new();
         let usdc_mint = Keypair::new();
+        let sol_mint = Keypair::new();
 
         //oracle
         let usdc_mock_oracle = Keypair::new();
@@ -85,6 +87,7 @@ impl DexTestContext {
             &admin,
             &dex,
             &usdc_mint,
+            &sol_mint,
         )
         .await;
 
@@ -190,7 +193,6 @@ impl DexTestContext {
             let oracle_price: f64 = TEST_SOL_ORACLE_PRICE;
             let oracle_expo: u8 = TEST_SOL_ORACLE_EXPO;
 
-            let mint = Keypair::new();
             let borrow_fee_rate: u16 = TEST_SOL_BORROW_FEE_RATE;
             let add_liquidity_fee_rate: u16 = TEST_SOL_ADD_LIQUIDITY_FEE_RATE;
             let remove_liquidity_fee_rate: u16 = TEST_SOL_REMOVE_LIQUIDITY_FEE_RATE;
@@ -201,7 +203,7 @@ impl DexTestContext {
                 &program,
                 &admin,
                 &dex,
-                &mint,
+                &sol_mint,
                 symbol,
                 decimals,
                 convert_to_big_number(oracle_price.into(), oracle_expo),
@@ -215,6 +217,7 @@ impl DexTestContext {
             .await;
         }
 
+        println!("=======>");
         //6. add BTC market
         {
             let symbol: &str = TEST_BTC_MARKET_SYMBOL;
@@ -355,8 +358,7 @@ pub async fn add_market(
     asset_index: u8,
     significant_decimals: u8,
 ) {
-    let long_order_book = Keypair::new();
-    let short_order_book = Keypair::new();
+    let order_book = Keypair::new();
     let order_pool_entry_page = Keypair::new();
 
     //add market
@@ -365,8 +367,7 @@ pub async fn add_market(
         program,
         payer,
         dex,
-        &long_order_book.pubkey(),
-        &short_order_book.pubkey(),
+        &order_book.pubkey(),
         &order_pool_entry_page.pubkey(),
         &mock_oracle.pubkey(),
         symbol.to_string(),
@@ -385,12 +386,7 @@ pub async fn add_market(
     let transaction = Transaction::new_signed_with_payer(
         &add_market_ixs,
         Some(&payer.pubkey()),
-        &[
-            payer,
-            &long_order_book,
-            &short_order_book,
-            &order_pool_entry_page,
-        ],
+        &[payer, &order_book, &order_pool_entry_page],
         context.last_blockhash,
     );
 
@@ -431,12 +427,13 @@ pub async fn add_asset(
     .await
     .unwrap();
 
+    println!("init mock oralce {}", mock_oracle.pubkey());
     //create mint
     create_mint(context, payer, &mint, decimals, &payer.pubkey())
         .await
         .unwrap();
 
-    println!("mint account:{:?}", &mint.pubkey());
+    println!("symbol: {}, mint account:{:?}", symbol, &mint.pubkey());
 
     //get program signer
     let (program_signer, nonce) = Pubkey::find_program_address(
@@ -498,27 +495,14 @@ pub async fn init_dex(
     payer: &Keypair,
     dex: &Keypair,
     usdc_mint: &Keypair,
+    sol_mint: &Keypair,
 ) {
     let event_queue = Keypair::new();
     let match_queue = Keypair::new();
     let user_list_entry_page = Keypair::new();
+    let reward_mint = sol_mint;
 
-    let vlp_decimals = 8;
-    let (vlp_mint, nonce) =
-        Pubkey::find_program_address(&[&dex.pubkey().to_bytes(), b"vlp"], &program.id());
-
-    println!("vlp mint account:{:?}", &vlp_mint);
-
-    //get vlp_authority
-    let (vlp_mint_authority, vlp_mint_nonce) = Pubkey::find_program_address(
-        &[&dex.pubkey().to_bytes(), &vlp_mint.to_bytes()],
-        &program.id(),
-    );
-
-    println!(
-        "vlp mint authority:{:?}, nonce:{:?}",
-        vlp_mint_authority, nonce
-    );
+    let vlp_decimals = TEST_VLP_DECIMALS;
 
     let init_dex_ixs = compose_init_dex_ixs(
         context,
@@ -529,10 +513,8 @@ pub async fn init_dex(
         &event_queue,
         &match_queue,
         &user_list_entry_page,
-        vlp_mint,
-        vlp_mint_authority,
+        &reward_mint,
         vlp_decimals,
-        vlp_mint_nonce,
     )
     .await;
 

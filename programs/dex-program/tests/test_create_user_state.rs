@@ -53,4 +53,7 @@ async fn test_init_user_state() {
 
     assert_eq!(us.borrow().meta.order_slot_count, 32);
     assert_eq!(us.borrow().meta.position_slot_count, 32);
+    assert_eq!(us.borrow().meta.vlp.staked, 0);
+    assert_eq!(us.borrow().meta.vlp.reward_debt, 0);
+    assert_eq!(us.borrow().meta.vlp.reward_accumulated, 0);
 }

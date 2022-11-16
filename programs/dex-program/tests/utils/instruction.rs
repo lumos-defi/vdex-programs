@@ -3,9 +3,7 @@
 use std::mem;
 
 use anchor_client::{
-    solana_sdk::{
-        instruction::Instruction, signer::Signer, system_instruction, system_program, sysvar,
-    },
+    solana_sdk::{instruction::Instruction, signer::Signer, system_instruction, system_program},
     Program,
 };
 use anchor_lang::prelude::{AccountMeta, Pubkey};
@@ -29,10 +27,8 @@ pub async fn compose_init_dex_ixs(
     event_queue: &Keypair,
     match_queue: &Keypair,
     user_list_entry_page: &Keypair,
-    vlp_mint: Pubkey,
-    vlp_mint_authority: Pubkey,
+    reward_mint: &Keypair,
     vlp_decimals: u8,
-    vlp_mint_nonce: u8,
 ) -> Vec<Instruction> {
     let rent = context.banks_client.get_rent().await.unwrap();
     let dex_account_size = 8 + mem::size_of::<Dex>();
@@ -77,16 +73,9 @@ pub async fn compose_init_dex_ixs(
             event_queue: event_queue.pubkey(),
             match_queue: match_queue.pubkey(),
             user_list_entry_page: user_list_entry_page.pubkey(),
-            vlp_mint,
-            vlp_mint_authority,
-            system_program: system_program::id(),
-            token_program: spl_token::id(),
-            rent: sysvar::rent::id(),
+            reward_mint: reward_mint.pubkey(),
         })
-        .args(dex_program::instruction::InitDex {
-            vlp_decimals,
-            vlp_mint_nonce,
-        })
+        .args(dex_program::instruction::InitDex { vlp_decimals })
         .instructions()
         .unwrap();
 
@@ -188,8 +177,7 @@ pub async fn compose_add_market_ixs(
     program: &Program,
     payer: &Keypair,
     dex: &Keypair,
-    long_order_book: &Pubkey,
-    short_order_book: &Pubkey,
+    order_book: &Pubkey,
     order_pool_entry_page: &Pubkey,
     oracle: &Pubkey,
     symbol: String,
@@ -211,14 +199,7 @@ pub async fn compose_add_market_ixs(
         .request()
         .instruction(system_instruction::create_account(
             &payer.pubkey(),
-            long_order_book,
-            account_rent,
-            account_size as u64,
-            &program.id(),
-        ))
-        .instruction(system_instruction::create_account(
-            &payer.pubkey(),
-            short_order_book,
+            order_book,
             account_rent,
             account_size as u64,
             &program.id(),
@@ -232,8 +213,7 @@ pub async fn compose_add_market_ixs(
         ))
         .accounts(AddMarket {
             dex: dex.pubkey(),
-            long_order_book: *long_order_book,
-            short_order_book: *short_order_book,
+            order_book: *order_book,
             order_pool_entry_page: *order_pool_entry_page,
             oracle: *oracle,
             authority: payer.pubkey(),
@@ -291,9 +271,8 @@ pub async fn compose_add_liquidity_ix(
     vault: &Pubkey,
     program_signer: &Pubkey,
     user_mint_acc: &Pubkey,
-    vlp_mint: &Pubkey,
-    vlp_mint_authority: &Pubkey,
-    user_vlp_account: &Pubkey,
+    event_queue: &Pubkey,
+    user_state: &Pubkey,
     amount: u64,
     remaining_accounts: Vec<AccountMeta>,
 ) -> Instruction {
@@ -305,11 +284,10 @@ pub async fn compose_add_liquidity_ix(
             vault: *vault,
             program_signer: *program_signer,
             user_mint_acc: *user_mint_acc,
-            vlp_mint: *vlp_mint,
-            vlp_mint_authority: *vlp_mint_authority,
-            user_vlp_account: *user_vlp_account,
+            event_queue: *event_queue,
             authority: payer.pubkey(),
             token_program: spl_token::id(),
+            user_state: *user_state,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::AddLiquidity { amount })
