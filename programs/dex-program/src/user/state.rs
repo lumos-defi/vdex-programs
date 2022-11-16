@@ -2,17 +2,18 @@ use std::cell::{RefCell, RefMut};
 use std::mem::{self, ManuallyDrop};
 
 use crate::collections::small_list::*;
-use crate::dex::state::*;
+use crate::dex::{state::*, StakingPool, UserStake};
 use crate::utils::{time::get_timestamp, SafeMath, NIL32, USER_STATE_MAGIC_NUMBER};
 use anchor_lang::prelude::*;
 
 use crate::errors::{DexError, DexResult};
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+// #[derive(Clone, Copy)]
 pub struct MetaInfo {
     pub magic: u32,
     pub user_list_index: u32,
+    pub vlp: UserStake,
     pub serial_number: u32,
     pub order_slot_count: u8,
     pub position_slot_count: u8,
@@ -439,6 +440,14 @@ impl<'a> UserState<'a> {
         position.data.init(market)?;
 
         Ok(position)
+    }
+
+    pub fn enter_staking_vlp(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
+        self.meta.vlp.enter_staking(pool, amount)
+    }
+
+    pub fn leave_staking_vlp(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
+        self.meta.vlp.leave_staking(pool, amount)
     }
 }
 
