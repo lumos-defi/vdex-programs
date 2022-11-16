@@ -23,6 +23,7 @@
     "serde",
     "solana",
     "struct",
+    "sysvar",
     "thiserror"
   ],
   "rust-analyzer.linkedProjects": ["programs/dex-program/Cargo.toml"],

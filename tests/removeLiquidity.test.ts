@@ -1,10 +1,10 @@
 import { Keypair, PublicKey, AccountMeta } from '@solana/web3.js'
 import { airdrop, getProviderAndProgram } from './utils/getProvider'
 import { TOKEN_PROGRAM_ID, Token } from '@solana/spl-token'
-import { createTokenAccount } from './utils/createTokenAccount'
 import { BN } from '@project-serum/anchor'
 import { createDexFull } from './utils/createDexFull'
 import { getOracleAccounts } from './utils/getOracleAccounts'
+import { createUserState } from './utils/createUserState'
 
 describe('Test Remove Liquidity', () => {
   const { program, provider } = getProviderAndProgram()
@@ -15,27 +15,24 @@ describe('Test Remove Liquidity', () => {
   let dex: Keypair
   let authority: Keypair
 
-  let vlpMint: PublicKey
-  let vlpMintAuthority: PublicKey
-
   let assetMint: Token
   let assetVault: PublicKey
   let programSigner: PublicKey
 
   let alice: Keypair
   let aliceAssetToken: PublicKey
-  let aliceVlpToken: PublicKey
+  let userState: PublicKey
+  let eventQueue: Keypair
 
   beforeEach(async () => {
     authority = Keypair.generate()
     alice = Keypair.generate()
 
     await airdrop(provider, alice.publicKey, 10000000000)
-    ;({ dex, assetMint, assetVault, programSigner, vlpMint, vlpMintAuthority } = await createDexFull(authority))
+    ;({ dex, assetMint, assetVault, programSigner, eventQueue } = await createDexFull(authority))
 
     //create alice asset associatedTokenAccount
     aliceAssetToken = await assetMint.createAssociatedTokenAccount(alice.publicKey)
-    aliceVlpToken = await createTokenAccount(vlpMint, alice.publicKey)
 
     //mint asset to alice
     await assetMint.mintTo(
@@ -47,6 +44,9 @@ describe('Test Remove Liquidity', () => {
 
     oracleAccounts = await getOracleAccounts(dex.publicKey)
 
+    //create userState
+    userState = await createUserState(alice, dex)
+
     //add liquidity
     await program.methods
       .addLiquidity(new BN(DEPOSIT_AMOUNT))
@@ -56,9 +56,8 @@ describe('Test Remove Liquidity', () => {
         vault: assetVault,
         programSigner: programSigner,
         userMintAcc: aliceAssetToken,
-        vlpMint: vlpMint,
-        vlpMintAuthority: vlpMintAuthority,
-        userVlpAccount: aliceVlpToken,
+        userState: userState,
+        eventQueue: eventQueue.publicKey,
         authority: alice.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
@@ -76,9 +75,9 @@ describe('Test Remove Liquidity', () => {
         vault: assetVault,
         programSigner: programSigner,
         userMintAcc: aliceAssetToken,
-        vlpMint: vlpMint,
-        userVlpAccount: aliceVlpToken,
         authority: alice.publicKey,
+        userState: userState,
+        eventQueue: eventQueue.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .remainingAccounts(oracleAccounts)
@@ -89,8 +88,6 @@ describe('Test Remove Liquidity', () => {
       await program.provider.connection.getTokenAccountBalance(aliceAssetToken)
     ).value
 
-    const aliceVlpTokenAccount = await (await program.provider.connection.getTokenAccountBalance(aliceVlpToken)).value
-
     const dexInfo = await program.account.dex.fetch(dex.publicKey)
 
     expect(dexInfo.assets[0]).toMatchObject({
@@ -99,11 +96,6 @@ describe('Test Remove Liquidity', () => {
       liquidityAmount: expect.toBNEqual(0),
     })
 
-    expect(aliceVlpTokenAccount).toMatchObject({
-      amount: '0',
-    })
-
-    console.log(999, aliceAssetTokenAccount, MINT_AMOUNT)
     expect(aliceAssetTokenAccount).toMatchObject({
       amount: (MINT_AMOUNT - 19_900_000).toString(), //fee:{add_liquidity:0.01,remove_liquidity:0.0099}
     })

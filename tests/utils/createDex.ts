@@ -1,4 +1,4 @@
-import { Keypair, PublicKey } from '@solana/web3.js'
+import { Keypair } from '@solana/web3.js'
 import { createAccountInstruction } from './createAccountInstruction'
 import { createMint } from './createMint'
 import { airdrop, getProviderAndProgram } from './getProvider'
@@ -9,26 +9,15 @@ export async function createDex(authority: Keypair) {
   const eventQueue = Keypair.generate()
   const matchQueue = Keypair.generate()
   const userListEntryPage = Keypair.generate()
+  const rewardMint = Keypair.generate()
   const VLP_DECIMALS = 6
   const USDC_MINT_DECIMALS = 6
-  let vlpMint: PublicKey
-  let vlpMintAuthority: PublicKey
-  let vlpMintNonce: number
 
   await airdrop(provider, authority.publicKey, 10000000000)
   const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
 
-  //gen vlp mint with seeds
-  // eslint-disable-next-line prefer-const
-  ;[vlpMint] = await PublicKey.findProgramAddress([dex.publicKey.toBuffer(), Buffer.from('vlp')], program.programId)
-  // eslint-disable-next-line prefer-const
-  ;[vlpMintAuthority, vlpMintNonce] = await PublicKey.findProgramAddress(
-    [dex.publicKey.toBuffer(), vlpMint.toBuffer()],
-    program.programId
-  )
-
   await program.methods
-    .initDex(VLP_DECIMALS, vlpMintNonce)
+    .initDex(VLP_DECIMALS)
     .accounts({
       dex: dex.publicKey,
       usdcMint,
@@ -36,8 +25,7 @@ export async function createDex(authority: Keypair) {
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
-      vlpMint: vlpMint,
-      vlpMintAuthority: vlpMintAuthority,
+      rewardMint: rewardMint.publicKey,
     })
     .preInstructions([
       await program.account.dex.createInstruction(dex),
@@ -48,5 +36,5 @@ export async function createDex(authority: Keypair) {
     .signers([authority, dex, eventQueue, matchQueue, userListEntryPage])
     .rpc()
 
-  return { dex, vlpMint, vlpMintAuthority }
+  return { dex }
 }
