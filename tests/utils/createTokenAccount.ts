@@ -1,5 +1,5 @@
 import { TokenInstructions } from '@project-serum/serum'
-import { TOKEN_PROGRAM_ID } from '@project-serum/serum/lib/token-instructions'
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import * as anchor from '@project-serum/anchor'
 import { getProviderAndProgram } from './getProvider'
 

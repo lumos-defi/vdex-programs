@@ -1,8 +1,5 @@
+// use anchor_client::solana_sdk::program_option::COption;
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token::{Mint, Token, TokenAccount},
-};
 
 use crate::{
     collections::{EventQueue, MountMode, PagedList, SingleEventQueue},
@@ -13,7 +10,6 @@ use crate::{
 };
 
 #[derive(Accounts)]
-#[instruction(vlp_decimal: u8)]
 pub struct InitDex<'info> {
     #[account(zero)]
     pub dex: AccountLoader<'info, Dex>,
@@ -36,45 +32,11 @@ pub struct InitDex<'info> {
     #[account(mut, constraint= user_list_entry_page.owner == program_id)]
     pub user_list_entry_page: UncheckedAccount<'info>,
 
-    #[account(
-        init,
-        seeds = [
-            dex.key().as_ref(),
-            b"vlp".as_ref(),
-        ],
-        bump,
-        payer = authority,
-        mint::decimals = vlp_decimal,
-        mint::authority = vlp_program_signer,
-        mint::freeze_authority = vlp_program_signer,
-    )]
-    pub vlp_mint: Account<'info, Mint>,
-
-    #[account(
-        init,
-        payer = authority,
-        associated_token::mint = vlp_mint,
-        associated_token::authority = vlp_program_signer,
-    )]
-    pub vlp_vault: Account<'info, TokenAccount>,
-
     /// CHECK
     pub reward_mint: UncheckedAccount<'info>,
-
-    /// CHECK
-    pub vlp_program_signer: UncheckedAccount<'info>,
-
-    pub system_program: Program<'info, System>,
-
-    pub token_program: Program<'info, Token>,
-
-    pub associated_token_program: Program<'info, AssociatedToken>,
-
-    ///CHECK
-    pub rent: UncheckedAccount<'info>,
 }
 
-pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8, vlp_mint_nonce: u8) -> DexResult {
+pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_init()?;
 
     dex.magic = DEX_MAGIC_NUMBER;
@@ -88,11 +50,12 @@ pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8, vlp_mint_nonce: u8) -> D
     dex.markets_number = 0;
     dex.usdc_asset_index = 0xff;
     dex.vlp_pool.init(
-        ctx.accounts.vlp_mint.key(),
-        ctx.accounts.vlp_vault.key(),
-        ctx.accounts.vlp_program_signer.key(),
+        // Dummy VLP token, never mint
+        Pubkey::default(),
+        Pubkey::default(),
+        Pubkey::default(),
         ctx.accounts.reward_mint.key(),
-        vlp_mint_nonce,
+        u8::MAX,
         vlp_decimals,
         u8::MAX,
     );

@@ -1,8 +1,8 @@
 import { Keypair, PublicKey } from '@solana/web3.js'
 import { createAccountInstruction } from './utils/createAccountInstruction'
 import { getProviderAndProgram, airdrop } from './utils/getProvider'
-// import { TOKEN_PROGRAM_ID, Token } from '@solana/spl-token'
-import { createMint } from './utils/createMint'
+import { createMint, createMintWithKeypair } from './utils/createMint'
+// import { createTokenAccount } from './utils/createTokenAccount'
 
 describe('Init Dex', () => {
   const { program, provider } = getProviderAndProgram()
@@ -14,11 +14,13 @@ describe('Init Dex', () => {
   let eventQueue: Keypair
   let matchQueue: Keypair
   let userListEntryPage: Keypair
+  let rewardMint: Keypair
+  // let vlpMint: Keypair
 
   let usdcMint: PublicKey
-  let vlpMint: PublicKey
-  let vlpMintAuthority: PublicKey
-  let vlpMintNonce: number
+  // let vlpVault: PublicKey
+  // let vlpProgramSigner: PublicKey
+  // let vlpMintNonce: number
 
   beforeAll(async () => {
     dex = Keypair.generate()
@@ -26,21 +28,27 @@ describe('Init Dex', () => {
     matchQueue = Keypair.generate()
     userListEntryPage = Keypair.generate()
     authority = Keypair.generate()
+    rewardMint = Keypair.generate()
+    // vlpMint = Keypair.generate()
 
     await airdrop(provider, authority.publicKey, 100_000_000_000)
     usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
+    await createMintWithKeypair(rewardMint, authority.publicKey, 6)
 
     //gen vlp mint with seeds
-    ;[vlpMint] = await PublicKey.findProgramAddress([dex.publicKey.toBuffer(), Buffer.from('vlp')], program.programId)
-    ;[vlpMintAuthority, vlpMintNonce] = await PublicKey.findProgramAddress(
-      [dex.publicKey.toBuffer(), vlpMint.toBuffer()],
-      program.programId
-    )
+    // ;[vlpProgramSigner, vlpMintNonce] = await PublicKey.findProgramAddress(
+    //   [dex.publicKey.toBuffer(), vlpMint.publicKey.toBuffer()],
+    //   program.programId
+    // )
+
+    // await createMintWithKeypair(vlpMint, vlpProgramSigner, VLP_DECIMALS)
+
+    // vlpVault = await createTokenAccount(vlpMint.publicKey, vlpProgramSigner)
   })
 
   it('should init dex account successfully', async () => {
     await program.methods
-      .initDex(VLP_DECIMALS, vlpMintNonce)
+      .initDex(VLP_DECIMALS)
       .accounts({
         dex: dex.publicKey,
         usdcMint: usdcMint,
@@ -48,8 +56,7 @@ describe('Init Dex', () => {
         eventQueue: eventQueue.publicKey,
         matchQueue: matchQueue.publicKey,
         userListEntryPage: userListEntryPage.publicKey,
-        vlpMint: vlpMint,
-        vlpMintAuthority: vlpMintAuthority,
+        rewardMint: rewardMint.publicKey,
       })
       .preInstructions([
         await program.account.dex.createInstruction(dex),
@@ -69,9 +76,18 @@ describe('Init Dex', () => {
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
       usdcMint: usdcMint,
-      vlpMint: vlpMint,
-      vlpMintNonce: vlpMintNonce,
-      vlpMintAuthority: vlpMintAuthority,
+      // vlpPool: expect.objectContaining({
+      //   mint: vlpMint,
+      //   vault: vlpVault.publicKey,
+      //   programSigner: vlpProgramSigner,
+      //   rewardMint: rewardMint.publicKey,
+      //   nonce: vlpMintNonce,
+      //   decimals: VLP_DECIMALS,
+      //   rewardTotal: expect.toBNEqual(0),
+      //   stakedTotal: expect.toBNEqual(0),
+      //   accumulateRewardPerShare: expect.toBNEqual(0),
+      //   rewardAssetIndex: 0xff,
+      // }),
       assets: expect.arrayContaining([
         expect.objectContaining({
           valid: false,

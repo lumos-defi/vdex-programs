@@ -1,6 +1,7 @@
 import * as anchor from '@project-serum/anchor'
 import { TokenInstructions } from '@project-serum/serum'
 import { getProviderAndProgram } from './getProvider'
+import { Keypair, PublicKey } from '@solana/web3.js'
 
 const TOKEN_PROGRAM_ID = new anchor.web3.PublicKey(TokenInstructions.TOKEN_PROGRAM_ID.toString())
 async function createMintInstructions(provider, authority, mint, decimals) {
@@ -27,6 +28,21 @@ export async function createMint(authority, decimals) {
     authority = provider.wallet.publicKey
   }
   const mint = anchor.web3.Keypair.generate()
+  const instructions = await createMintInstructions(provider, authority, mint.publicKey, decimals)
+
+  const tx = new anchor.web3.Transaction()
+  tx.add(...instructions)
+
+  await provider.sendAndConfirm(tx, [mint])
+
+  return mint.publicKey
+}
+
+export async function createMintWithKeypair(mint: Keypair, authority: PublicKey, decimals) {
+  const { provider } = getProviderAndProgram()
+  if (authority === undefined) {
+    authority = provider.wallet.publicKey
+  }
   const instructions = await createMintInstructions(provider, authority, mint.publicKey, decimals)
 
   const tx = new anchor.web3.Transaction()
