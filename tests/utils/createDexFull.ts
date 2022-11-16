@@ -40,26 +40,16 @@ export async function createDexFull(authority: Keypair) {
   const userListEntryPage = Keypair.generate()
   const VLP_DECIMALS = 6
 
-  const longOrderBook = Keypair.generate()
-  const shortOrderBook = Keypair.generate()
+  const orderBook = Keypair.generate()
   const orderPoolEntryPage = Keypair.generate()
+  const rewardMint = Keypair.generate()
 
   await airdrop(provider, authority.publicKey, 10000000000)
   const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
-  //gen vlp mint with seeds
-  const [vlpMint] = await PublicKey.findProgramAddress(
-    [dex.publicKey.toBuffer(), Buffer.from('vlp')],
-    program.programId
-  )
-
-  const [vlpMintAuthority, vlpMintNonce] = await PublicKey.findProgramAddress(
-    [dex.publicKey.toBuffer(), vlpMint.toBuffer()],
-    program.programId
-  )
 
   //init dex
   await program.methods
-    .initDex(VLP_DECIMALS, vlpMintNonce)
+    .initDex(VLP_DECIMALS)
     .accounts({
       dex: dex.publicKey,
       usdcMint,
@@ -67,8 +57,7 @@ export async function createDexFull(authority: Keypair) {
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
-      vlpMint: vlpMint,
-      vlpMintAuthority: vlpMintAuthority,
+      rewardMint: rewardMint.publicKey,
     })
     .preInstructions([
       await program.account.dex.createInstruction(dex),
@@ -139,18 +128,16 @@ export async function createDexFull(authority: Keypair) {
     )
     .accounts({
       dex: dex.publicKey,
-      longOrderBook: longOrderBook.publicKey,
-      shortOrderBook: shortOrderBook.publicKey,
+      orderBook: orderBook.publicKey,
       orderPoolEntryPage: orderPoolEntryPage.publicKey,
       authority: authority.publicKey,
       oracle: mockOracle.publicKey,
     })
     .preInstructions([
-      await createAccountInstruction(longOrderBook, 128 * 1024),
-      await createAccountInstruction(shortOrderBook, 128 * 1024),
+      await createAccountInstruction(orderBook, 128 * 1024),
       await createAccountInstruction(orderPoolEntryPage, 128 * 1024),
     ])
-    .signers([authority, longOrderBook, shortOrderBook, orderPoolEntryPage])
+    .signers([authority, orderBook, orderPoolEntryPage])
     .rpc()
 
   return {
@@ -162,11 +149,8 @@ export async function createDexFull(authority: Keypair) {
     authority,
     eventQueue,
     userListEntryPage,
-    longOrderBook,
-    shortOrderBook,
+    orderBook,
     orderPoolEntryPage,
-    vlpMint,
-    vlpMintAuthority,
     MOCK_ORACLE_PRICE,
     ADD_LIQUIDITY_FEE_RATE,
   }

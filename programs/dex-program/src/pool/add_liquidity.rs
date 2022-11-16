@@ -23,6 +23,9 @@ pub struct AddLiquidity<'info> {
     #[account(mut)]
     vault: AccountInfo<'info>,
 
+    /// CHECK
+    pub program_signer: AccountInfo<'info>,
+
     #[account(
          mut,
          constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *mint.key)
@@ -132,7 +135,8 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
         .enter_staking_vlp(&mut dex.vlp_pool, vlp_amount)?;
 
     // TODO: save to event queue
-    let mut _event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
+    let mut _event_queue = EventQueue::mount(&ctx.accounts.event_queue, false)?
+        .initialize(true)
         .map_err(|_| DexError::FailedMountEventQueue)?;
 
     Ok(())
