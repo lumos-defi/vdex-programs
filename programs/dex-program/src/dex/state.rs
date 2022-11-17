@@ -3,8 +3,8 @@ use anchor_lang::prelude::*;
 use crate::{
     errors::{DexError, DexResult},
     utils::{
-        swap, time::get_timestamp, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_BASE,
-        FEE_RATE_DECIMALS,
+        swap, time::get_timestamp, value, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_BASE,
+        FEE_RATE_DECIMALS, USD_POW_DECIMALS,
     },
 };
 
@@ -72,6 +72,111 @@ impl Dex {
         };
 
         self.asset_as_mut(index)
+    }
+
+    pub fn find_asset_by_mint(&self, mint: Pubkey) -> DexResult<(u8, &AssetInfo)> {
+        let index = self
+            .assets
+            .iter()
+            .position(|x| x.mint == mint)
+            .ok_or(DexError::InvalidMint)? as u8;
+
+        Ok((index, &self.assets[index as usize]))
+    }
+
+    fn aum(&self, oracles: &[AccountInfo]) -> DexResult<i64> {
+        let mut aum = 0u64;
+
+        let mut oracle_offset = 0;
+        for i in 0..self.assets_number as usize {
+            let ai = &self.assets[i];
+            if !ai.valid {
+                continue;
+            }
+            require_eq!(
+                ai.oracle,
+                oracles[oracle_offset].key(),
+                DexError::InvalidOracle
+            );
+
+            let price = get_oracle_price(ai.oracle_source, &oracles[oracle_offset])?;
+
+            let amount = ai
+                .liquidity_amount
+                .safe_add(ai.collateral_amount)?
+                .safe_add(ai.borrowed_amount)?;
+
+            aum = aum.safe_add(
+                amount
+                    .safe_mul(price.into())?
+                    .safe_div(10u128.pow(ai.decimals.into()))? as u64,
+            )?;
+
+            oracle_offset += 1;
+        }
+
+        let mut pnl = 0i64;
+        for index in 0..self.markets_number as usize {
+            let mi = &self.markets[index];
+            if !mi.valid {
+                continue;
+            }
+            require_eq!(
+                mi.oracle,
+                oracles[oracle_offset].key(),
+                DexError::InvalidOracleAccount
+            );
+
+            let price = get_oracle_price(mi.oracle_source, &oracles[oracle_offset])?;
+            pnl = pnl.i_safe_add(mi.un_pnl(price)?)?;
+
+            oracle_offset += 1;
+        }
+
+        (aum as i64).i_safe_add(pnl)
+    }
+
+    pub fn add_liquidity(
+        &mut self,
+        index: u8,
+        amount: u64,
+        oracles: &[AccountInfo],
+    ) -> DexResult<u64> {
+        let ai = self.asset_as_mut(index)?;
+
+        let fee = amount
+            .safe_mul(ai.add_liquidity_fee_rate as u64)?
+            .safe_div(FEE_RATE_BASE)? as u64;
+
+        let added = amount.safe_sub(fee)?;
+        ai.liquidity_amount = ai.liquidity_amount.safe_add(added)?;
+
+        require!(
+            ai.oracle == oracles[index as usize].key(),
+            DexError::InvalidOracle
+        );
+
+        // vlp_amount = asset_value * glp_supply / aum
+        let price = get_oracle_price(ai.oracle_source, &oracles[index as usize])?;
+        let asset_value = value(added, price, ai.decimals)?;
+
+        let aum = self.aum(oracles)?;
+        require!(aum >= 0, DexError::AUMBelowZero);
+
+        let vlp_amount = if aum == 0 {
+            asset_value
+                .safe_mul(10u64.pow(self.vlp_pool.decimals.into()))?
+                .safe_div(USD_POW_DECIMALS as u128)? as u64
+        } else {
+            asset_value
+                .safe_mul(self.vlp_pool.staked_total)?
+                .safe_div(10u128.pow(self.vlp_pool.decimals.into()))?
+                .safe_div(aum as u128)?
+                .safe_mul(10u128.pow(self.vlp_pool.decimals.into()))?
+                .safe_div(USD_POW_DECIMALS as u128)? as u64
+        };
+
+        Ok(vlp_amount)
     }
 
     pub fn has_sufficient_fund(&mut self, market: u8, long: bool, borrow: u64) -> DexResult {
@@ -232,7 +337,7 @@ impl Dex {
         Ok((out, fee))
     }
 
-    pub fn collect_fees(&mut self, reward_asset: u8, oracles: &[&AccountInfo]) -> DexResult {
+    pub fn collect_fees(&mut self, reward_asset: u8, oracles: &[AccountInfo]) -> DexResult<u64> {
         let rai = self.asset_as_ref(reward_asset)?;
         require_eq!(
             rai.oracle,
@@ -259,7 +364,7 @@ impl Dex {
             );
 
             let swap_oracles: Vec<&AccountInfo> =
-                vec![oracles[i as usize], oracles[reward_asset as usize]];
+                vec![&oracles[i as usize], &oracles[reward_asset as usize]];
             let (collected, _) = self.swap(i, reward_asset, ai.fee_amount, false, &swap_oracles)?;
 
             self.assets[i as usize].fee_amount = 0;
@@ -267,6 +372,18 @@ impl Dex {
                 .fee_amount
                 .safe_add(collected)?;
         }
+
+        Ok(self.assets[reward_asset as usize].fee_amount)
+    }
+
+    pub fn collect_rewards(&mut self, oracles: &[AccountInfo]) -> DexResult {
+        let index = self.vlp_pool.reward_asset_index;
+
+        let rewards = self.collect_fees(index, oracles)?;
+        self.vlp_pool.add_reward(rewards)?;
+
+        let ai = self.asset_as_mut(index)?;
+        ai.fee_amount = 0;
 
         Ok(())
     }
@@ -1521,7 +1638,7 @@ mod test {
         set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
         set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
 
-        let oracles: Vec<&AccountInfo> = vec![&btc_oracle, &usdc_oracle, &sol_oracle];
+        let oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle];
 
         dex.collect_fees(2, &oracles).assert_ok();
 

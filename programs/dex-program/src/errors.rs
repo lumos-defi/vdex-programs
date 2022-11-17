@@ -205,6 +205,9 @@ pub enum DexError {
 
     #[msg("Close size too large")]
     CloseSizeTooLarge,
+
+    #[msg("AUM below zero")]
+    AUMBelowZero,
 }
 
 pub type DexResult<T = ()> = Result<T>;
