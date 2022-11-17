@@ -126,23 +126,31 @@ impl ISafeAddSub for i64 {
     }
 }
 
-pub fn get_timestamp() -> Result<i64> {
-    #[cfg(test)]
-    {
-        Ok(0)
-    }
-
-    #[cfg(not(test))]
-    {
-        Ok(Clock::get()?.unix_timestamp)
-    }
+pub fn swap(
+    in_amount: u64,
+    in_price: u64,
+    in_decimals: u8,
+    out_price: u64,
+    out_decimals: u8,
+) -> DexResult<u64> {
+    Ok(in_amount
+        .safe_mul(in_price)?
+        .safe_mul(10u128.pow(out_decimals as u32))?
+        .safe_div(out_price as u128)?
+        .safe_div(10u128.pow(in_decimals as u32))? as u64)
 }
 
 #[cfg(test)]
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use crate::{errors::DexResult, utils::test::TestResult};
+    use crate::{
+        errors::DexResult,
+        utils::{
+            test::{btc, eth, usdc, TestResult, BTC_DECIMALS, ETH_DECIMALS},
+            USDC_DECIMALS,
+        },
+    };
 
     fn test_safe_add() -> DexResult {
         let result = 1u64.safe_add(2u64)?;
@@ -253,5 +261,41 @@ mod test {
 
         test_i_safe_sub().assert_ok();
         test_i_safe_sub_negative().assert_ok();
+    }
+
+    #[test]
+    fn test_swap_btc_to_usdc() {
+        let in_amount = btc(1.0);
+        let in_price = usdc(20000.);
+        let out_price = usdc(1.0);
+
+        let out_amount =
+            swap(in_amount, in_price, BTC_DECIMALS, out_price, USDC_DECIMALS).assert_unwrap();
+
+        assert_eq!(out_amount, usdc(20000.));
+    }
+
+    #[test]
+    fn test_swap_btc_to_eth() {
+        let in_amount = btc(1.0);
+        let in_price = usdc(20000.);
+        let out_price = usdc(2000.0);
+
+        let out_amount =
+            swap(in_amount, in_price, BTC_DECIMALS, out_price, ETH_DECIMALS).assert_unwrap();
+
+        assert_eq!(out_amount, eth(10.));
+    }
+
+    #[test]
+    fn test_swap_usdc_to_btc() {
+        let in_amount = usdc(1.0);
+        let in_price = usdc(1.);
+        let out_price = usdc(20000.0);
+
+        let out_amount =
+            swap(in_amount, in_price, USDC_DECIMALS, out_price, BTC_DECIMALS).assert_unwrap();
+
+        assert_eq!(out_amount, btc(0.00005));
     }
 }

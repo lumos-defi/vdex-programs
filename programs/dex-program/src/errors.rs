@@ -8,6 +8,9 @@ pub enum DexError {
     #[msg("Invalid mint")]
     InvalidMint,
 
+    #[msg("Invalid oracle")]
+    InvalidOracle,
+
     #[msg("Invalid oracle source")]
     InvalidOracleSource,
 

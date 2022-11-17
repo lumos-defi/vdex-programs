@@ -3,7 +3,8 @@ use anchor_lang::prelude::*;
 use crate::{
     errors::{DexError, DexResult},
     utils::{
-        time::get_timestamp, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_BASE, FEE_RATE_DECIMALS,
+        swap, time::get_timestamp, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_BASE,
+        FEE_RATE_DECIMALS,
     },
 };
 
@@ -193,6 +194,47 @@ impl Dex {
         }
 
         Ok(())
+    }
+
+    fn get_asset_info_as_ref(&self, index: u8) -> DexResult<&AssetInfo> {
+        require!(
+            index < self.assets_number && self.assets[index as usize].valid,
+            DexError::InvalidIndex
+        );
+
+        Ok(&self.assets[index as usize])
+    }
+
+    pub fn swap(
+        &self,
+        ain: u8,
+        aout: u8,
+        amount: u64,
+        charge: bool,
+        oracles: &[AccountInfo],
+    ) -> DexResult<(u64, u64)> {
+        // TODO: check minimum amount ?
+
+        let aii = self.get_asset_info_as_ref(ain)?;
+        let aoi = self.get_asset_info_as_ref(aout)?;
+
+        require!(
+            aii.oracle == oracles[0].key() && aoi.oracle == oracles[1].key(),
+            DexError::InvalidOracle
+        );
+
+        let in_price = get_oracle_price(aii.oracle_source, &oracles[0])?;
+        let out_price = get_oracle_price(aoi.oracle_source, &oracles[1])?;
+
+        let fee = if charge {
+            amount.safe_mul(10u64)?.safe_div(FEE_RATE_BASE)? as u64
+        } else {
+            0
+        };
+        let in_amount = amount.safe_sub(fee)?;
+        let out = swap(in_amount, in_price, aii.decimals, out_price, aoi.decimals)?;
+
+        Ok((out, fee))
     }
 }
 
