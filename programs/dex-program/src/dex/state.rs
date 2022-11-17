@@ -31,33 +31,51 @@ pub struct Dex {
 }
 
 impl Dex {
-    pub fn get_asset_info(&mut self, market: usize, long: bool) -> DexResult<&mut AssetInfo> {
+    fn asset_as_ref(&self, index: u8) -> DexResult<&AssetInfo> {
         require!(
-            market < self.markets_number as usize,
-            DexError::InvalidMarketIndex
+            index < self.assets_number && self.assets[index as usize].valid,
+            DexError::InvalidIndex
         );
 
-        let mi = &mut self.markets[market];
+        Ok(&self.assets[index as usize])
+    }
+
+    fn asset_as_mut(&mut self, index: u8) -> DexResult<&mut AssetInfo> {
+        require!(
+            index < self.assets_number && self.assets[index as usize].valid,
+            DexError::InvalidIndex
+        );
+
+        Ok(&mut self.assets[index as usize])
+    }
+
+    fn position_as_mut(&mut self, market: u8, long: bool) -> DexResult<&mut Position> {
+        require!(market < self.markets_number, DexError::InvalidMarketIndex);
+
+        Ok(if long {
+            &mut self.markets[market as usize].global_long
+        } else {
+            &mut self.markets[market as usize].global_short
+        })
+    }
+
+    pub fn market_asset(&mut self, market: u8, long: bool) -> DexResult<&mut AssetInfo> {
+        require!(market < self.markets_number, DexError::InvalidMarketIndex);
+
+        let mi = &mut self.markets[market as usize];
         require!(mi.valid, DexError::InvalidMarketIndex);
 
-        let asset_index = if long {
+        let index = if long {
             mi.asset_index
         } else {
             self.usdc_asset_index
-        } as usize;
+        };
 
-        require!(
-            asset_index < self.assets_number as usize,
-            DexError::InvalidMarketIndex
-        );
-        let ai = &mut self.assets[asset_index];
-        require!(ai.valid, DexError::InvalidMarketIndex);
-
-        Ok(ai)
+        self.asset_as_mut(index)
     }
 
-    pub fn has_sufficient_fund(&mut self, market: usize, long: bool, borrow: u64) -> DexResult {
-        let ai = self.get_asset_info(market, long)?;
+    pub fn has_sufficient_fund(&mut self, market: u8, long: bool, borrow: u64) -> DexResult {
+        let ai = self.market_asset(market, long)?;
         if ai.liquidity_amount > borrow {
             Ok(())
         } else {
@@ -67,13 +85,13 @@ impl Dex {
 
     pub fn borrow_fund(
         &mut self,
-        market: usize,
+        market: u8,
         long: bool,
         collateral: u64,
         borrow: u64,
         open_fee: u64,
     ) -> DexResult {
-        let ai = self.get_asset_info(market, long)?;
+        let ai = self.market_asset(market, long)?;
 
         ai.fee_amount = ai.fee_amount.safe_add(open_fee)?;
         ai.liquidity_amount = ai
@@ -88,7 +106,7 @@ impl Dex {
 
     pub fn settle_pnl(
         &mut self,
-        market: usize,
+        market: u8,
         long: bool,
         collateral: u64,
         borrow: u64,
@@ -96,7 +114,7 @@ impl Dex {
         close_fee: u64,
         borrow_fee: u64,
     ) -> DexResult<u64> {
-        let ai = self.get_asset_info(market, long)?;
+        let ai = self.market_asset(market, long)?;
 
         ai.liquidity_amount = ai.liquidity_amount.safe_add(borrow)?;
         ai.collateral_amount = ai.collateral_amount.safe_sub(collateral)?;
@@ -135,22 +153,13 @@ impl Dex {
 
     pub fn increase_global_position(
         &mut self,
-        market: usize,
+        market: u8,
         long: bool,
         price: u64,
         size: u64,
         collateral: u64,
     ) -> DexResult {
-        require!(
-            market < self.markets_number as usize,
-            DexError::InvalidMarketIndex
-        );
-
-        let pos = if long {
-            &mut self.markets[market].global_long
-        } else {
-            &mut self.markets[market].global_short
-        };
+        let pos = self.position_as_mut(market, long)?;
 
         let merged_size = pos.size.safe_add(size)?;
 
@@ -169,21 +178,12 @@ impl Dex {
 
     pub fn decrease_global_position(
         &mut self,
-        market: usize,
+        market: u8,
         long: bool,
         size: u64,
         collateral: u64,
     ) -> DexResult {
-        require!(
-            market < self.markets_number as usize,
-            DexError::InvalidMarketIndex
-        );
-
-        let pos = if long {
-            &mut self.markets[market].global_long
-        } else {
-            &mut self.markets[market].global_short
-        };
+        let pos = self.position_as_mut(market, long)?;
 
         pos.collateral = pos.collateral.safe_sub(collateral)?;
         pos.size = pos.size.safe_sub(size)?;
@@ -196,27 +196,18 @@ impl Dex {
         Ok(())
     }
 
-    fn get_asset_info_as_ref(&self, index: u8) -> DexResult<&AssetInfo> {
-        require!(
-            index < self.assets_number && self.assets[index as usize].valid,
-            DexError::InvalidIndex
-        );
-
-        Ok(&self.assets[index as usize])
-    }
-
     pub fn swap(
         &self,
         ain: u8,
         aout: u8,
         amount: u64,
         charge: bool,
-        oracles: &[AccountInfo],
+        oracles: &[&AccountInfo],
     ) -> DexResult<(u64, u64)> {
-        // TODO: check minimum amount ?
+        // TODO: check minimum amount?
 
-        let aii = self.get_asset_info_as_ref(ain)?;
-        let aoi = self.get_asset_info_as_ref(aout)?;
+        let aii = self.asset_as_ref(ain)?;
+        let aoi = self.asset_as_ref(aout)?;
 
         require!(
             aii.oracle == oracles[0].key() && aoi.oracle == oracles[1].key(),
@@ -227,6 +218,7 @@ impl Dex {
         let out_price = get_oracle_price(aoi.oracle_source, &oracles[1])?;
 
         let fee = if charge {
+            // TODO: swap fee rate?
             amount.safe_mul(10u64)?.safe_div(FEE_RATE_BASE)? as u64
         } else {
             0
@@ -235,6 +227,45 @@ impl Dex {
         let out = swap(in_amount, in_price, aii.decimals, out_price, aoi.decimals)?;
 
         Ok((out, fee))
+    }
+
+    pub fn collect_fees(&mut self, reward_asset: u8, oracles: &[AccountInfo]) -> DexResult {
+        let rai = self.asset_as_ref(reward_asset)?;
+        require_eq!(
+            rai.oracle,
+            oracles[reward_asset as usize].key(),
+            DexError::InvalidOracle
+        );
+
+        require_eq!(
+            oracles.len(),
+            self.assets_number as usize,
+            DexError::InvalidOracle
+        );
+
+        for i in 0..self.assets_number {
+            let ai = self.asset_as_ref(i)?;
+            if ai.valid || i == reward_asset {
+                continue;
+            }
+
+            require_eq!(
+                ai.oracle,
+                oracles[i as usize].key(),
+                DexError::InvalidOracle
+            );
+
+            let swap_oracles: Vec<&AccountInfo> =
+                vec![&oracles[i as usize], &oracles[reward_asset as usize]];
+            let (collected, _) = self.swap(i, reward_asset, ai.fee_amount, false, &swap_oracles)?;
+
+            self.assets[i as usize].fee_amount = 0;
+            self.assets[reward_asset as usize].fee_amount = self.assets[reward_asset as usize]
+                .fee_amount
+                .safe_add(collected)?;
+        }
+
+        Ok(())
     }
 }
 

@@ -127,10 +127,10 @@ pub fn handler(
     );
 
     // Update asset info (collateral amount, borrow amount, fee)
-    dex.borrow_fund(market as usize, long, collateral, borrow, open_fee)?;
+    dex.borrow_fund(market, long, collateral, borrow, open_fee)?;
 
     // Update market global position
-    dex.increase_global_position(market as usize, long, price, size, collateral)?;
+    dex.increase_global_position(market, long, price, size, collateral)?;
 
     // Save to event queue
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
