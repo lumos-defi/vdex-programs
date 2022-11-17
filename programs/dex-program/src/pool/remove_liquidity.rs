@@ -101,14 +101,6 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
         .safe_mul(10u64.pow(ai.decimals.into()))?
         .safe_div(asset_price as u128)? as u64;
 
-    msg!(
-        "withdraw amount=====>{},mint:{}, vlp_in_usdc:{}, asset_sum:{}, vlp_supply:{}",
-        withdraw_amount,
-        ai.mint.to_string(),
-        vlp_in_usdc,
-        asset_sum,
-        vlp_supply
-    );
     let fee_amount = withdraw_amount
         .safe_mul(ai.remove_liquidity_fee_rate as u64)?
         .safe_div(FEE_RATE_BASE)? as u64;
