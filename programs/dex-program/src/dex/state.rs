@@ -58,6 +58,13 @@ impl Dex {
         })
     }
 
+    fn vlp_info(&self) -> DexResult<(u64, u8)> {
+        // If VLP is dummy token (not minted), then total supply can be read from vlp_pool.staked_total.
+        // Otherwise should read the token's total supply
+
+        Ok((self.vlp_pool.staked_total, self.vlp_pool.decimals))
+    }
+
     pub fn market_asset(&mut self, market: u8, long: bool) -> DexResult<&mut AssetInfo> {
         require!(market < self.markets_number, DexError::InvalidMarketIndex);
 
@@ -135,12 +142,33 @@ impl Dex {
         (aum as i64).i_safe_add(pnl)
     }
 
+    fn to_oracle_index(&self, index: u8) -> DexResult<usize> {
+        require!(index < self.assets_number, DexError::InvalidAssetIndex);
+
+        let mut oracle_index = 0usize;
+        for i in 0..index as usize {
+            if self.assets[i].valid {
+                oracle_index += 1;
+            }
+        }
+
+        Ok(oracle_index)
+    }
+
     pub fn add_liquidity(
         &mut self,
         index: u8,
         amount: u64,
         oracles: &[AccountInfo],
     ) -> DexResult<u64> {
+        require!(amount > 0, DexError::InvalidAmount);
+
+        let aum = self.aum(oracles)?;
+        require!(aum >= 0, DexError::AUMBelowZero);
+
+        let (vlp_supply, vlp_decimals) = self.vlp_info()?;
+        let oracle_index = self.to_oracle_index(index)?;
+
         let ai = self.asset_as_mut(index)?;
 
         let fee = amount
@@ -149,33 +177,69 @@ impl Dex {
 
         let added = amount.safe_sub(fee)?;
         ai.liquidity_amount = ai.liquidity_amount.safe_add(added)?;
+        ai.fee_amount = ai.fee_amount.safe_add(fee)?;
 
         require!(
-            ai.oracle == oracles[index as usize].key(),
+            ai.oracle == oracles[oracle_index].key(),
             DexError::InvalidOracle
         );
 
         // vlp_amount = asset_value * glp_supply / aum
-        let price = get_oracle_price(ai.oracle_source, &oracles[index as usize])?;
+        let price = get_oracle_price(ai.oracle_source, &oracles[oracle_index])?;
         let asset_value = value(added, price, ai.decimals)?;
-
-        let aum = self.aum(oracles)?;
-        require!(aum >= 0, DexError::AUMBelowZero);
 
         let vlp_amount = if aum == 0 {
             asset_value
-                .safe_mul(10u64.pow(self.vlp_pool.decimals.into()))?
+                .safe_mul(10u64.pow(vlp_decimals.into()))?
                 .safe_div(USD_POW_DECIMALS as u128)? as u64
         } else {
             asset_value
-                .safe_mul(self.vlp_pool.staked_total)?
-                .safe_div(10u128.pow(self.vlp_pool.decimals.into()))?
+                .safe_mul(vlp_supply)?
+                .safe_div(10u128.pow(vlp_decimals.into()))?
                 .safe_div(aum as u128)?
-                .safe_mul(10u128.pow(self.vlp_pool.decimals.into()))?
+                .safe_mul(10u128.pow(vlp_decimals.into()))?
                 .safe_div(USD_POW_DECIMALS as u128)? as u64
         };
 
         Ok(vlp_amount)
+    }
+
+    pub fn remove_liquidity(
+        &mut self,
+        index: u8,
+        amount: u64,
+        oracles: &[AccountInfo],
+    ) -> DexResult<u64> {
+        require!(amount > 0, DexError::InvalidAmount);
+
+        let aum = self.aum(oracles)?;
+        require!(aum >= 0, DexError::AUMBelowZero);
+
+        let (vlp_supply, vlp_decimals) = self.vlp_info()?;
+        let oracle_index = self.to_oracle_index(index)?;
+
+        let ai = self.asset_as_mut(index)?;
+        require!(
+            ai.oracle == oracles[oracle_index].key(),
+            DexError::InvalidOracle
+        );
+
+        let asset_price = get_oracle_price(ai.oracle_source, &oracles[oracle_index])?;
+        let vlp_price = (aum as u64)
+            .safe_mul(USD_POW_DECIMALS as u64)?
+            .safe_div(vlp_supply as u128)?
+            .safe_div(10u128.pow(vlp_decimals.into()))? as u64;
+
+        let out_amount = swap(amount, vlp_price, vlp_decimals, asset_price, ai.decimals)?;
+
+        let fee = out_amount
+            .safe_mul(ai.remove_liquidity_fee_rate as u64)?
+            .safe_div(FEE_RATE_BASE)? as u64;
+
+        ai.liquidity_amount = ai.liquidity_amount.safe_sub(out_amount)?;
+        ai.fee_amount = ai.fee_amount.safe_add(fee)?;
+
+        out_amount.safe_sub(fee)
     }
 
     pub fn has_sufficient_fund(&mut self, market: u8, long: bool, borrow: u64) -> DexResult {

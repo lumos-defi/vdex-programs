@@ -63,15 +63,12 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
     require_eq!(ai.vault, ctx.accounts.vault.key(), DexError::InvalidVault);
 
     //Transfer assets
-    let transfer_cpi_accounts = Transfer {
+    let cpi_accounts = Transfer {
         from: ctx.accounts.user_mint_acc.to_account_info(),
         to: ctx.accounts.vault.to_account_info(),
         authority: ctx.accounts.authority.to_account_info(),
     };
-    let cpi_ctx = CpiContext::new(
-        ctx.accounts.token_program.to_account_info(),
-        transfer_cpi_accounts,
-    );
+    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
     token::transfer(cpi_ctx, amount)?;
 
     let vlp_amount = dex.add_liquidity(index, amount, &ctx.remaining_accounts)?;
@@ -83,7 +80,7 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
     us.borrow_mut()
         .enter_staking_vlp(&mut dex.vlp_pool, vlp_amount)?;
 
-    // TODO: save to event queue
+    // Save to event queue
     let mut _event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
         .map_err(|_| DexError::FailedMountEventQueue)?;
 
