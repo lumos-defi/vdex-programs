@@ -400,11 +400,13 @@ impl Dex {
         Ok((out, fee))
     }
 
-    pub fn collect_fees(&mut self, reward_asset: u8, oracles: &[AccountInfo]) -> DexResult<u64> {
+    fn collect_fees(&mut self, reward_asset: u8, oracles: &[AccountInfo]) -> DexResult<u64> {
         let rai = self.asset_as_ref(reward_asset)?;
+        let reward_oracle_index = self.to_oracle_index(reward_asset)?;
+
         require_eq!(
             rai.oracle,
-            oracles[reward_asset as usize].key(),
+            oracles[reward_oracle_index].key(),
             DexError::InvalidOracle
         );
 
@@ -414,26 +416,36 @@ impl Dex {
             DexError::InvalidOracle
         );
 
+        let mut oracle_offset = 0usize;
         for i in 0..self.assets_number {
             let ai = self.asset_as_ref(i)?;
-            if !ai.valid || i == reward_asset || ai.fee_amount == 0 {
+            if !ai.valid {
+                continue;
+            }
+
+            if i == reward_asset || ai.fee_amount == 0 {
+                oracle_offset += 1;
                 continue;
             }
 
             require_eq!(
                 ai.oracle,
-                oracles[i as usize].key(),
+                oracles[oracle_offset].key(),
                 DexError::InvalidOracle
             );
 
             let swap_oracles: Vec<&AccountInfo> =
-                vec![&oracles[i as usize], &oracles[reward_asset as usize]];
+                vec![&oracles[oracle_offset], &oracles[reward_oracle_index]];
+
+            // TODO: define DUST fee amount which should be ignored?
             let (collected, _) = self.swap(i, reward_asset, ai.fee_amount, false, &swap_oracles)?;
 
             self.assets[i as usize].fee_amount = 0;
             self.assets[reward_asset as usize].fee_amount = self.assets[reward_asset as usize]
                 .fee_amount
                 .safe_add(collected)?;
+
+            oracle_offset += 1;
         }
 
         Ok(self.assets[reward_asset as usize].fee_amount)
