@@ -89,6 +89,9 @@ pub enum DexError {
     #[msg("Invalid Amount")]
     InvalidAmount,
 
+    #[msg("Invalid asset index")]
+    InvalidAssetIndex,
+
     #[msg("Invalid market index")]
     InvalidMarketIndex,
 

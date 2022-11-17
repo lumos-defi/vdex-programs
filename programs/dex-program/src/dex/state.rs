@@ -34,7 +34,7 @@ impl Dex {
     fn asset_as_ref(&self, index: u8) -> DexResult<&AssetInfo> {
         require!(
             index < self.assets_number && self.assets[index as usize].valid,
-            DexError::InvalidIndex
+            DexError::InvalidAssetIndex
         );
 
         Ok(&self.assets[index as usize])
@@ -43,7 +43,7 @@ impl Dex {
     fn asset_as_mut(&mut self, index: u8) -> DexResult<&mut AssetInfo> {
         require!(
             index < self.assets_number && self.assets[index as usize].valid,
-            DexError::InvalidIndex
+            DexError::InvalidAssetIndex
         );
 
         Ok(&mut self.assets[index as usize])
@@ -206,6 +206,9 @@ impl Dex {
     ) -> DexResult<(u64, u64)> {
         // TODO: check minimum amount?
 
+        require!(ain != aout, DexError::InvalidAssetIndex);
+        require!(amount > 0, DexError::InvalidAmount);
+
         let aii = self.asset_as_ref(ain)?;
         let aoi = self.asset_as_ref(aout)?;
 
@@ -229,7 +232,7 @@ impl Dex {
         Ok((out, fee))
     }
 
-    pub fn collect_fees(&mut self, reward_asset: u8, oracles: &[AccountInfo]) -> DexResult {
+    pub fn collect_fees(&mut self, reward_asset: u8, oracles: &[&AccountInfo]) -> DexResult {
         let rai = self.asset_as_ref(reward_asset)?;
         require_eq!(
             rai.oracle,
@@ -245,7 +248,7 @@ impl Dex {
 
         for i in 0..self.assets_number {
             let ai = self.asset_as_ref(i)?;
-            if ai.valid || i == reward_asset {
+            if !ai.valid || i == reward_asset || ai.fee_amount == 0 {
                 continue;
             }
 
@@ -256,7 +259,7 @@ impl Dex {
             );
 
             let swap_oracles: Vec<&AccountInfo> =
-                vec![&oracles[i as usize], &oracles[reward_asset as usize]];
+                vec![oracles[i as usize], oracles[reward_asset as usize]];
             let (collected, _) = self.swap(i, reward_asset, ai.fee_amount, false, &swap_oracles)?;
 
             self.assets[i as usize].fee_amount = 0;
@@ -647,7 +650,11 @@ impl GetOraclePrice for OracleInfo<'_, '_> {
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use crate::utils::test::*;
+    use crate::{
+        dex::{set_mock_price, OracleSource},
+        utils::test::*,
+    };
+    use bumpalo::Bump;
 
     impl Default for Dex {
         fn default() -> Dex {
@@ -736,6 +743,22 @@ mod test {
             self.usdc_asset_index = 1;
         }
 
+        pub fn add_asset(&mut self, decimals: u8, oracle: Pubkey) {
+            self.assets[self.assets_number as usize] = AssetInfo {
+                valid: true,
+                decimals,
+                borrow_fee_rate: 10,
+                oracle_source: OracleSource::Mock as u8,
+                oracle,
+                ..AssetInfo::default()
+            };
+            self.assets_number += 1;
+        }
+
+        pub fn mock_asset_fee_amount(&mut self, index: u8, amount: u64) {
+            self.assets[index as usize].fee_amount = amount;
+        }
+
         pub fn mock_btc_liquidity(&mut self, amount: u64) {
             self.assets[0].liquidity_amount = amount;
         }
@@ -776,6 +799,10 @@ mod test {
 
         pub fn assert_usdc_fee_amount(&self, amount: u64) {
             assert_eq!(self.assets[1].fee_amount, amount)
+        }
+
+        pub fn assert_asset_fee_amount(&self, index: u8, amount: u64) {
+            assert_eq!(self.assets[index as usize].fee_amount, amount)
         }
     }
 
@@ -1419,5 +1446,112 @@ mod test {
         let _user_paid_fee = usdc(20.);
         let actual_pool_pnl = 980. - 25. - 35. + 20.;
         dex.assert_usdc_liquidity(usdc(10000. + actual_pool_pnl));
+    }
+
+    #[test]
+    fn test_swap_with_invalid_input() {
+        let bump = Bump::new();
+        let btc_oracle = gen_account(1024, &bump);
+        let usdc_oracle = gen_account(1024, &bump);
+        let dummy_oracle = gen_account(1024, &bump);
+
+        let mut dex = Dex::default();
+        dex.add_asset(BTC_DECIMALS, btc_oracle.key());
+        dex.add_asset(USDC_DECIMALS, usdc_oracle.key());
+
+        let oracles: Vec<&AccountInfo> = vec![&usdc_oracle, &btc_oracle];
+
+        set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
+        set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
+
+        // Invalid asset index
+        dex.swap(1, 2, usdc(0.1), false, &oracles).assert_err();
+        dex.swap(1, 1, usdc(0.1), false, &oracles).assert_err();
+
+        // Invalid amount
+        dex.swap(1, 0, usdc(0.), false, &oracles).assert_err();
+
+        // Invalid oracle
+        dex.swap(1, 0, usdc(0.1), false, &oracles).assert_ok();
+        let wrong_oracles: Vec<&AccountInfo> = vec![&usdc_oracle, &dummy_oracle];
+        dex.swap(1, 0, usdc(0.1), false, &wrong_oracles)
+            .assert_err();
+    }
+
+    #[test]
+    fn test_swap_btc_for_usdc_no_fee() {
+        let bump = Bump::new();
+        let btc_oracle = gen_account(1024, &bump);
+        let usdc_oracle = gen_account(1024, &bump);
+
+        let mut dex = Dex::default();
+        dex.add_asset(BTC_DECIMALS, btc_oracle.key());
+        dex.add_asset(USDC_DECIMALS, usdc_oracle.key());
+
+        let oracles: Vec<&AccountInfo> = vec![&btc_oracle, &usdc_oracle];
+
+        set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
+        set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
+
+        let (out, fee) = dex.swap(0, 1, btc(1.0), false, &oracles).assert_unwrap();
+
+        assert_eq!(out, usdc(20000.));
+        assert_eq!(fee, 0);
+    }
+
+    #[test]
+    fn test_swap_usdc_for_btc_no_fee() {
+        let bump = Bump::new();
+        let btc_oracle = gen_account(1024, &bump);
+        let usdc_oracle = gen_account(1024, &bump);
+
+        let mut dex = Dex::default();
+        dex.add_asset(BTC_DECIMALS, btc_oracle.key());
+        dex.add_asset(USDC_DECIMALS, usdc_oracle.key());
+
+        let oracles: Vec<&AccountInfo> = vec![&usdc_oracle, &btc_oracle];
+
+        set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
+        set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
+
+        let (out, fee) = dex.swap(1, 0, usdc(0.1), false, &oracles).assert_unwrap();
+
+        assert_eq!(out, btc(0.000005));
+        assert_eq!(fee, 0);
+    }
+
+    #[test]
+    fn test_collect_fees() {
+        let bump = Bump::new();
+        let btc_oracle = gen_account(1024, &bump);
+        let usdc_oracle = gen_account(1024, &bump);
+        let sol_oracle = gen_account(1024, &bump);
+
+        let mut dex = Dex::default();
+        dex.add_asset(BTC_DECIMALS, btc_oracle.key());
+        dex.add_asset(USDC_DECIMALS, usdc_oracle.key());
+        dex.add_asset(SOL_DECIMALS, sol_oracle.key());
+
+        set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
+        set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
+        set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
+
+        let oracles: Vec<&AccountInfo> = vec![&btc_oracle, &usdc_oracle, &sol_oracle];
+
+        dex.collect_fees(2, &oracles).assert_ok();
+
+        dex.assert_asset_fee_amount(0, 0);
+        dex.assert_asset_fee_amount(1, 0);
+        dex.assert_asset_fee_amount(2, 0);
+
+        // Mock fee for each asset
+        dex.mock_asset_fee_amount(0, btc(0.01));
+        dex.mock_asset_fee_amount(1, usdc(100.));
+        dex.mock_asset_fee_amount(2, sol(3.));
+
+        dex.collect_fees(2, &oracles).assert_ok();
+        dex.assert_asset_fee_amount(0, 0);
+        dex.assert_asset_fee_amount(1, 0);
+        dex.assert_asset_fee_amount(2, sol(10.0 + 5.0 + 3.0));
     }
 }

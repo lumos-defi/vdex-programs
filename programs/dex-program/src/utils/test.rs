@@ -10,6 +10,7 @@ use safe_transmute::to_bytes::{transmute_to_bytes, transmute_to_bytes_mut};
 use super::LEVERAGE_DECIMALS;
 
 pub const USDC_DECIMALS: u8 = 6;
+pub const SOL_DECIMALS: u8 = 6;
 pub const BTC_DECIMALS: u8 = 9;
 pub const ETH_DECIMALS: u8 = 9;
 
@@ -104,6 +105,10 @@ pub fn btc(size: f64) -> u64 {
     (size * (10u64.pow(BTC_DECIMALS as u32) as f64)) as u64
 }
 
+pub fn sol(size: f64) -> u64 {
+    (size * (10u64.pow(SOL_DECIMALS as u32) as f64)) as u64
+}
+
 pub fn eth(size: f64) -> u64 {
     (size * (10u64.pow(ETH_DECIMALS as u32) as f64)) as u64
 }
@@ -118,6 +123,10 @@ pub fn btc_i(size: f64) -> i64 {
 
 pub fn eth_i(size: f64) -> i64 {
     (size * (10u64.pow(ETH_DECIMALS as u32) as f64)) as i64
+}
+
+pub fn sol_i(size: f64) -> i64 {
+    (size * (10u64.pow(SOL_DECIMALS as u32) as f64)) as i64
 }
 
 pub fn leverage(l: u32) -> u32 {
