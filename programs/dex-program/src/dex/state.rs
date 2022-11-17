@@ -1479,7 +1479,7 @@ mod test {
     }
 
     #[test]
-    fn test_swap_btc_for_usdc_no_fee() {
+    fn test_swap_btc_with_usdc_no_fee() {
         let bump = Bump::new();
         let btc_oracle = gen_account(1024, &bump);
         let usdc_oracle = gen_account(1024, &bump);
@@ -1497,23 +1497,8 @@ mod test {
 
         assert_eq!(out, usdc(20000.));
         assert_eq!(fee, 0);
-    }
-
-    #[test]
-    fn test_swap_usdc_for_btc_no_fee() {
-        let bump = Bump::new();
-        let btc_oracle = gen_account(1024, &bump);
-        let usdc_oracle = gen_account(1024, &bump);
-
-        let mut dex = Dex::default();
-        dex.add_asset(BTC_DECIMALS, btc_oracle.key());
-        dex.add_asset(USDC_DECIMALS, usdc_oracle.key());
 
         let oracles: Vec<&AccountInfo> = vec![&usdc_oracle, &btc_oracle];
-
-        set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
-        set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
-
         let (out, fee) = dex.swap(1, 0, usdc(0.1), false, &oracles).assert_unwrap();
 
         assert_eq!(out, btc(0.000005));
