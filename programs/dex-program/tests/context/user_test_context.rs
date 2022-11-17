@@ -327,20 +327,20 @@ impl UserTestContext {
         .unwrap();
     }
 
-    pub async fn remove_liquidity_with_usdc(&self, vlp_amount: f64) {
+    pub async fn remove_liquidity_withdraw_usdc(&self, vlp_amount: f64) {
         self.remove_liquidity(DexAsset::USDC as u8, vlp_amount)
             .await;
     }
 
-    pub async fn remove_liquidity_with_btc(&self, vlp_amount: f64) {
+    pub async fn remove_liquidity_withdraw_btc(&self, vlp_amount: f64) {
         self.remove_liquidity(DexAsset::BTC as u8, vlp_amount).await;
     }
 
-    pub async fn remove_liquidity_with_eth(&self, vlp_amount: f64) {
+    pub async fn remove_liquidity_withdraw_eth(&self, vlp_amount: f64) {
         self.remove_liquidity(DexAsset::ETH as u8, vlp_amount).await;
     }
 
-    pub async fn remove_liquidity_with_sol(&self, vlp_amount: f64) {
+    pub async fn remove_liquidity_withdraw_sol(&self, vlp_amount: f64) {
         self.remove_liquidity(DexAsset::SOL as u8, vlp_amount).await;
     }
 
@@ -454,5 +454,15 @@ impl UserTestContext {
         let asset_info = self.dex_info.borrow().assets[asset];
         let user_mint_acc = get_associated_token_address(&self.user.pubkey(), &asset_info.mint);
         user_mint_acc
+    }
+
+    pub async fn assert_pool_vlp_amount(&mut self, amount: f64) {
+        self.refresh_dex_info().await;
+        let staked_total = self.dex_info.borrow().vlp_pool.staked_total;
+
+        assert_eq!(
+            staked_total,
+            convert_to_big_number(amount.into(), TEST_VLP_DECIMALS)
+        );
     }
 }

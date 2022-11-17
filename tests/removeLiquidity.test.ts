@@ -10,7 +10,7 @@ describe('Test Remove Liquidity', () => {
   const { program, provider } = getProviderAndProgram()
   const MINT_AMOUNT = 10_000_000_000 //10 BTC
   const DEPOSIT_AMOUNT = 1_000_000_000 //1 BTC
-  const WITHDRAW_VLP_AMOUNT = 19800_000_000 // 19800 vlp
+  const WITHDRAW_VLP_AMOUNT = 19800_000_000 // 19800 vlp vlp_decimals=6
   let oracleAccounts = new Array<AccountMeta>()
   let dex: Keypair
   let authority: Keypair
