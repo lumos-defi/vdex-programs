@@ -47,6 +47,22 @@ impl PackedEvent for PositionFilled {
     const DISCRIMINATOR: u8 = 1;
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
+#[cfg_attr(feature = "client-support", derive(Serialize))]
+pub struct LiquidityMoved {
+    pub user_state: [u8; 32],
+
+    pub add: bool,
+    pub asset: u8,
+    pub asset_amount: u64,
+    pub vlp_amount: u64,
+    pub fee: u64,
+}
+
+impl PackedEvent for LiquidityMoved {
+    const DISCRIMINATOR: u8 = 2;
+}
+
 pub trait AppendEvent {
     #[allow(clippy::too_many_arguments)]
     fn fill_position(
@@ -62,6 +78,17 @@ pub trait AppendEvent {
         fee: u64,
         borrow_fee: u64,
         pnl: i64,
+    ) -> DexResult;
+
+    #[allow(clippy::too_many_arguments)]
+    fn move_liquidity(
+        &mut self,
+        user_state: [u8; 32],
+        add: bool,
+        asset: u8,
+        asset_amount: u64,
+        vlp_amount: u64,
+        fee: u64,
     ) -> DexResult;
 }
 
@@ -115,6 +142,40 @@ impl AppendEvent for EventQueue<'_> {
             event_seq
         );
 
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn move_liquidity(
+        &mut self,
+        user_state: [u8; 32],
+        add: bool,
+        asset: u8,
+        asset_amount: u64,
+        vlp_amount: u64,
+        fee: u64,
+    ) -> DexResult {
+        let event = LiquidityMoved {
+            user_state,
+            add,
+            asset,
+            asset_amount,
+            vlp_amount,
+            fee,
+        };
+
+        let event_seq = self.append(event)?;
+        msg!(
+            "Liquidity {}: {:?} {} {} {} {} {} {}",
+            if add { "added" } else { "removed" },
+            user_state,
+            add,
+            asset,
+            asset_amount,
+            vlp_amount,
+            fee,
+            event_seq
+        );
         Ok(())
     }
 }

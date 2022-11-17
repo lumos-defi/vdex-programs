@@ -160,7 +160,7 @@ impl Dex {
         index: u8,
         amount: u64,
         oracles: &[AccountInfo],
-    ) -> DexResult<u64> {
+    ) -> DexResult<(u64, u64)> {
         require!(amount > 0, DexError::InvalidAmount);
 
         let aum = self.aum(oracles)?;
@@ -201,7 +201,7 @@ impl Dex {
                 .safe_div(USD_POW_DECIMALS as u128)? as u64
         };
 
-        Ok(vlp_amount)
+        Ok((vlp_amount, fee))
     }
 
     pub fn remove_liquidity(
@@ -209,7 +209,7 @@ impl Dex {
         index: u8,
         amount: u64,
         oracles: &[AccountInfo],
-    ) -> DexResult<u64> {
+    ) -> DexResult<(u64, u64)> {
         require!(amount > 0, DexError::InvalidAmount);
 
         let aum = self.aum(oracles)?;
@@ -239,7 +239,7 @@ impl Dex {
         ai.liquidity_amount = ai.liquidity_amount.safe_sub(out_amount)?;
         ai.fee_amount = ai.fee_amount.safe_add(fee)?;
 
-        out_amount.safe_sub(fee)
+        Ok((out_amount.safe_sub(fee)?, fee))
     }
 
     pub fn has_sufficient_fund(&mut self, market: u8, long: bool, borrow: u64) -> DexResult {

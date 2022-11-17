@@ -2,7 +2,11 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
-    collections::EventQueue, dex::Dex, errors::DexError, errors::DexResult, user::UserState,
+    collections::EventQueue,
+    dex::{event::AppendEvent, Dex},
+    errors::DexError,
+    errors::DexResult,
+    user::UserState,
 };
 
 #[derive(Accounts)]
@@ -59,6 +63,11 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
         DexError::InvalidRemainingAccounts
     );
 
+    require!(
+        dex.event_queue == ctx.accounts.event_queue.key(),
+        DexError::InvalidEventQueue
+    );
+
     let (index, ai) = dex.find_asset_by_mint(ctx.accounts.mint.key())?;
     require_eq!(ai.vault, ctx.accounts.vault.key(), DexError::InvalidVault);
 
@@ -71,7 +80,7 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
     let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
     token::transfer(cpi_ctx, amount)?;
 
-    let vlp_amount = dex.add_liquidity(index, amount, &ctx.remaining_accounts)?;
+    let (vlp_amount, fee) = dex.add_liquidity(index, amount, &ctx.remaining_accounts)?;
 
     // Update rewards
     dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len])?;
@@ -81,8 +90,15 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
         .enter_staking_vlp(&mut dex.vlp_pool, vlp_amount)?;
 
     // Save to event queue
-    let mut _event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
+    let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
         .map_err(|_| DexError::FailedMountEventQueue)?;
 
-    Ok(())
+    event_queue.move_liquidity(
+        ctx.accounts.user_state.key().to_bytes(),
+        true,
+        index,
+        amount,
+        vlp_amount,
+        fee,
+    )
 }

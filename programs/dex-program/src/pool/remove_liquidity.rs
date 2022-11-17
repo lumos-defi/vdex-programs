@@ -3,7 +3,7 @@ use anchor_spl::token::{self, TokenAccount, Transfer};
 
 use crate::{
     collections::EventQueue,
-    dex::state::*,
+    dex::{event::AppendEvent, state::*},
     errors::{DexError, DexResult},
     user::UserState,
 };
@@ -64,6 +64,11 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
         DexError::InvalidRemainingAccounts
     );
 
+    require!(
+        dex.event_queue == ctx.accounts.event_queue.key(),
+        DexError::InvalidEventQueue
+    );
+
     let (index, ai) = dex.find_asset_by_mint(ctx.accounts.mint.key())?;
     require_eq!(ai.vault, *ctx.accounts.vault.key, DexError::InvalidVault);
     let seeds = &[
@@ -73,21 +78,23 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
     ];
     let signer = &[&seeds[..]];
 
-    let withdraw = dex.remove_liquidity(index, amount, &ctx.remaining_accounts)?;
+    let (withdraw, fee) = dex.remove_liquidity(index, amount, &ctx.remaining_accounts)?;
 
-    // Withdraw assets
-    let cpi_accounts = Transfer {
-        from: ctx.accounts.vault.to_account_info(),
-        to: ctx.accounts.user_mint_acc.to_account_info(),
-        authority: ctx.accounts.program_signer.to_account_info(),
-    };
+    if withdraw > 0 {
+        // Withdraw assets
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.vault.to_account_info(),
+            to: ctx.accounts.user_mint_acc.to_account_info(),
+            authority: ctx.accounts.program_signer.to_account_info(),
+        };
 
-    let cpi_ctx = CpiContext::new_with_signer(
-        ctx.accounts.token_program.to_account_info(),
-        cpi_accounts,
-        signer,
-    );
-    token::transfer(cpi_ctx, withdraw)?;
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+            signer,
+        );
+        token::transfer(cpi_ctx, withdraw)?;
+    }
 
     // Update rewards
     dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len])?;
@@ -97,8 +104,14 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
         .leave_staking_vlp(&mut dex.vlp_pool, amount)?;
 
     // Save to event queue
-    let mut _event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
+    let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
         .map_err(|_| DexError::FailedMountEventQueue)?;
-
-    Ok(())
+    event_queue.move_liquidity(
+        ctx.accounts.user_state.key().to_bytes(),
+        false,
+        index,
+        withdraw,
+        amount,
+        fee,
+    )
 }
