@@ -208,6 +208,9 @@ pub enum DexError {
 
     #[msg("VLP supply is zero")]
     VLPSupplyZero,
+
+    #[msg("Invalid reward asset")]
+    InvalidRewardAsset,
 }
 
 pub type DexResult<T = ()> = Result<T>;

@@ -471,8 +471,16 @@ impl Dex {
 
     pub fn collect_rewards(&mut self, oracles: &[AccountInfo]) -> DexResult {
         let index = self.vlp_pool.reward_asset_index;
+        require!(
+            index < self.assets_number && self.assets[index as usize].valid,
+            DexError::InvalidRewardAsset
+        );
 
         let rewards = self.collect_fees(index as usize, oracles)?;
+        if rewards == 0 {
+            return Ok(());
+        }
+
         self.vlp_pool.add_reward(rewards)?;
 
         let ai = self.asset_as_mut(index)?;
