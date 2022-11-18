@@ -451,7 +451,6 @@ impl Dex {
                 &swap_oracles,
             )?;
 
-            msg!("collected:{}", collected);
             self.assets[i].liquidity_amount = self.assets[i]
                 .liquidity_amount
                 .safe_add(self.assets[i].fee_amount)?;
@@ -1935,6 +1934,7 @@ mod test {
         );
         assert_eq!(fee, sol(1.));
         dex.assert_asset_fee(3, sol(1.));
+        dex.vlp_pool.increase_staking(vlp_amount).assert_ok();
 
         // Add another 1000 SOL
         let (vlp_amount, fee) = dex.add_liquidity(3, sol(1000.), &oracles).assert_unwrap();
@@ -1947,5 +1947,12 @@ mod test {
 
         assert_eq!(fee, sol(1.));
         dex.assert_asset_fee(3, sol(2.));
+        dex.vlp_pool.increase_staking(vlp_amount).assert_ok();
+
+        assert_eq!(
+            dex.vlp_pool.staked_total,
+            2 * sol(1000.0 - 1.0) * 20 * 10u64.pow(VLP_DECIMALS as u32)
+                / 10u64.pow(SOL_DECIMALS as u32)
+        );
     }
 }
