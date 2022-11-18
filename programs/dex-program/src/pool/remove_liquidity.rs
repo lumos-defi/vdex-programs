@@ -78,9 +78,6 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
     ];
     let signer = &[&seeds[..]];
 
-    // Update rewards
-    dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len])?;
-
     let (withdraw, fee) = dex.remove_liquidity(index, amount, &ctx.remaining_accounts)?;
 
     if withdraw > 0 {
@@ -98,6 +95,9 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
         );
         token::transfer(cpi_ctx, withdraw)?;
     }
+
+    // Update rewards
+    dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len])?;
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     us.borrow_mut()
