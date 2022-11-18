@@ -400,9 +400,9 @@ impl Dex {
         Ok((out, fee))
     }
 
-    fn collect_fees(&mut self, reward_asset: u8, oracles: &[AccountInfo]) -> DexResult<u64> {
-        let rai = self.asset_as_ref(reward_asset)?;
-        let reward_oracle_index = self.to_oracle_index(reward_asset)?;
+    fn collect_fees(&mut self, reward_asset: usize, oracles: &[AccountInfo]) -> DexResult<u64> {
+        let rai = self.asset_as_ref(reward_asset as u8)?;
+        let reward_oracle_index = self.to_oracle_index(reward_asset as u8)?;
 
         require_eq!(
             rai.oracle,
@@ -417,13 +417,13 @@ impl Dex {
         );
 
         let mut oracle_offset = 0usize;
-        for i in 0..self.assets_number {
-            let ai = self.asset_as_ref(i)?;
+        for i in 0..self.assets_number as usize {
+            let ai = self.asset_as_ref(i as u8)?;
             if !ai.valid {
                 continue;
             }
 
-            if i == reward_asset || ai.fee_amount == 0 {
+            if i == reward_asset as usize || ai.fee_amount == 0 {
                 oracle_offset += 1;
                 continue;
             }
@@ -438,12 +438,24 @@ impl Dex {
                 vec![&oracles[oracle_offset], &oracles[reward_oracle_index]];
 
             // TODO: define DUST fee amount which should be ignored?
-            let (collected, _) = self.swap(i, reward_asset, ai.fee_amount, false, &swap_oracles)?;
+            let (collected, _) = self.swap(
+                i as u8,
+                reward_asset as u8,
+                ai.fee_amount,
+                false,
+                &swap_oracles,
+            )?;
 
-            self.assets[i as usize].fee_amount = 0;
-            self.assets[reward_asset as usize].fee_amount = self.assets[reward_asset as usize]
-                .fee_amount
-                .safe_add(collected)?;
+            self.assets[i].liquidity_amount = self.assets[i]
+                .liquidity_amount
+                .safe_add(self.assets[i].fee_amount)?;
+            self.assets[i].fee_amount = 0;
+
+            self.assets[reward_asset].liquidity_amount = self.assets[reward_asset]
+                .liquidity_amount
+                .safe_sub(collected)?;
+            self.assets[reward_asset].fee_amount =
+                self.assets[reward_asset].fee_amount.safe_add(collected)?;
 
             oracle_offset += 1;
         }
@@ -454,7 +466,7 @@ impl Dex {
     pub fn collect_rewards(&mut self, oracles: &[AccountInfo]) -> DexResult {
         let index = self.vlp_pool.reward_asset_index;
 
-        let rewards = self.collect_fees(index, oracles)?;
+        let rewards = self.collect_fees(index as usize, oracles)?;
         self.vlp_pool.add_reward(rewards)?;
 
         let ai = self.asset_as_mut(index)?;
@@ -947,7 +959,11 @@ mod test {
             self.assets_number += 1;
         }
 
-        pub fn mock_asset_fee_amount(&mut self, index: u8, amount: u64) {
+        pub fn mock_asset_liquidity(&mut self, index: u8, amount: u64) {
+            self.assets[index as usize].liquidity_amount = amount;
+        }
+
+        pub fn mock_asset_fee(&mut self, index: u8, amount: u64) {
             self.assets[index as usize].fee_amount = amount;
         }
 
@@ -972,7 +988,7 @@ mod test {
             assert_eq!(self.assets[0].borrowed_amount, amount)
         }
 
-        pub fn assert_btc_fee_amount(&self, amount: u64) {
+        pub fn assert_btc_fee(&self, amount: u64) {
             assert_eq!(self.assets[0].fee_amount, amount)
         }
 
@@ -989,12 +1005,16 @@ mod test {
             assert_eq!(self.assets[1].borrowed_amount, amount)
         }
 
-        pub fn assert_usdc_fee_amount(&self, amount: u64) {
+        pub fn assert_usdc_fee(&self, amount: u64) {
             assert_eq!(self.assets[1].fee_amount, amount)
         }
 
-        pub fn assert_asset_fee_amount(&self, index: u8, amount: u64) {
+        pub fn assert_asset_fee(&self, index: u8, amount: u64) {
             assert_eq!(self.assets[index as usize].fee_amount, amount)
+        }
+
+        pub fn assert_asset_liquidity(&self, index: u8, amount: u64) {
+            assert_eq!(self.assets[index as usize].liquidity_amount, amount)
         }
     }
 
@@ -1452,7 +1472,7 @@ mod test {
         dex.assert_btc_liquidity(0);
         dex.assert_btc_borrowed(btc(1.));
         dex.assert_btc_collateral(btc(0.1));
-        dex.assert_btc_fee_amount(btc(0.04));
+        dex.assert_btc_fee(btc(0.04));
     }
 
     #[test]
@@ -1469,7 +1489,7 @@ mod test {
         dex.assert_usdc_liquidity(0);
         dex.assert_usdc_borrowed(usdc(10000.));
         dex.assert_usdc_collateral(usdc(1000.));
-        dex.assert_usdc_fee_amount(usdc(20.));
+        dex.assert_usdc_fee(usdc(20.));
     }
 
     #[test]
@@ -1495,7 +1515,7 @@ mod test {
         assert_eq!(withdrawable, btc(0.1 + 0.02 - 0.002 - 0.003));
         dex.assert_btc_borrowed(0);
         dex.assert_btc_collateral(0);
-        dex.assert_btc_fee_amount(btc(0.004 + 0.002 + 0.003));
+        dex.assert_btc_fee(btc(0.004 + 0.002 + 0.003));
         dex.assert_btc_liquidity(btc(1.0 - 0.02));
     }
 
@@ -1522,7 +1542,7 @@ mod test {
         assert_eq!(withdrawable, btc(0.1 - 0.02 - 0.002 - 0.003));
         dex.assert_btc_borrowed(0);
         dex.assert_btc_collateral(0);
-        dex.assert_btc_fee_amount(btc(0.004 + 0.002 + 0.003));
+        dex.assert_btc_fee(btc(0.004 + 0.002 + 0.003));
         dex.assert_btc_liquidity(btc(1.0 + 0.02));
     }
 
@@ -1549,7 +1569,7 @@ mod test {
         assert_eq!(withdrawable, 0);
         dex.assert_btc_borrowed(0);
         dex.assert_btc_collateral(0);
-        dex.assert_btc_fee_amount(btc(0.004 + 0.002 + 0.003));
+        dex.assert_btc_fee(btc(0.004 + 0.002 + 0.003));
 
         let _user_paid_fee = 0.002;
         let actual_pool_pnl = 0.098 - 0.003;
@@ -1579,7 +1599,7 @@ mod test {
         assert_eq!(withdrawable, usdc(1000. + 500. - 25. - 35.));
         dex.assert_usdc_borrowed(0);
         dex.assert_usdc_collateral(0);
-        dex.assert_usdc_fee_amount(usdc(20. + 25. + 35.));
+        dex.assert_usdc_fee(usdc(20. + 25. + 35.));
         dex.assert_usdc_liquidity(usdc(10000. - 500.));
     }
 
@@ -1606,7 +1626,7 @@ mod test {
         assert_eq!(withdrawable, usdc(1000. - 500. - 25. - 35.));
         dex.assert_usdc_borrowed(0);
         dex.assert_usdc_collateral(0);
-        dex.assert_usdc_fee_amount(usdc(20. + 25. + 35.));
+        dex.assert_usdc_fee(usdc(20. + 25. + 35.));
         dex.assert_usdc_liquidity(usdc(10000. + 500.));
     }
 
@@ -1633,7 +1653,7 @@ mod test {
         assert_eq!(withdrawable, 0);
         dex.assert_usdc_borrowed(0);
         dex.assert_usdc_collateral(0);
-        dex.assert_usdc_fee_amount(usdc(20. + 25. + 35.));
+        dex.assert_usdc_fee(usdc(20. + 25. + 35.));
 
         let _user_paid_fee = usdc(20.);
         let actual_pool_pnl = 980. - 25. - 35. + 20.;
@@ -1717,18 +1737,28 @@ mod test {
 
         dex.collect_fees(2, &oracles).assert_ok();
 
-        dex.assert_asset_fee_amount(0, 0);
-        dex.assert_asset_fee_amount(1, 0);
-        dex.assert_asset_fee_amount(2, 0);
+        dex.assert_asset_fee(0, 0);
+        dex.assert_asset_fee(1, 0);
+        dex.assert_asset_fee(2, 0);
 
         // Mock fee for each asset
-        dex.mock_asset_fee_amount(0, btc(0.01));
-        dex.mock_asset_fee_amount(1, usdc(100.));
-        dex.mock_asset_fee_amount(2, sol(3.));
+
+        dex.mock_asset_liquidity(0, 0);
+        dex.mock_asset_liquidity(1, 0);
+        dex.mock_asset_liquidity(2, sol(30.)); // Fee of btc&usdc will be converted to sol
+
+        dex.mock_asset_fee(0, btc(0.01));
+        dex.mock_asset_fee(1, usdc(100.));
+        dex.mock_asset_fee(2, sol(3.));
 
         dex.collect_fees(2, &oracles).assert_ok();
-        dex.assert_asset_fee_amount(0, 0);
-        dex.assert_asset_fee_amount(1, 0);
-        dex.assert_asset_fee_amount(2, sol(10.0 + 5.0 + 3.0));
+        dex.assert_asset_fee(0, 0);
+        dex.assert_asset_fee(1, 0);
+        dex.assert_asset_fee(2, sol(10.0 + 5.0 + 3.0));
+
+        // Check liquidity
+        dex.assert_asset_liquidity(0, btc(0.01));
+        dex.assert_asset_liquidity(1, usdc(100.));
+        dex.assert_asset_liquidity(2, sol(15.));
     }
 }
