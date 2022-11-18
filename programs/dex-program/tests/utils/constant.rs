@@ -3,6 +3,8 @@
 //vlp decimals
 pub const TEST_VLP_DECIMALS: u8 = 8;
 
+pub const INIT_VLP_POOL_AMOUNT_WITH_SOL: f64 = 199_800.0; //1000 * 200 -（1000 * 200）*0.1%
+
 //init user wallet asset amount
 pub const INIT_WALLET_BTC_ASSET_AMOUNT: f64 = 10.0;
 pub const INIT_WALLET_ETH_ASSET_AMOUNT: f64 = 100.0;
@@ -47,6 +49,9 @@ pub const TEST_SOL_SYMBOL: &str = "SOL";
 pub const TEST_SOL_DECIMALS: u8 = 9;
 pub const TEST_SOL_ORACLE_PRICE: f64 = 2_00.0;
 pub const TEST_SOL_ORACLE_EXPO: u8 = 8;
+
+//reward asset need first add into pool
+pub const TEST_REWARD_ASSET_INDEX: u8 = 3;
 
 pub const TEST_SOL_BORROW_FEE_RATE: u16 = 10; //1-10_000  0.1%
 pub const TEST_SOL_ADD_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%

@@ -16,16 +16,16 @@ use crate::utils::{
         TEST_ETH_MARKET_SYMBOL, TEST_ETH_MINIMUM_POSITION_VALUE, TEST_ETH_OPEN_FEE_RATE,
         TEST_ETH_ORACLE_EXPO, TEST_ETH_ORACLE_PRICE, TEST_ETH_ORACLE_SOURCE,
         TEST_ETH_REMOVE_LIQUIDITY_FEE_RATE, TEST_ETH_SIGNIFICANT_DECIMALS, TEST_ETH_SYMBOL,
-        TEST_ETH_TARGET_WEIGHT, TEST_SOL_ADD_LIQUIDITY_FEE_RATE, TEST_SOL_ASSET_INDEX,
-        TEST_SOL_BORROW_FEE_RATE, TEST_SOL_CHARGE_BORROW_FEE_INTERVAL, TEST_SOL_CLOSE_FEE_RATE,
-        TEST_SOL_DECIMALS, TEST_SOL_LIQUIDITY_FEE_RATE, TEST_SOL_MARKET_DECIMALS,
-        TEST_SOL_MARKET_SYMBOL, TEST_SOL_MINIMUM_POSITION_VALUE, TEST_SOL_OPEN_FEE_RATE,
-        TEST_SOL_ORACLE_EXPO, TEST_SOL_ORACLE_PRICE, TEST_SOL_ORACLE_SOURCE,
-        TEST_SOL_REMOVE_LIQUIDITY_FEE_RATE, TEST_SOL_SIGNIFICANT_DECIMALS, TEST_SOL_SYMBOL,
-        TEST_SOL_TARGET_WEIGHT, TEST_USDC_ADD_LIQUIDITY_FEE_RATE, TEST_USDC_BORROW_FEE_RATE,
-        TEST_USDC_DECIMALS, TEST_USDC_ORACLE_EXPO, TEST_USDC_ORACLE_PRICE,
-        TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE, TEST_USDC_SYMBOL, TEST_USDC_TARGET_WEIGHT,
-        TEST_VLP_DECIMALS,
+        TEST_ETH_TARGET_WEIGHT, TEST_REWARD_ASSET_INDEX, TEST_SOL_ADD_LIQUIDITY_FEE_RATE,
+        TEST_SOL_ASSET_INDEX, TEST_SOL_BORROW_FEE_RATE, TEST_SOL_CHARGE_BORROW_FEE_INTERVAL,
+        TEST_SOL_CLOSE_FEE_RATE, TEST_SOL_DECIMALS, TEST_SOL_LIQUIDITY_FEE_RATE,
+        TEST_SOL_MARKET_DECIMALS, TEST_SOL_MARKET_SYMBOL, TEST_SOL_MINIMUM_POSITION_VALUE,
+        TEST_SOL_OPEN_FEE_RATE, TEST_SOL_ORACLE_EXPO, TEST_SOL_ORACLE_PRICE,
+        TEST_SOL_ORACLE_SOURCE, TEST_SOL_REMOVE_LIQUIDITY_FEE_RATE, TEST_SOL_SIGNIFICANT_DECIMALS,
+        TEST_SOL_SYMBOL, TEST_SOL_TARGET_WEIGHT, TEST_USDC_ADD_LIQUIDITY_FEE_RATE,
+        TEST_USDC_BORROW_FEE_RATE, TEST_USDC_DECIMALS, TEST_USDC_ORACLE_EXPO,
+        TEST_USDC_ORACLE_PRICE, TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE, TEST_USDC_SYMBOL,
+        TEST_USDC_TARGET_WEIGHT, TEST_VLP_DECIMALS,
     },
     convert_to_big_number, create_mint, create_token_account, get_context, get_dex_info,
     get_keypair_from_file, get_program, set_mock_oracle,
@@ -326,6 +326,16 @@ impl DexTestContext {
             user.mint_btc(INIT_WALLET_BTC_ASSET_AMOUNT).await;
             user.mint_eth(INIT_WALLET_ETH_ASSET_AMOUNT).await;
             user.mint_sol(INIT_WALLET_SOL_ASSET_AMOUNT).await;
+
+            users.push(user);
+        }
+
+        //init reward asset
+        {
+            let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
+            user.mint_sol(INIT_WALLET_SOL_ASSET_AMOUNT).await;
+            user.add_liquidity_with_sol(INIT_WALLET_SOL_ASSET_AMOUNT)
+                .await;
             users.push(user);
         }
 
@@ -502,6 +512,7 @@ pub async fn init_dex(
     let reward_mint = sol_mint;
 
     let vlp_decimals = TEST_VLP_DECIMALS;
+    let reward_asset_index = TEST_REWARD_ASSET_INDEX;
 
     let init_dex_ixs = compose_init_dex_ixs(
         context,
@@ -514,6 +525,7 @@ pub async fn init_dex(
         &user_list_entry_page,
         &reward_mint,
         vlp_decimals,
+        reward_asset_index,
     )
     .await;
 

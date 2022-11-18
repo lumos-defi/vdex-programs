@@ -39,6 +39,7 @@ export async function createDexFull(authority: Keypair) {
   const matchQueue = Keypair.generate()
   const userListEntryPage = Keypair.generate()
   const VLP_DECIMALS = 6
+  const REWARD_ASSET_INDEX = 0
 
   const orderBook = Keypair.generate()
   const orderPoolEntryPage = Keypair.generate()
@@ -49,7 +50,7 @@ export async function createDexFull(authority: Keypair) {
 
   //init dex
   await program.methods
-    .initDex(VLP_DECIMALS)
+    .initDex(VLP_DECIMALS, REWARD_ASSET_INDEX)
     .accounts({
       dex: dex.publicKey,
       usdcMint,

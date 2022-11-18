@@ -184,7 +184,7 @@ impl Dex {
             DexError::InvalidOracle
         );
 
-        // vlp_amount = asset_value * glp_supply / aum
+        // vlp_amount = asset_value * vlp_supply / aum
         let price = get_oracle_price(ai.oracle_source, &oracles[oracle_index])?;
         let asset_value = value(added, price, ai.decimals)?;
 
@@ -193,12 +193,7 @@ impl Dex {
                 .safe_mul(10u64.pow(vlp_decimals.into()))?
                 .safe_div(USD_POW_DECIMALS as u128)? as u64
         } else {
-            asset_value
-                .safe_mul(vlp_supply)?
-                .safe_div(10u128.pow(vlp_decimals.into()))?
-                .safe_div(aum as u128)?
-                .safe_mul(10u128.pow(vlp_decimals.into()))?
-                .safe_div(USD_POW_DECIMALS as u128)? as u64
+            asset_value.safe_mul(vlp_supply)?.safe_div(aum as u128)? as u64
         };
 
         Ok((vlp_amount, fee))
@@ -225,10 +220,10 @@ impl Dex {
         );
 
         let asset_price = get_oracle_price(ai.oracle_source, &oracles[oracle_index])?;
+        // vlp_price= aum / vlp_supply
         let vlp_price = (aum as u64)
-            .safe_mul(USD_POW_DECIMALS as u64)?
-            .safe_div(vlp_supply as u128)?
-            .safe_div(10u128.pow(vlp_decimals.into()))? as u64;
+            .safe_mul(10u64.pow(vlp_decimals.into()))?
+            .safe_div(vlp_supply as u128)? as u64;
 
         let out_amount = swap(amount, vlp_price, vlp_decimals, asset_price, ai.decimals)?;
 
@@ -446,6 +441,7 @@ impl Dex {
                 &swap_oracles,
             )?;
 
+            msg!("collected:{}", collected);
             self.assets[i].liquidity_amount = self.assets[i]
                 .liquidity_amount
                 .safe_add(self.assets[i].fee_amount)?;

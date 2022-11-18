@@ -12,12 +12,13 @@ export async function createDex(authority: Keypair) {
   const rewardMint = Keypair.generate()
   const VLP_DECIMALS = 6
   const USDC_MINT_DECIMALS = 6
+  const REWARD_ASSET_INDEX = 0
 
   await airdrop(provider, authority.publicKey, 10000000000)
   const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
 
   await program.methods
-    .initDex(VLP_DECIMALS)
+    .initDex(VLP_DECIMALS, REWARD_ASSET_INDEX)
     .accounts({
       dex: dex.publicKey,
       usdcMint,

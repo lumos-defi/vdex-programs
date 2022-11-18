@@ -8,6 +8,7 @@ describe('Init Dex', () => {
   const { program, provider } = getProviderAndProgram()
   const VLP_DECIMALS = 6
   const USDC_MINT_DECIMALS = 6
+  const REWARD_ASSET_INDEX = 0
 
   let dex: Keypair
   let authority: Keypair
@@ -48,7 +49,7 @@ describe('Init Dex', () => {
 
   it('should init dex account successfully', async () => {
     await program.methods
-      .initDex(VLP_DECIMALS)
+      .initDex(VLP_DECIMALS, REWARD_ASSET_INDEX)
       .accounts({
         dex: dex.publicKey,
         usdcMint: usdcMint,

@@ -29,6 +29,7 @@ pub async fn compose_init_dex_ixs(
     user_list_entry_page: &Keypair,
     reward_mint: &Keypair,
     vlp_decimals: u8,
+    reward_asset_index: u8,
 ) -> Vec<Instruction> {
     let rent = context.banks_client.get_rent().await.unwrap();
     let dex_account_size = 8 + mem::size_of::<Dex>();
@@ -75,7 +76,10 @@ pub async fn compose_init_dex_ixs(
             user_list_entry_page: user_list_entry_page.pubkey(),
             reward_mint: reward_mint.pubkey(),
         })
-        .args(dex_program::instruction::InitDex { vlp_decimals })
+        .args(dex_program::instruction::InitDex {
+            vlp_decimals,
+            reward_asset_index,
+        })
         .instructions()
         .unwrap();
 

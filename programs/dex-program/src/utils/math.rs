@@ -143,7 +143,7 @@ pub fn swap(
 pub fn value(amount: u64, price: u64, decimals: u8) -> DexResult<u64> {
     Ok(amount
         .safe_mul(price)?
-        .safe_mul(10u128.pow(decimals as u32))? as u64)
+        .safe_div(10u128.pow(decimals as u32))? as u64)
 }
 
 #[cfg(test)]
