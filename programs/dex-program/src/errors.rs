@@ -205,6 +205,9 @@ pub enum DexError {
 
     #[msg("AUM below zero")]
     AUMBelowZero,
+
+    #[msg("VLP supply is zero")]
+    VLPSupplyZero,
 }
 
 pub type DexResult<T = ()> = Result<T>;
