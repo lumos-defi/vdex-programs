@@ -125,9 +125,6 @@ pub enum DexError {
     #[msg("Need no liquidation")]
     NeedNoLiquidation,
 
-    #[msg("Invalid oracle account")]
-    InvalidOracleAccount,
-
     #[msg("Invalid vlp mint")]
     InvalidVlpMint,
 
