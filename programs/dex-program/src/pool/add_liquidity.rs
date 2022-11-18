@@ -80,10 +80,10 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
     let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
     token::transfer(cpi_ctx, amount)?;
 
-    let (vlp_amount, fee) = dex.add_liquidity(index, amount, &ctx.remaining_accounts)?;
-
     // Update rewards
     dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len])?;
+
+    let (vlp_amount, fee) = dex.add_liquidity(index, amount, &ctx.remaining_accounts)?;
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     us.borrow_mut()
