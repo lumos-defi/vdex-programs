@@ -365,4 +365,39 @@ mod test {
             reward / user_total as u64
         );
     }
+
+    #[test]
+    //
+    // 1. Alice add the first liquidity, she will have all the rewards( add liquidity fee );
+    // 2. Bob add the second liquidity, he will share the generated rewards with Alice.
+    //
+    fn test_add_liquidity_process() {
+        let mut pool = StakingPool::default();
+        let mut alice = UserStake::default();
+        let mut bob = UserStake::default();
+
+        // 1. Initially no pending rewards
+        assert_eq!(alice.pending_reward(&pool).assert_unwrap(), 0);
+        assert_eq!(bob.pending_reward(&pool).assert_unwrap(), 0);
+
+        // 2. Alice add liquidity and enter staking
+        // No rewards available
+        pool.add_reward(0).assert_ok();
+        alice.enter_staking(&mut pool, usdc(1000.)).assert_ok();
+        assert_eq!(alice.pending_reward(&pool).assert_unwrap(), 0);
+
+        // 3. Bob add liquidity and enter staking.
+        // Rewards were generated when alice adding liquidity
+        pool.add_reward(eth(0.1)).assert_ok();
+
+        bob.enter_staking(&mut pool, usdc(1000.)).assert_ok();
+
+        assert_eq!(alice.pending_reward(&pool).assert_unwrap(), eth(0.1));
+        assert_eq!(bob.pending_reward(&pool).assert_unwrap(), 0);
+
+        // 4. Update rewards later, check the pending rewards
+        pool.add_reward(eth(0.1)).assert_ok();
+        assert_eq!(alice.pending_reward(&pool).assert_unwrap(), eth(0.1 + 0.05));
+        assert_eq!(bob.pending_reward(&pool).assert_unwrap(), eth(0.05));
+    }
 }
