@@ -143,13 +143,14 @@ impl UserStake {
         Ok(())
     }
 
-    pub fn withdraw_reward(&mut self, pool: &StakingPool) -> DexResult<u64> {
+    pub fn withdraw_reward(&mut self, pool: &mut StakingPool) -> DexResult<u64> {
         let pending = (self
             .staked
             .safe_mul(pool.accumulate_reward_per_share)?
             .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64)
             .safe_sub(self.reward_debt)?;
 
+        pool.withdraw_reward(pending)?;
         let withdrawable = self.reward_accumulated.safe_add(pending)?;
 
         self.reward_accumulated = 0;
@@ -358,12 +359,31 @@ mod test {
             );
         }
 
+        // Check rewards
+        let pending_reward = users[user_total as usize - 1]
+            .pending_reward(&pool)
+            .assert_unwrap();
+
+        assert_eq!(pending_reward, reward / user_total as u64);
         assert_eq!(
-            users[user_total as usize - 1]
-                .pending_reward(&pool)
-                .assert_unwrap(),
-            reward / user_total as u64
+            pool.reward_total,
+            reward + additional_reward - pending_reward
         );
+
+        // Withdraw rewards
+        let withdrawable_reward = users[user_total as usize - 1]
+            .withdraw_reward(&mut pool)
+            .assert_unwrap();
+        assert_eq!(pending_reward, withdrawable_reward);
+        assert_eq!(
+            pool.reward_total,
+            reward + additional_reward - withdrawable_reward
+        );
+
+        let pending_reward = users[user_total as usize - 1]
+            .pending_reward(&pool)
+            .assert_unwrap();
+        assert_eq!(pending_reward, 0);
     }
 
     #[test]
