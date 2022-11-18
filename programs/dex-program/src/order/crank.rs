@@ -124,7 +124,7 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             .borrow()
             .calc_borrow_fund(order.size, order.leverage, &mfr)
         {
-            if let Ok(_) = dex.has_sufficient_fund(order.market as usize, order.long, borrow) {
+            if let Ok(_) = dex.has_sufficient_fund(order.market, order.long, borrow) {
                 sufficient_fund = true;
             }
         }
@@ -143,22 +143,10 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             &mfr,
         )?;
 
-        let _ = dex.borrow_fund(
-            order.market as usize,
-            order.long,
-            collateral,
-            borrow,
-            open_fee,
-        );
+        let _ = dex.borrow_fund(order.market, order.long, collateral, borrow, open_fee);
 
         // Update market global position
-        dex.increase_global_position(
-            order.market as usize,
-            order.long,
-            order.price,
-            size,
-            collateral,
-        )?;
+        dex.increase_global_position(order.market, order.long, order.price, size, collateral)?;
 
         // Save to event queue
         event_queue.fill_position(
@@ -199,10 +187,10 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         )?;
 
         // Update market global position
-        dex.decrease_global_position(order.market as usize, order.long, order.size, collateral)?;
+        dex.decrease_global_position(order.market, order.long, order.size, collateral)?;
 
         let withdrawable = dex.settle_pnl(
-            order.market as usize,
+            order.market,
             order.long,
             collateral,
             borrow,

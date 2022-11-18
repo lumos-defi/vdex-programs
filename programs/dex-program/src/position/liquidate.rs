@@ -105,17 +105,10 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         .close_position(market, size, price, long, &mfr, true)?;
 
     // Update market global position
-    dex.decrease_global_position(market as usize, long, size, collateral)?;
+    dex.decrease_global_position(market, long, size, collateral)?;
 
-    let withdrawable = dex.settle_pnl(
-        market as usize,
-        long,
-        collateral,
-        borrow,
-        pnl,
-        close_fee,
-        borrow_fee,
-    )?;
+    let withdrawable =
+        dex.settle_pnl(market, long, collateral, borrow, pnl, close_fee, borrow_fee)?;
 
     // Should the position be liquidated?
     let threshold = collateral.safe_mul(15u64)?.safe_div(100u128)? as u64;

@@ -110,17 +110,10 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
         .close_position(market, size, price, long, &mfr, false)?;
 
     // Update market global position
-    dex.decrease_global_position(market as usize, long, size, collateral)?;
+    dex.decrease_global_position(market, long, size, collateral)?;
 
-    let withdrawable = dex.settle_pnl(
-        market as usize,
-        long,
-        collateral,
-        borrow,
-        pnl,
-        close_fee,
-        borrow_fee,
-    )?;
+    let withdrawable =
+        dex.settle_pnl(market, long, collateral, borrow, pnl, close_fee, borrow_fee)?;
     if withdrawable > 0 {
         let signer = &[&seeds[..]];
         let cpi_accounts = Transfer {

@@ -8,6 +8,9 @@ pub enum DexError {
     #[msg("Invalid mint")]
     InvalidMint,
 
+    #[msg("Invalid oracle")]
+    InvalidOracle,
+
     #[msg("Invalid oracle source")]
     InvalidOracleSource,
 
@@ -85,6 +88,9 @@ pub enum DexError {
 
     #[msg("Invalid Amount")]
     InvalidAmount,
+
+    #[msg("Invalid asset index")]
+    InvalidAssetIndex,
 
     #[msg("Invalid market index")]
     InvalidMarketIndex,
@@ -199,6 +205,9 @@ pub enum DexError {
 
     #[msg("Close size too large")]
     CloseSizeTooLarge,
+
+    #[msg("AUM below zero")]
+    AUMBelowZero,
 }
 
 pub type DexResult<T = ()> = Result<T>;
