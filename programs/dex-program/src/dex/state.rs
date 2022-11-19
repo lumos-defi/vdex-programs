@@ -99,6 +99,9 @@ impl Dex {
             if !ai.valid {
                 continue;
             }
+
+            require!(oracle_offset < oracles.len(), DexError::InvalidOracle);
+
             require_eq!(
                 ai.oracle,
                 oracles[oracle_offset].key(),
@@ -127,10 +130,13 @@ impl Dex {
             if !mi.valid {
                 continue;
             }
+
+            require!(oracle_offset < oracles.len(), DexError::InvalidOracle);
+
             require_eq!(
                 mi.oracle,
                 oracles[oracle_offset].key(),
-                DexError::InvalidOracleAccount
+                DexError::InvalidOracle
             );
 
             let price = get_oracle_price(mi.oracle_source, &oracles[oracle_offset])?;
@@ -139,7 +145,7 @@ impl Dex {
             oracle_offset += 1;
         }
 
-        (aum as i64).i_safe_add(pnl)
+        (aum as i64).i_safe_sub(pnl)
     }
 
     fn to_oracle_index(&self, index: u8) -> DexResult<usize> {
@@ -211,6 +217,7 @@ impl Dex {
         require!(aum >= 0, DexError::AUMBelowZero);
 
         let (vlp_supply, vlp_decimals) = self.vlp_info()?;
+        require!(vlp_supply > 0, DexError::VLPSupplyZero);
         let oracle_index = self.to_oracle_index(index)?;
 
         let ai = self.asset_as_mut(index)?;
@@ -399,6 +406,8 @@ impl Dex {
         let rai = self.asset_as_ref(reward_asset as u8)?;
         let reward_oracle_index = self.to_oracle_index(reward_asset as u8)?;
 
+        require!(reward_oracle_index < oracles.len(), DexError::InvalidOracle);
+
         require_eq!(
             rai.oracle,
             oracles[reward_oracle_index].key(),
@@ -423,6 +432,8 @@ impl Dex {
                 continue;
             }
 
+            require!(oracle_offset < oracles.len(), DexError::InvalidOracle);
+
             require_eq!(
                 ai.oracle,
                 oracles[oracle_offset].key(),
@@ -441,7 +452,6 @@ impl Dex {
                 &swap_oracles,
             )?;
 
-            msg!("collected:{}", collected);
             self.assets[i].liquidity_amount = self.assets[i]
                 .liquidity_amount
                 .safe_add(self.assets[i].fee_amount)?;
@@ -461,8 +471,16 @@ impl Dex {
 
     pub fn collect_rewards(&mut self, oracles: &[AccountInfo]) -> DexResult {
         let index = self.vlp_pool.reward_asset_index;
+        require!(
+            index < self.assets_number && self.assets[index as usize].valid,
+            DexError::InvalidRewardAsset
+        );
 
         let rewards = self.collect_fees(index as usize, oracles)?;
+        if rewards == 0 {
+            return Ok(());
+        }
+
         self.vlp_pool.add_reward(rewards)?;
 
         let ai = self.asset_as_mut(index)?;
@@ -950,13 +968,60 @@ mod test {
                 borrow_fee_rate: 10,
                 oracle_source: OracleSource::Mock as u8,
                 oracle,
+                add_liquidity_fee_rate: 10,
+                remove_liquidity_fee_rate: 10,
                 ..AssetInfo::default()
             };
             self.assets_number += 1;
         }
 
+        pub fn mock_invalid_asset(&mut self, decimals: u8, oracle: Pubkey) {
+            self.assets[self.assets_number as usize] = AssetInfo {
+                valid: false,
+                decimals,
+                borrow_fee_rate: 10,
+                oracle_source: OracleSource::Mock as u8,
+                oracle,
+                ..AssetInfo::default()
+            };
+            self.assets_number += 1;
+        }
+
+        pub fn add_market(&mut self, decimals: u8, asset_index: u8, oracle: Pubkey) {
+            self.markets[self.markets_number as usize] = MarketInfo {
+                valid: true,
+                decimals,
+                oracle,
+                asset_index,
+                open_fee_rate: 20,
+                close_fee_rate: 20,
+                liquidate_fee_rate: 50,
+                charge_borrow_fee_interval: 3600,
+                global_long: Position::new(true).assert_unwrap(),
+                global_short: Position::new(false).assert_unwrap(),
+                ..MarketInfo::default()
+            };
+
+            self.markets_number += 1;
+        }
+        pub fn mock_vlp_pool(&mut self, decimals: u8, reward_asset_index: u8) {
+            self.vlp_pool = StakingPool {
+                decimals,
+                reward_asset_index,
+                ..StakingPool::default()
+            };
+        }
+
         pub fn mock_asset_liquidity(&mut self, index: u8, amount: u64) {
             self.assets[index as usize].liquidity_amount = amount;
+        }
+
+        pub fn add_asset_collateral(&mut self, index: u8, amount: u64) {
+            self.assets[index as usize].collateral_amount += amount;
+        }
+
+        pub fn mock_asset_borrowed(&mut self, index: u8, amount: u64) {
+            self.assets[index as usize].borrowed_amount = amount;
         }
 
         pub fn mock_asset_fee(&mut self, index: u8, amount: u64) {
@@ -1756,5 +1821,168 @@ mod test {
         dex.assert_asset_liquidity(0, btc(0.01));
         dex.assert_asset_liquidity(1, usdc(100.));
         dex.assert_asset_liquidity(2, sol(15.));
+    }
+
+    #[test]
+    fn test_aum() {
+        let bump = Bump::new();
+        let btc_oracle = gen_account(1024, &bump);
+        let btc_oracle2 = gen_account(1024, &bump);
+        let usdc_oracle = gen_account(1024, &bump);
+        let sol_oracle = gen_account(1024, &bump);
+        let dummy_oracle = gen_account(1024, &bump);
+
+        // Mock dex with 4 assets and 1 market
+        let mut dex = Dex::default();
+        dex.mock_invalid_asset(6, dummy_oracle.key()); // Mock invalid asset
+        dex.add_asset(BTC_DECIMALS, btc_oracle.key());
+        dex.add_asset(USDC_DECIMALS, usdc_oracle.key());
+        dex.add_asset(SOL_DECIMALS, sol_oracle.key());
+
+        dex.add_market(BTC_DECIMALS, 1, btc_oracle2.key());
+
+        set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
+        set_mock_price(&btc_oracle2, usdc(20000.)).assert_ok();
+        set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
+        set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
+
+        let mut oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle, btc_oracle2];
+
+        let aum = dex.aum(&oracles).assert_unwrap();
+        assert_eq!(aum, 0);
+
+        // Add liquidity
+        dex.mock_asset_liquidity(1, btc(0.04));
+        dex.mock_asset_liquidity(2, usdc(500.));
+        dex.mock_asset_liquidity(3, sol(30.));
+
+        let aum = dex.aum(&oracles).assert_unwrap();
+        let mut liquidity = usdc_i(800.0 + 500. + 600.0);
+        assert_eq!(aum, liquidity);
+
+        // Mock borrow amount
+        dex.mock_asset_borrowed(1, btc(0.005));
+        dex.mock_asset_borrowed(2, usdc(110.));
+        dex.mock_asset_borrowed(3, sol(3.));
+
+        let aum = dex.aum(&oracles).assert_unwrap();
+        let mut borrowed = usdc_i(100.0 + 110.0 + 60.0);
+        assert_eq!(aum, liquidity + borrowed);
+
+        let mut collateral = 0i64;
+
+        // Mock global long
+        dex.increase_global_position(0, true, usdc(18000.), btc(0.01), btc(0.001))
+            .assert_ok();
+        dex.add_asset_collateral(1, btc(0.001));
+
+        liquidity -= usdc_i(200.0);
+        collateral += usdc_i(20.0);
+        borrowed += usdc_i(200.0);
+        let long_un_pnl = usdc_i(20.0);
+
+        let aum = dex.aum(&oracles).assert_unwrap();
+        assert_eq!(aum, liquidity + collateral + borrowed - long_un_pnl);
+
+        // Mock global short
+        dex.increase_global_position(0, false, usdc(19000.), btc(0.01), btc(0.001))
+            .assert_ok();
+        dex.add_asset_collateral(1, btc(0.001));
+
+        liquidity -= usdc_i(200.0);
+        collateral += usdc_i(20.0);
+        borrowed += usdc_i(200.0);
+        let short_un_pnl = -usdc_i(10.0);
+
+        let aum = dex.aum(&oracles).assert_unwrap();
+        assert_eq!(
+            aum,
+            liquidity + collateral + borrowed - long_un_pnl - short_un_pnl
+        );
+
+        // Test invalid oracles
+        dex.aum(&vec![]).assert_err();
+        oracles.pop();
+        dex.aum(&oracles).assert_err()
+    }
+
+    const VLP_DECIMALS: u8 = 8;
+    fn vlp(size: f64) -> u64 {
+        (size * (10u64.pow(VLP_DECIMALS as u32) as f64)) as u64
+    }
+
+    #[test]
+    fn test_add_and_remove_liquidity() {
+        let bump = Bump::new();
+        let btc_oracle = gen_account(1024, &bump);
+        let btc_oracle2 = gen_account(1024, &bump);
+        let usdc_oracle = gen_account(1024, &bump);
+        let sol_oracle = gen_account(1024, &bump);
+        let dummy_oracle = gen_account(1024, &bump);
+
+        // Mock dex with 4 assets and 1 market
+        let mut dex = Dex::default();
+        dex.mock_invalid_asset(6, dummy_oracle.key()); // Mock invalid asset
+        dex.add_asset(BTC_DECIMALS, btc_oracle.key());
+        dex.add_asset(USDC_DECIMALS, usdc_oracle.key());
+        dex.add_asset(SOL_DECIMALS, sol_oracle.key());
+
+        dex.mock_vlp_pool(VLP_DECIMALS, 3);
+
+        dex.add_market(BTC_DECIMALS, 1, btc_oracle2.key());
+
+        set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
+        set_mock_price(&btc_oracle2, usdc(20000.)).assert_ok();
+        set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
+        set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
+
+        let oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle, btc_oracle2];
+
+        // Add 1000 SOL, add liquidity fee rate = 0.1%
+        let (vlp_amount, fee) = dex.add_liquidity(3, sol(1000.), &oracles).assert_unwrap();
+
+        // vlp_amount = 19980_00000000
+        assert_eq!(vlp_amount, vlp((1000.0 - 1.0) * 20.0));
+        assert_eq!(fee, sol(1.));
+        dex.assert_asset_fee(3, sol(1.));
+        dex.vlp_pool.increase_staking(vlp_amount).assert_ok();
+
+        // Add another 1000 SOL
+        let (vlp_amount, fee) = dex.add_liquidity(3, sol(1000.), &oracles).assert_unwrap();
+
+        // vlp_amount = 19980_00000000
+        assert_eq!(vlp_amount, vlp((1000.0 - 1.0) * 20.0));
+
+        assert_eq!(fee, sol(1.));
+        dex.assert_asset_fee(3, sol(2.));
+        dex.vlp_pool.increase_staking(vlp_amount).assert_ok();
+
+        assert_eq!(dex.vlp_pool.staked_total, 2 * vlp((1000.0 - 1.0) * 20.0));
+
+        // Remove liquidity, remove liquidity fee rate = 0.1%
+        let (withdraw, fee) = dex
+            .remove_liquidity(3, vlp(1000.), &oracles)
+            .assert_unwrap();
+
+        assert_eq!(fee, sol(0.05));
+        assert_eq!(withdraw, sol(49.95));
+
+        dex.vlp_pool.decrease_staking(vlp(1000.)).assert_ok();
+        assert_eq!(
+            dex.vlp_pool.staked_total,
+            2 * vlp((1000.0 - 1.0) * 20.0) - vlp(1000.)
+        );
+
+        // Add 1 BTC
+        let (vlp_amount, fee) = dex.add_liquidity(1, btc(1.), &oracles).assert_unwrap();
+        assert_eq!(vlp_amount, vlp((1.0 - 0.001) * 20000.0));
+        assert_eq!(fee, btc(0.001));
+        dex.vlp_pool.increase_staking(vlp_amount).assert_ok();
+
+        // Add 10000 usdc
+        let (vlp_amount, fee) = dex.add_liquidity(2, usdc(10000.), &oracles).assert_unwrap();
+        assert_eq!(vlp_amount, vlp((10000.0 - 10.) * 1.0));
+        assert_eq!(fee, usdc(10.));
+        dex.vlp_pool.increase_staking(vlp_amount).assert_ok();
     }
 }

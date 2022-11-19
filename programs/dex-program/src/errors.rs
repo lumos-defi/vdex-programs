@@ -125,9 +125,6 @@ pub enum DexError {
     #[msg("Need no liquidation")]
     NeedNoLiquidation,
 
-    #[msg("Invalid oracle account")]
-    InvalidOracleAccount,
-
     #[msg("Invalid vlp mint")]
     InvalidVlpMint,
 
@@ -208,6 +205,12 @@ pub enum DexError {
 
     #[msg("AUM below zero")]
     AUMBelowZero,
+
+    #[msg("VLP supply is zero")]
+    VLPSupplyZero,
+
+    #[msg("Invalid reward asset")]
+    InvalidRewardAsset,
 }
 
 pub type DexResult<T = ()> = Result<T>;
