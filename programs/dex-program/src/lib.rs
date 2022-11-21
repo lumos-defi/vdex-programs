@@ -22,8 +22,8 @@ declare_id!("2aJZ6AufDU5NRzXLg5Ww4S4Nf2tx7xZDQD6he2gjsKyq");
 pub mod dex_program {
     use super::*;
 
-    pub fn init_dex(ctx: Context<InitDex>, vlp_decimals: u8, reward_asset_index: u8) -> DexResult {
-        dex::init_dex::handler(ctx, vlp_decimals, reward_asset_index)
+    pub fn init_dex(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
+        dex::init_dex::handler(ctx, vlp_decimals)
     }
 
     pub fn init_mock_oracle(ctx: Context<InitMockOracle>, price: u64, expo: u8) -> DexResult {
