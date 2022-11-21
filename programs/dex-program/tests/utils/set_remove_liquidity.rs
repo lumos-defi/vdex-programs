@@ -15,7 +15,6 @@ use super::compose_remove_liquidity_ix;
 pub async fn setup(
     context: &mut ProgramTestContext,
     program: &Program,
-    admin: &Keypair,
     user: &Keypair,
     dex: &Pubkey,
     mint: &Pubkey,

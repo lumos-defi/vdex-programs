@@ -9,22 +9,23 @@ use crate::utils::{
         TEST_BTC_DECIMALS, TEST_BTC_LIQUIDITY_FEE_RATE, TEST_BTC_MARKET_DECIMALS,
         TEST_BTC_MARKET_SYMBOL, TEST_BTC_MINIMUM_POSITION_VALUE, TEST_BTC_OPEN_FEE_RATE,
         TEST_BTC_ORACLE_EXPO, TEST_BTC_ORACLE_PRICE, TEST_BTC_ORACLE_SOURCE,
-        TEST_BTC_REMOVE_LIQUIDITY_FEE_RATE, TEST_BTC_SIGNIFICANT_DECIMALS, TEST_BTC_SYMBOL,
-        TEST_BTC_TARGET_WEIGHT, TEST_ETH_ADD_LIQUIDITY_FEE_RATE, TEST_ETH_ASSET_INDEX,
-        TEST_ETH_BORROW_FEE_RATE, TEST_ETH_CHARGE_BORROW_FEE_INTERVAL, TEST_ETH_CLOSE_FEE_RATE,
-        TEST_ETH_DECIMALS, TEST_ETH_LIQUIDITY_FEE_RATE, TEST_ETH_MARKET_DECIMALS,
-        TEST_ETH_MARKET_SYMBOL, TEST_ETH_MINIMUM_POSITION_VALUE, TEST_ETH_OPEN_FEE_RATE,
-        TEST_ETH_ORACLE_EXPO, TEST_ETH_ORACLE_PRICE, TEST_ETH_ORACLE_SOURCE,
-        TEST_ETH_REMOVE_LIQUIDITY_FEE_RATE, TEST_ETH_SIGNIFICANT_DECIMALS, TEST_ETH_SYMBOL,
-        TEST_ETH_TARGET_WEIGHT, TEST_REWARD_ASSET_INDEX, TEST_SOL_ADD_LIQUIDITY_FEE_RATE,
-        TEST_SOL_ASSET_INDEX, TEST_SOL_BORROW_FEE_RATE, TEST_SOL_CHARGE_BORROW_FEE_INTERVAL,
-        TEST_SOL_CLOSE_FEE_RATE, TEST_SOL_DECIMALS, TEST_SOL_LIQUIDITY_FEE_RATE,
-        TEST_SOL_MARKET_DECIMALS, TEST_SOL_MARKET_SYMBOL, TEST_SOL_MINIMUM_POSITION_VALUE,
-        TEST_SOL_OPEN_FEE_RATE, TEST_SOL_ORACLE_EXPO, TEST_SOL_ORACLE_PRICE,
-        TEST_SOL_ORACLE_SOURCE, TEST_SOL_REMOVE_LIQUIDITY_FEE_RATE, TEST_SOL_SIGNIFICANT_DECIMALS,
-        TEST_SOL_SYMBOL, TEST_SOL_TARGET_WEIGHT, TEST_USDC_ADD_LIQUIDITY_FEE_RATE,
-        TEST_USDC_BORROW_FEE_RATE, TEST_USDC_DECIMALS, TEST_USDC_ORACLE_EXPO,
-        TEST_USDC_ORACLE_PRICE, TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE, TEST_USDC_SYMBOL,
+        TEST_BTC_REMOVE_LIQUIDITY_FEE_RATE, TEST_BTC_SIGNIFICANT_DECIMALS, TEST_BTC_SWAP_FEE_RATE,
+        TEST_BTC_SYMBOL, TEST_BTC_TARGET_WEIGHT, TEST_ETH_ADD_LIQUIDITY_FEE_RATE,
+        TEST_ETH_ASSET_INDEX, TEST_ETH_BORROW_FEE_RATE, TEST_ETH_CHARGE_BORROW_FEE_INTERVAL,
+        TEST_ETH_CLOSE_FEE_RATE, TEST_ETH_DECIMALS, TEST_ETH_LIQUIDITY_FEE_RATE,
+        TEST_ETH_MARKET_DECIMALS, TEST_ETH_MARKET_SYMBOL, TEST_ETH_MINIMUM_POSITION_VALUE,
+        TEST_ETH_OPEN_FEE_RATE, TEST_ETH_ORACLE_EXPO, TEST_ETH_ORACLE_PRICE,
+        TEST_ETH_ORACLE_SOURCE, TEST_ETH_REMOVE_LIQUIDITY_FEE_RATE, TEST_ETH_SIGNIFICANT_DECIMALS,
+        TEST_ETH_SWAP_FEE_RATE, TEST_ETH_SYMBOL, TEST_ETH_TARGET_WEIGHT,
+        TEST_SOL_ADD_LIQUIDITY_FEE_RATE, TEST_SOL_ASSET_INDEX, TEST_SOL_BORROW_FEE_RATE,
+        TEST_SOL_CHARGE_BORROW_FEE_INTERVAL, TEST_SOL_CLOSE_FEE_RATE, TEST_SOL_DECIMALS,
+        TEST_SOL_LIQUIDITY_FEE_RATE, TEST_SOL_MARKET_DECIMALS, TEST_SOL_MARKET_SYMBOL,
+        TEST_SOL_MINIMUM_POSITION_VALUE, TEST_SOL_OPEN_FEE_RATE, TEST_SOL_ORACLE_EXPO,
+        TEST_SOL_ORACLE_PRICE, TEST_SOL_ORACLE_SOURCE, TEST_SOL_REMOVE_LIQUIDITY_FEE_RATE,
+        TEST_SOL_SIGNIFICANT_DECIMALS, TEST_SOL_SWAP_FEE_RATE, TEST_SOL_SYMBOL,
+        TEST_SOL_TARGET_WEIGHT, TEST_USDC_ADD_LIQUIDITY_FEE_RATE, TEST_USDC_BORROW_FEE_RATE,
+        TEST_USDC_DECIMALS, TEST_USDC_ORACLE_EXPO, TEST_USDC_ORACLE_PRICE,
+        TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE, TEST_USDC_SWAP_FEE_RATE, TEST_USDC_SYMBOL,
         TEST_USDC_TARGET_WEIGHT, TEST_VLP_DECIMALS,
     },
     convert_to_big_number, create_mint, create_token_account, get_context, get_dex_info,
@@ -101,6 +102,7 @@ impl DexTestContext {
             let borrow_fee_rate: u16 = TEST_USDC_BORROW_FEE_RATE;
             let add_liquidity_fee_rate: u16 = TEST_USDC_ADD_LIQUIDITY_FEE_RATE;
             let remove_liquidity_fee_rate: u16 = TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE;
+            let swap_fee_rate: u16 = TEST_USDC_SWAP_FEE_RATE;
             let target_weight: u16 = TEST_USDC_TARGET_WEIGHT;
 
             add_asset(
@@ -117,6 +119,7 @@ impl DexTestContext {
                 borrow_fee_rate,
                 add_liquidity_fee_rate,
                 remove_liquidity_fee_rate,
+                swap_fee_rate,
                 target_weight,
             )
             .await;
@@ -133,6 +136,7 @@ impl DexTestContext {
             let borrow_fee_rate: u16 = TEST_BTC_BORROW_FEE_RATE;
             let add_liquidity_fee_rate: u16 = TEST_BTC_ADD_LIQUIDITY_FEE_RATE;
             let remove_liquidity_fee_rate: u16 = TEST_BTC_REMOVE_LIQUIDITY_FEE_RATE;
+            let swap_fee_rate: u16 = TEST_BTC_SWAP_FEE_RATE;
             let target_weight: u16 = TEST_BTC_TARGET_WEIGHT;
 
             add_asset(
@@ -149,6 +153,7 @@ impl DexTestContext {
                 borrow_fee_rate,
                 add_liquidity_fee_rate,
                 remove_liquidity_fee_rate,
+                swap_fee_rate,
                 target_weight,
             )
             .await;
@@ -165,6 +170,7 @@ impl DexTestContext {
             let borrow_fee_rate: u16 = TEST_ETH_BORROW_FEE_RATE;
             let add_liquidity_fee_rate: u16 = TEST_ETH_ADD_LIQUIDITY_FEE_RATE;
             let remove_liquidity_fee_rate: u16 = TEST_ETH_REMOVE_LIQUIDITY_FEE_RATE;
+            let swap_fee_rate: u16 = TEST_ETH_SWAP_FEE_RATE;
             let target_weight: u16 = TEST_ETH_TARGET_WEIGHT;
 
             add_asset(
@@ -181,6 +187,7 @@ impl DexTestContext {
                 borrow_fee_rate,
                 add_liquidity_fee_rate,
                 remove_liquidity_fee_rate,
+                swap_fee_rate,
                 target_weight,
             )
             .await;
@@ -196,6 +203,7 @@ impl DexTestContext {
             let borrow_fee_rate: u16 = TEST_SOL_BORROW_FEE_RATE;
             let add_liquidity_fee_rate: u16 = TEST_SOL_ADD_LIQUIDITY_FEE_RATE;
             let remove_liquidity_fee_rate: u16 = TEST_SOL_REMOVE_LIQUIDITY_FEE_RATE;
+            let swap_fee_rate: u16 = TEST_SOL_SWAP_FEE_RATE;
             let target_weight: u16 = TEST_SOL_TARGET_WEIGHT;
 
             add_asset(
@@ -212,6 +220,7 @@ impl DexTestContext {
                 borrow_fee_rate,
                 add_liquidity_fee_rate,
                 remove_liquidity_fee_rate,
+                swap_fee_rate,
                 target_weight,
             )
             .await;
@@ -420,6 +429,7 @@ pub async fn add_asset(
     borrow_fee_rate: u16,
     add_liquidity_fee_rate: u16,
     remove_liquidity_fee_rate: u16,
+    swap_fee_rate: u16,
     target_weight: u16,
 ) {
     let asset_vault = Keypair::new();
@@ -481,6 +491,7 @@ pub async fn add_asset(
         borrow_fee_rate,
         add_liquidity_fee_rate,
         remove_liquidity_fee_rate,
+        swap_fee_rate,
         target_weight,
     );
 
@@ -512,7 +523,6 @@ pub async fn init_dex(
     let reward_mint = sol_mint;
 
     let vlp_decimals = TEST_VLP_DECIMALS;
-    let reward_asset_index = TEST_REWARD_ASSET_INDEX;
 
     let init_dex_ixs = compose_init_dex_ixs(
         context,
@@ -525,7 +535,6 @@ pub async fn init_dex(
         &user_list_entry_page,
         &reward_mint,
         vlp_decimals,
-        reward_asset_index,
     )
     .await;
 
