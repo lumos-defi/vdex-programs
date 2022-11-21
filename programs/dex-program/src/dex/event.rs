@@ -63,6 +63,21 @@ impl PackedEvent for LiquidityMoved {
     const DISCRIMINATOR: u8 = 2;
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
+#[cfg_attr(feature = "client-support", derive(Serialize))]
+pub struct AssetSwapped {
+    pub user_state: [u8; 32],
+    pub in_mint: [u8; 32],
+    pub out_mint: [u8; 32],
+    pub in_amount: u64,
+    pub out_amount: u64,
+    pub fee: u64,
+}
+
+impl PackedEvent for AssetSwapped {
+    const DISCRIMINATOR: u8 = 3;
+}
+
 pub trait AppendEvent {
     #[allow(clippy::too_many_arguments)]
     fn fill_position(
@@ -88,6 +103,16 @@ pub trait AppendEvent {
         asset: u8,
         asset_amount: u64,
         vlp_amount: u64,
+        fee: u64,
+    ) -> DexResult;
+
+    fn swap_asset(
+        &mut self,
+        user_state: [u8; 32],
+        in_mint: [u8; 32],
+        out_mint: [u8; 32],
+        in_amount: u64,
+        out_amount: u64,
         fee: u64,
     ) -> DexResult;
 }
@@ -173,6 +198,38 @@ impl AppendEvent for EventQueue<'_> {
             asset,
             asset_amount,
             vlp_amount,
+            fee,
+            event_seq
+        );
+        Ok(())
+    }
+
+    fn swap_asset(
+        &mut self,
+        user_state: [u8; 32],
+        in_mint: [u8; 32],
+        out_mint: [u8; 32],
+        in_amount: u64,
+        out_amount: u64,
+        fee: u64,
+    ) -> DexResult {
+        let event = AssetSwapped {
+            user_state,
+            in_mint,
+            out_mint,
+            in_amount,
+            out_amount,
+            fee,
+        };
+
+        let event_seq = self.append(event)?;
+        msg!(
+            "Asset swapped: {:?} {:?} {:?} {} {} {} {}",
+            user_state,
+            in_mint,
+            out_mint,
+            in_amount,
+            out_amount,
             fee,
             event_seq
         );

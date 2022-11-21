@@ -489,6 +489,23 @@ impl Dex {
 
         Ok(())
     }
+
+    pub fn swap_in(&mut self, index: u8, amount: u64, fee: u64) -> DexResult {
+        let ai = self.asset_as_mut(index)?;
+
+        ai.liquidity_amount = ai.liquidity_amount.safe_add(amount)?;
+        ai.fee_amount = ai.fee_amount.safe_add(fee)?;
+
+        Ok(())
+    }
+
+    pub fn swap_out(&mut self, index: u8, amount: u64) -> DexResult {
+        let ai = self.asset_as_mut(index)?;
+
+        ai.liquidity_amount = ai.liquidity_amount.safe_sub(amount)?;
+
+        Ok(())
+    }
 }
 
 #[zero_copy]
