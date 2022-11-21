@@ -51,6 +51,7 @@ pub mod dex_program {
         borrow_fee_rate: u16,
         add_liquidity_fee_rate: u16,
         remove_liquidity_fee_rate: u16,
+        swap_fee_rate: u16,
         target_weight: u16,
     ) -> DexResult {
         dex::add_asset::handler(
@@ -62,6 +63,7 @@ pub mod dex_program {
             borrow_fee_rate,
             add_liquidity_fee_rate,
             remove_liquidity_fee_rate,
+            swap_fee_rate,
             target_weight,
         )
     }
