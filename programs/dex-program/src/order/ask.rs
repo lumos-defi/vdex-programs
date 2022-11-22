@@ -101,7 +101,7 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
     // Save order in user state
     let user_order_slot =
         us.borrow_mut()
-            .new_ask_order(order.index(), size, price, long, market, mi.decimals)?;
+            .new_ask_order(order.index(), size, price, long, market)?;
 
     // Link order to order book
     let side = if long { OrderSide::BID } else { OrderSide::ASK };

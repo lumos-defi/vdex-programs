@@ -8,7 +8,7 @@ use crate::{
     order::MatchEvent,
     position::update_user_serial_number,
     user::state::*,
-    utils::USER_LIST_MAGIC_BYTE,
+    utils::{SafeMath, USER_LIST_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -18,22 +18,27 @@ pub struct Crank<'info> {
     #[account(mut, owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
+    /// Possibly used for bid order that needs swap assets
     /// CHECK
-    pub mint: AccountInfo<'info>,
+    pub in_mint_oracle: AccountInfo<'info>,
 
     /// CHECK
-    pub oracle: AccountInfo<'info>,
+    pub market_mint: AccountInfo<'info>,
 
+    /// CHECK
+    pub market_mint_oracle: AccountInfo<'info>,
+
+    /// Only for ask order that transfer collateral(\w PnL) back to use account
     /// CHECK
     #[account(mut)]
-    pub vault: AccountInfo<'info>,
+    pub market_mint_vault: AccountInfo<'info>,
 
     /// CHECK
-    pub program_signer: AccountInfo<'info>,
+    pub market_mint_program_signer: AccountInfo<'info>,
 
     #[account(
         mut,
-        constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *mint.key)
+        constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *market_mint.key)
     )]
     pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
@@ -103,49 +108,63 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
     );
 
     let mi = &dex.markets[order.market as usize];
-    require!(
-        mi.valid && mi.oracle == ctx.accounts.oracle.key(),
-        DexError::InvalidMarketIndex
-    );
+    require!(mi.valid, DexError::InvalidMarketIndex);
 
-    let ai = if order.long {
-        &dex.assets[mi.asset_index as usize]
+    let (market_asset_index, mai) = if order.long {
+        (mi.asset_index, &dex.assets[mi.asset_index as usize])
     } else {
-        &dex.assets[dex.usdc_asset_index as usize]
+        (
+            dex.usdc_asset_index,
+            &dex.assets[dex.usdc_asset_index as usize],
+        )
     };
-    let mfr = mi.get_fee_rates(ai.borrow_fee_rate);
+
+    let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
 
     if order.open {
         require_neq!(order.size, 0u64, DexError::InvalidAmount);
 
-        let mut sufficient_fund = false;
-        if let Ok(borrow) = us
-            .borrow()
-            .calc_borrow_fund(order.size, order.leverage, &mfr)
-        {
-            if let Ok(_) = dex.has_sufficient_fund(order.market, order.long, borrow) {
-                sufficient_fund = true;
-            }
-        }
+        let ai = dex.asset_as_ref(order.asset)?;
+        require!(
+            ai.valid && ai.oracle == ctx.accounts.in_mint_oracle.key(),
+            DexError::InvalidAssetIndex
+        );
 
-        if !sufficient_fund {
-            match_queue.remove_head()?;
-            return Ok(());
-        }
+        // Check if need to swap asset before opening position
+        let actual_amount = if ai.mint == mai.mint {
+            order.size
+        } else {
+            // Swap input asset to market desired mint
+            require!(
+                mai.valid && mai.oracle == ctx.accounts.market_mint_oracle.key(),
+                DexError::InvalidOracle
+            );
 
+            let oracles = &vec![
+                &ctx.accounts.in_mint_oracle,
+                &ctx.accounts.market_mint_oracle,
+            ];
+            let (out, fee) =
+                dex.swap(order.asset, market_asset_index, order.size, true, &oracles)?;
+
+            dex.swap_in(order.asset, order.size.safe_sub(fee)?, fee)?;
+            dex.swap_out(market_asset_index, out)?;
+
+            out
+        };
+
+        // Ready to open
         let (size, collateral, borrow, open_fee) = us.borrow_mut().open_position(
             order.market,
             order.price,
-            order.size,
+            actual_amount,
             order.long,
             order.leverage,
             &mfr,
         )?;
 
-        let _ = dex.borrow_fund(order.market, order.long, collateral, borrow, open_fee);
-
-        // Update market global position
+        dex.borrow_fund(order.market, order.long, collateral, borrow, open_fee)?;
         dex.increase_global_position(order.market, order.long, order.price, size, collateral)?;
 
         // Save to event queue
@@ -155,7 +174,7 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             PositionAct::Open,
             order.long,
             order.price,
-            order.size,
+            size,
             collateral,
             borrow,
             open_fee,
@@ -164,16 +183,16 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         )?;
     } else {
         let seeds = &[
-            ctx.accounts.mint.key.as_ref(),
+            ctx.accounts.market_mint.key.as_ref(),
             ctx.accounts.dex.to_account_info().key.as_ref(),
-            &[ai.nonce],
+            &[mai.nonce],
         ];
 
         require!(
-            ai.valid
-                && ai.mint == ctx.accounts.mint.key()
-                && ai.vault == ctx.accounts.vault.key()
-                && ai.program_signer == ctx.accounts.program_signer.key(),
+            mai.valid
+                && mai.mint == ctx.accounts.market_mint.key()
+                && mai.vault == ctx.accounts.market_mint_vault.key()
+                && mai.program_signer == ctx.accounts.market_mint_program_signer.key(),
             DexError::InvalidMarketIndex
         );
 
@@ -202,12 +221,11 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         if withdrawable > 0 {
             let signer = &[&seeds[..]];
             let cpi_accounts = Transfer {
-                from: ctx.accounts.vault.to_account_info(),
+                from: ctx.accounts.market_mint_vault.to_account_info(),
                 to: ctx.accounts.user_mint_acc.to_account_info(),
-                authority: ctx.accounts.program_signer.to_account_info(),
+                authority: ctx.accounts.market_mint_program_signer.to_account_info(),
             };
 
-            // let cpi_program = ctx.accounts.token_program.clone();
             let cpi_ctx = CpiContext::new_with_signer(
                 ctx.accounts.token_program.clone(),
                 cpi_accounts,

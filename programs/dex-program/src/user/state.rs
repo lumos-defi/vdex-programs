@@ -32,7 +32,7 @@ pub struct UserOrder {
     pub leverage: u32,
     pub long: bool,
     pub open: bool,
-    pub decimals: u8,
+    pub asset: u8,
     pub market: u8,
     padding: [u8; 4],
 }
@@ -46,7 +46,7 @@ impl UserOrder {
         leverage: u32,
         long: bool,
         market: u8,
-        decimals: u8,
+        asset: u8,
     ) -> DexResult {
         self.order_slot = order_slot;
         self.size = size;
@@ -54,7 +54,7 @@ impl UserOrder {
         self.leverage = leverage;
         self.long = long;
         self.market = market;
-        self.decimals = decimals;
+        self.asset = asset;
         self.open = true;
 
         self.list_time = get_timestamp()?;
@@ -68,14 +68,12 @@ impl UserOrder {
         price: u64,
         long: bool,
         market: u8,
-        decimals: u8,
     ) -> DexResult {
         self.order_slot = order_slot;
         self.size = size;
         self.price = price;
         self.long = long;
         self.market = market;
-        self.decimals = decimals;
         self.open = false;
 
         self.list_time = get_timestamp()?;
@@ -284,18 +282,6 @@ impl<'a> UserState<'a> {
         Ok(size)
     }
 
-    pub fn calc_borrow_fund(
-        &self,
-        amount: u64,
-        leverage: u32,
-        mfr: &MarketFeeRates,
-    ) -> DexResult<u64> {
-        let (collateral, _) =
-            Position::calc_collateral_and_fee(amount, leverage, mfr.open_fee_rate)?;
-
-        Ok(collateral.safe_mul(leverage as u64)? as u64)
-    }
-
     pub fn open_position(
         &mut self,
         market: u8,
@@ -330,12 +316,12 @@ impl<'a> UserState<'a> {
         leverage: u32,
         long: bool,
         market: u8,
-        decimals: u8,
+        asset: u8,
     ) -> DexResult<u8> {
         let order = self.order_pool.new_slot()?;
         order
             .data
-            .init_as_bid(order_slot, size, price, leverage, long, market, decimals)?;
+            .init_as_bid(order_slot, size, price, leverage, long, market, asset)?;
 
         self.order_pool.add_to_tail(order)?;
 
@@ -349,12 +335,11 @@ impl<'a> UserState<'a> {
         price: u64,
         long: bool,
         market: u8,
-        decimals: u8,
     ) -> DexResult<u8> {
         let order = self.order_pool.new_slot()?;
         order
             .data
-            .init_as_ask(order_slot, size, price, long, market, decimals)?;
+            .init_as_ask(order_slot, size, price, long, market)?;
 
         self.order_pool.add_to_tail(order)?;
 
@@ -916,11 +901,11 @@ mod test {
         // Create ask orders
         for _ in 0..max_order_count {
             us.borrow_mut()
-                .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0, 9)
+                .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0)
                 .assert_unwrap();
         }
         us.borrow_mut()
-            .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0, 9)
+            .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0)
             .assert_err();
     }
 
@@ -943,7 +928,7 @@ mod test {
 
         let user_order_slot = us
             .borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_unwrap();
 
         let order = us.borrow().get_order(user_order_slot).assert_unwrap();
@@ -977,16 +962,16 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         // Can not place ask order with larger size
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_err();
     }
 
@@ -1014,11 +999,11 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0, 9)
+            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0)
             .assert_ok();
 
         let orders = us.borrow().collect_market_orders(0);
@@ -1053,11 +1038,11 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0, 9)
+            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0)
             .assert_ok();
 
         let orders = us.borrow().collect_market_orders(0);
@@ -1094,7 +1079,7 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, 9)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         // It should be ok to close the other half size.

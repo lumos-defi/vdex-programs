@@ -30,7 +30,7 @@ pub struct Dex {
 }
 
 impl Dex {
-    fn asset_as_ref(&self, index: u8) -> DexResult<&AssetInfo> {
+    pub fn asset_as_ref(&self, index: u8) -> DexResult<&AssetInfo> {
         require!(
             index < self.assets_number && self.assets[index as usize].valid,
             DexError::InvalidAssetIndex
