@@ -635,6 +635,28 @@ impl Position {
         Ok(())
     }
 
+    pub fn size(
+        long: bool,
+        price: u64,
+        amount: u64,
+        leverage: u32,
+        mfr: &MarketFeeRates,
+    ) -> DexResult<u64> {
+        let (collateral, _) =
+            Position::calc_collateral_and_fee(amount, leverage, mfr.open_fee_rate)?;
+
+        let size = if long {
+            collateral.safe_mul(leverage as u64)
+        } else {
+            collateral
+                .safe_mul(leverage as u64)?
+                .safe_mul(10u128.pow(mfr.base_decimals.into()))?
+                .safe_div(price as u128)
+        }? as u64;
+
+        Ok(size)
+    }
+
     pub fn open(
         &mut self,
         price: u64,

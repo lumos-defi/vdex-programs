@@ -1,10 +1,10 @@
 use crate::{
     collections::{MountMode, OrderBook, OrderSide, PagedList},
-    dex::{get_oracle_price, Dex},
+    dex::{get_oracle_price, Dex, Position},
     errors::{DexError, DexResult},
     order::Order,
     user::state::*,
-    utils::ORDER_POOL_MAGIC_BYTE,
+    utils::{SafeMath, ORDER_POOL_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -18,11 +18,20 @@ pub struct LimitBid<'info> {
     pub in_mint: AccountInfo<'info>,
 
     /// CHECK
+    pub in_mint_oracle: AccountInfo<'info>,
+
+    /// CHECK
     #[account(mut)]
     pub in_mint_vault: AccountInfo<'info>,
 
     /// CHECK
     pub market_oracle: AccountInfo<'info>,
+
+    /// CHECK
+    pub market_mint: AccountInfo<'info>,
+
+    /// CHECK
+    pub market_mint_oracle: AccountInfo<'info>,
 
     /// CHECK
     #[account(mut, constraint= order_book.owner == program_id)]
@@ -78,6 +87,7 @@ pub fn handler(
         ctx.remaining_accounts.len(),
         DexError::InvalidRemainingAccounts
     );
+    let minimum_position_value = mi.minimum_position_value;
 
     for i in 0..mi.order_pool_remaining_pages_number as usize {
         require_eq!(
@@ -95,6 +105,44 @@ pub fn handler(
         DexError::InvalidMarketIndex
     );
     require_neq!(amount, 0u64, DexError::InvalidAmount);
+
+    // Check if the amount is too small
+    // Read market asset info
+    let (market_asset_index, mai) = if long {
+        (mi.asset_index, &dex.assets[mi.asset_index as usize])
+    } else {
+        (
+            dex.usdc_asset_index,
+            &dex.assets[dex.usdc_asset_index as usize],
+        )
+    };
+
+    require!(
+        mai.valid
+            && mai.mint == ctx.accounts.market_mint.key()
+            && mai.oracle == ctx.accounts.market_mint_oracle.key(),
+        DexError::InvalidMarketIndex
+    );
+
+    let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
+
+    let actual_amount = if ai.mint == mai.mint {
+        amount
+    } else {
+        // Swap input asset to market required mint
+        let oracles = &vec![
+            &ctx.accounts.in_mint_oracle,
+            &ctx.accounts.market_mint_oracle,
+        ];
+        let (out, _) = dex.swap(asset, market_asset_index, amount, true, &oracles)?;
+        out
+    };
+
+    let size = Position::size(long, price, actual_amount, leverage, &mfr)?;
+    require!(
+        size.safe_mul(price)? as u64 >= minimum_position_value,
+        DexError::PositionTooSmall
+    );
 
     // Transfer token in
     let cpi_accounts = Transfer {

@@ -108,6 +108,7 @@ pub fn handler(
     require!(
         mai.valid
             && mai.mint == ctx.accounts.market_mint.key()
+            && mai.oracle == ctx.accounts.market_mint_oracle.key()
             && mai.vault == ctx.accounts.market_mint_vault.key(),
         DexError::InvalidMarketIndex
     );
