@@ -250,6 +250,8 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         )?;
     }
 
+    us.borrow_mut().unlink_order(data.user_order_slot)?;
+
     match_queue.remove_head()?;
     let user_list = PagedList::<UserListItem>::mount(
         &ctx.accounts.user_list_entry_page,

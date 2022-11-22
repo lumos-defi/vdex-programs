@@ -24,7 +24,7 @@ pub struct MetaInfo {
 #[derive(Clone, Copy)]
 pub struct UserOrder {
     pub list_time: i64,
-    pub size: u64,
+    pub size: u64, // Refer to collateral size for opening position
     pub price: u64,
     pub loss_stop_price: u64,
     pub profit_stop_price: u64,
