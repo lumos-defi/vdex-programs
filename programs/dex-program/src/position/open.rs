@@ -18,21 +18,31 @@ pub struct OpenPosition<'info> {
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
-    pub mint: AccountInfo<'info>,
+    pub in_mint: AccountInfo<'info>,
 
     /// CHECK
-    pub oracle: AccountInfo<'info>,
+    pub in_mint_oracle: AccountInfo<'info>,
 
     /// CHECK
     #[account(mut)]
-    pub vault: AccountInfo<'info>,
+    pub in_mint_vault: AccountInfo<'info>,
 
     /// CHECK
-    pub program_signer: AccountInfo<'info>,
+    pub market_mint: AccountInfo<'info>,
+
+    /// CHECK
+    pub market_mint_oracle: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(mut)]
+    pub market_mint_vault: AccountInfo<'info>,
+
+    /// CHECK
+    pub market_oracle: AccountInfo<'info>,
 
     #[account(
         mut,
-        constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *mint.key)
+        constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *in_mint.key)
     )]
     pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
@@ -78,51 +88,98 @@ pub fn handler(
         DexError::InvalidRemainingAccounts
     );
 
+    // Read market info
     let mi = &dex.markets[market as usize];
     require!(
-        mi.valid && mi.oracle == ctx.accounts.oracle.key(),
+        mi.valid && mi.oracle == ctx.accounts.market_oracle.key(),
         DexError::InvalidMarketIndex
     );
 
-    let ai = if long {
-        &dex.assets[mi.asset_index as usize]
+    // Read market asset info
+    let (market_asset_index, mai) = if long {
+        (mi.asset_index, &dex.assets[mi.asset_index as usize])
     } else {
-        &dex.assets[dex.usdc_asset_index as usize]
+        (
+            dex.usdc_asset_index,
+            &dex.assets[dex.usdc_asset_index as usize],
+        )
     };
 
     require!(
-        ai.valid
-            && ai.mint == ctx.accounts.mint.key()
-            && ai.vault == ctx.accounts.vault.key()
-            && ai.program_signer == ctx.accounts.program_signer.key(),
+        mai.valid
+            && mai.mint == ctx.accounts.market_mint.key()
+            && mai.oracle == ctx.accounts.market_mint_oracle.key()
+            && mai.vault == ctx.accounts.market_mint_vault.key(),
         DexError::InvalidMarketIndex
     );
 
-    require_neq!(amount, 0u64, DexError::InvalidAmount);
+    // Get market price
+    let price = get_oracle_price(mi.oracle_source, &ctx.accounts.market_oracle)?;
+    let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
+    let minimum_position_value = mi.minimum_position_value;
 
-    let cpi_accounts = Transfer {
-        from: ctx.accounts.user_mint_acc.to_account_info(),
-        to: ctx.accounts.vault.to_account_info(),
-        authority: ctx.accounts.authority.to_account_info(),
+    // Read user input asset info
+    let (input_asset_index, ai) = dex.find_asset_by_mint(ctx.accounts.in_mint.key())?;
+
+    let actual_amount = if ai.mint == mai.mint {
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.user_mint_acc.to_account_info(),
+            to: ctx.accounts.market_mint_vault.to_account_info(),
+            authority: ctx.accounts.authority.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_accounts);
+        token::transfer(cpi_ctx, amount)?;
+
+        require_neq!(amount, 0u64, DexError::InvalidAmount);
+
+        amount
+    } else {
+        // Transfer the asset first
+        require!(
+            ai.valid
+                && ai.oracle == ctx.accounts.in_mint_oracle.key()
+                && ai.vault == ctx.accounts.in_mint_vault.key(),
+            DexError::InvalidMint
+        );
+
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.user_mint_acc.to_account_info(),
+            to: ctx.accounts.in_mint_vault.to_account_info(),
+            authority: ctx.accounts.authority.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_accounts);
+        token::transfer(cpi_ctx, amount)?;
+
+        // Swap input asset to market required mint
+        let oracles = &vec![
+            &ctx.accounts.in_mint_oracle,
+            &ctx.accounts.market_mint_oracle,
+        ];
+        let (out, fee) = dex.swap(
+            input_asset_index,
+            market_asset_index,
+            amount,
+            true,
+            &oracles,
+        )?;
+
+        dex.swap_in(input_asset_index, amount.safe_sub(fee)?, fee)?;
+        dex.swap_out(market_asset_index, out)?;
+
+        out
     };
-
-    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_accounts);
-    token::transfer(cpi_ctx, amount)?;
-
-    // Get oracle price
-    let price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
-
-    let mfr = mi.get_fee_rates(ai.borrow_fee_rate);
 
     // User open position
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let (size, collateral, borrow, open_fee) = us
-        .borrow_mut()
-        .open_position(market, price, amount, long, leverage, &mfr)?;
+    let (size, collateral, borrow, open_fee) =
+        us.borrow_mut()
+            .open_position(market, price, actual_amount, long, leverage, &mfr)?;
 
     // Check if satisfy the minimum open size
     require!(
-        size.safe_mul(price)? as u64 >= mi.minimum_position_value,
+        size.safe_mul(price)? as u64 >= minimum_position_value,
         DexError::PositionTooSmall
     );
 

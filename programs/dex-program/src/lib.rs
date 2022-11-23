@@ -104,8 +104,8 @@ pub mod dex_program {
         pool::remove_liquidity::handler(ctx, amount)
     }
 
-    pub fn swap(_ctx: Context<Swap>) -> DexResult {
-        Ok(())
+    pub fn swap(ctx: Context<Swap>, amount: u64) -> DexResult {
+        pool::swap::handler(ctx, amount)
     }
 
     pub fn open_position(
@@ -175,12 +175,6 @@ pub mod dex_program {
     pub fn crank(ctx: Context<Crank>) -> DexResult {
         order::crank::handler(ctx)
     }
-}
-
-#[derive(Accounts)]
-pub struct Swap<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]

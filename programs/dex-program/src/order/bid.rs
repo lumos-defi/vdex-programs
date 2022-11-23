@@ -1,10 +1,10 @@
 use crate::{
     collections::{MountMode, OrderBook, OrderSide, PagedList},
-    dex::{get_oracle_price, Dex},
+    dex::{get_oracle_price, Dex, Position},
     errors::{DexError, DexResult},
     order::Order,
     user::state::*,
-    utils::ORDER_POOL_MAGIC_BYTE,
+    utils::{SafeMath, ORDER_POOL_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -15,10 +15,23 @@ pub struct LimitBid<'info> {
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
-    pub mint: AccountInfo<'info>,
+    pub in_mint: AccountInfo<'info>,
 
     /// CHECK
-    pub oracle: AccountInfo<'info>,
+    pub in_mint_oracle: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(mut)]
+    pub in_mint_vault: AccountInfo<'info>,
+
+    /// CHECK
+    pub market_oracle: AccountInfo<'info>,
+
+    /// CHECK
+    pub market_mint: AccountInfo<'info>,
+
+    /// CHECK
+    pub market_mint_oracle: AccountInfo<'info>,
 
     /// CHECK
     #[account(mut, constraint= order_book.owner == program_id)]
@@ -28,16 +41,9 @@ pub struct LimitBid<'info> {
     #[account(mut, constraint= order_pool_entry_page.owner == program_id)]
     pub order_pool_entry_page: UncheckedAccount<'info>,
 
-    /// CHECK
-    #[account(mut)]
-    pub vault: AccountInfo<'info>,
-
-    /// CHECK
-    pub program_signer: AccountInfo<'info>,
-
     #[account(
             mut,
-            constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *mint.key)
+            constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *in_mint.key)
         )]
     pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
@@ -70,7 +76,7 @@ pub fn handler(
     let mi = &dex.markets[market as usize];
     require!(
         mi.valid
-            && mi.oracle == ctx.accounts.oracle.key()
+            && mi.oracle == ctx.accounts.market_oracle.key()
             && mi.order_book == ctx.accounts.order_book.key()
             && mi.order_pool_entry_page == ctx.accounts.order_pool_entry_page.key(),
         DexError::InvalidMarketIndex
@@ -81,6 +87,7 @@ pub fn handler(
         ctx.remaining_accounts.len(),
         DexError::InvalidRemainingAccounts
     );
+    let minimum_position_value = mi.minimum_position_value;
 
     for i in 0..mi.order_pool_remaining_pages_number as usize {
         require_eq!(
@@ -90,19 +97,65 @@ pub fn handler(
         );
     }
 
-    let ai = &dex.assets[mi.asset_index as usize];
+    let (asset, ai) = dex.find_asset_by_mint(ctx.accounts.in_mint.key())?;
     require!(
         ai.valid
-            && ai.mint == ctx.accounts.mint.key()
-            && ai.vault == ctx.accounts.vault.key()
-            && ai.program_signer == ctx.accounts.program_signer.key(),
+            && ai.mint == ctx.accounts.in_mint.key()
+            && ai.vault == ctx.accounts.in_mint_vault.key(),
+        DexError::InvalidMarketIndex
+    );
+    require_neq!(amount, 0u64, DexError::InvalidAmount);
+
+    // Check if the amount is too small
+    // Read market asset info
+    let (market_asset_index, mai) = if long {
+        (mi.asset_index, &dex.assets[mi.asset_index as usize])
+    } else {
+        (
+            dex.usdc_asset_index,
+            &dex.assets[dex.usdc_asset_index as usize],
+        )
+    };
+
+    require!(
+        mai.valid
+            && mai.mint == ctx.accounts.market_mint.key()
+            && mai.oracle == ctx.accounts.market_mint_oracle.key(),
         DexError::InvalidMarketIndex
     );
 
-    require_neq!(amount, 0u64, DexError::InvalidAmount);
+    let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
+
+    let actual_amount = if ai.mint == mai.mint {
+        amount
+    } else {
+        // Swap input asset to market required mint
+        let oracles = &vec![
+            &ctx.accounts.in_mint_oracle,
+            &ctx.accounts.market_mint_oracle,
+        ];
+        let (out, _) = dex.swap(asset, market_asset_index, amount, true, &oracles)?;
+        out
+    };
+
+    let size = Position::size(long, price, actual_amount, leverage, &mfr)?;
+    require!(
+        size.safe_mul(price)? as u64 >= minimum_position_value,
+        DexError::PositionTooSmall
+    );
+
+    // Transfer token in
+    let cpi_accounts = Transfer {
+        from: ctx.accounts.user_mint_acc.to_account_info(),
+        to: ctx.accounts.in_mint_vault.to_account_info(),
+        authority: ctx.accounts.authority.to_account_info(),
+    };
+
+    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_accounts);
+    token::transfer(cpi_ctx, amount)?;
 
     // Check price
-    let market_price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
+    let market_price = get_oracle_price(mi.oracle_source, &ctx.accounts.market_oracle)?;
     if long {
         require!(market_price > price, DexError::PriceGTMarketPrice)
     } else {
@@ -139,7 +192,7 @@ pub fn handler(
         leverage,
         long,
         market,
-        mi.decimals,
+        asset,
     )?;
 
     // Link order to order book
@@ -147,13 +200,5 @@ pub fn handler(
     let price_node = order_book.link_order(side, order, &order_pool)?;
     order.data.set_extra_slot(price_node, user_order_slot);
 
-    // Transfer token in
-    let cpi_accounts = Transfer {
-        from: ctx.accounts.user_mint_acc.to_account_info(),
-        to: ctx.accounts.vault.to_account_info(),
-        authority: ctx.accounts.authority.to_account_info(),
-    };
-
-    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_accounts);
-    token::transfer(cpi_ctx, amount)
+    Ok(())
 }

@@ -30,7 +30,7 @@ pub struct Dex {
 }
 
 impl Dex {
-    fn asset_as_ref(&self, index: u8) -> DexResult<&AssetInfo> {
+    pub fn asset_as_ref(&self, index: u8) -> DexResult<&AssetInfo> {
         require!(
             index < self.assets_number && self.assets[index as usize].valid,
             DexError::InvalidAssetIndex
@@ -489,6 +489,23 @@ impl Dex {
 
         Ok(())
     }
+
+    pub fn swap_in(&mut self, index: u8, amount: u64, fee: u64) -> DexResult {
+        let ai = self.asset_as_mut(index)?;
+
+        ai.liquidity_amount = ai.liquidity_amount.safe_add(amount)?;
+        ai.fee_amount = ai.fee_amount.safe_add(fee)?;
+
+        Ok(())
+    }
+
+    pub fn swap_out(&mut self, index: u8, amount: u64) -> DexResult {
+        let ai = self.asset_as_mut(index)?;
+
+        ai.liquidity_amount = ai.liquidity_amount.safe_sub(amount)?;
+
+        Ok(())
+    }
 }
 
 #[zero_copy]
@@ -616,6 +633,28 @@ impl Position {
         self.long = long;
 
         Ok(())
+    }
+
+    pub fn size(
+        long: bool,
+        price: u64,
+        amount: u64,
+        leverage: u32,
+        mfr: &MarketFeeRates,
+    ) -> DexResult<u64> {
+        let (collateral, _) =
+            Position::calc_collateral_and_fee(amount, leverage, mfr.open_fee_rate)?;
+
+        let size = if long {
+            collateral.safe_mul(leverage as u64)
+        } else {
+            collateral
+                .safe_mul(leverage as u64)?
+                .safe_mul(10u128.pow(mfr.base_decimals.into()))?
+                .safe_div(price as u128)
+        }? as u64;
+
+        Ok(size)
     }
 
     pub fn open(
