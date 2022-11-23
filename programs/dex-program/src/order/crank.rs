@@ -118,6 +118,7 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             &dex.assets[dex.usdc_asset_index as usize],
         )
     };
+    let minimum_position_value = mi.minimum_position_value;
 
     let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
@@ -163,6 +164,11 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             order.leverage,
             &mfr,
         )?;
+
+        require!(
+            size.safe_mul(order.price)? as u64 >= minimum_position_value,
+            DexError::PositionTooSmall
+        );
 
         dex.borrow_fund(order.market, order.long, collateral, borrow, open_fee)?;
         dex.increase_global_position(order.market, order.long, order.price, size, collateral)?;
