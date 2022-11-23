@@ -20,6 +20,7 @@ pub const TEST_USDC_ORACLE_EXPO: u8 = 5;
 pub const TEST_USDC_BORROW_FEE_RATE: u16 = 10; //1-10_000  0.1%
 pub const TEST_USDC_ADD_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
 pub const TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
+pub const TEST_USDC_SWAP_FEE_RATE: u16 = 10;
 pub const TEST_USDC_TARGET_WEIGHT: u16 = 400; //1-1000 //40%
 
 //BTC asset
@@ -31,6 +32,7 @@ pub const TEST_BTC_ORACLE_EXPO: u8 = 8;
 pub const TEST_BTC_BORROW_FEE_RATE: u16 = 10; //1-10_000  0.1%
 pub const TEST_BTC_ADD_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
 pub const TEST_BTC_REMOVE_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
+pub const TEST_BTC_SWAP_FEE_RATE: u16 = 10;
 pub const TEST_BTC_TARGET_WEIGHT: u16 = 300; //1-1000 //30%
 
 //ETH asset
@@ -42,6 +44,7 @@ pub const TEST_ETH_ORACLE_EXPO: u8 = 8;
 pub const TEST_ETH_BORROW_FEE_RATE: u16 = 10; //1-10_000  0.1%
 pub const TEST_ETH_ADD_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
 pub const TEST_ETH_REMOVE_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
+pub const TEST_ETH_SWAP_FEE_RATE: u16 = 10;
 pub const TEST_ETH_TARGET_WEIGHT: u16 = 200; //1-1000 //20%
 
 //SOL asset
@@ -50,12 +53,10 @@ pub const TEST_SOL_DECIMALS: u8 = 9;
 pub const TEST_SOL_ORACLE_PRICE: f64 = 2_00.0;
 pub const TEST_SOL_ORACLE_EXPO: u8 = 8;
 
-//reward asset need first add into pool
-pub const TEST_REWARD_ASSET_INDEX: u8 = 3;
-
 pub const TEST_SOL_BORROW_FEE_RATE: u16 = 10; //1-10_000  0.1%
 pub const TEST_SOL_ADD_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
 pub const TEST_SOL_REMOVE_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
+pub const TEST_SOL_SWAP_FEE_RATE: u16 = 10;
 pub const TEST_SOL_TARGET_WEIGHT: u16 = 200; //1-1000 //20%
 
 //BTC market

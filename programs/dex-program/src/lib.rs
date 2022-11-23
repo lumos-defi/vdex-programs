@@ -22,8 +22,8 @@ declare_id!("2aJZ6AufDU5NRzXLg5Ww4S4Nf2tx7xZDQD6he2gjsKyq");
 pub mod dex_program {
     use super::*;
 
-    pub fn init_dex(ctx: Context<InitDex>, vlp_decimals: u8, reward_asset_index: u8) -> DexResult {
-        dex::init_dex::handler(ctx, vlp_decimals, reward_asset_index)
+    pub fn init_dex(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
+        dex::init_dex::handler(ctx, vlp_decimals)
     }
 
     pub fn init_mock_oracle(ctx: Context<InitMockOracle>, price: u64, expo: u8) -> DexResult {
@@ -51,6 +51,7 @@ pub mod dex_program {
         borrow_fee_rate: u16,
         add_liquidity_fee_rate: u16,
         remove_liquidity_fee_rate: u16,
+        swap_fee_rate: u16,
         target_weight: u16,
     ) -> DexResult {
         dex::add_asset::handler(
@@ -62,6 +63,7 @@ pub mod dex_program {
             borrow_fee_rate,
             add_liquidity_fee_rate,
             remove_liquidity_fee_rate,
+            swap_fee_rate,
             target_weight,
         )
     }

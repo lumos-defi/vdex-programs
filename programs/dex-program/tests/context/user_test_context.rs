@@ -312,7 +312,6 @@ impl UserTestContext {
         set_add_liquidity::setup(
             context,
             &self.program,
-            &self.admin,
             &self.user,
             &self.dex,
             &asset_info.mint,
@@ -353,7 +352,6 @@ impl UserTestContext {
         set_remove_liquidity::setup(
             context,
             &self.program,
-            &self.admin,
             &self.user,
             &self.dex,
             &asset_info.mint,

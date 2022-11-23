@@ -36,7 +36,7 @@ pub struct InitDex<'info> {
     pub reward_mint: UncheckedAccount<'info>,
 }
 
-pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8, reward_asset_index: u8) -> DexResult {
+pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_init()?;
 
     dex.magic = DEX_MAGIC_NUMBER;
@@ -57,7 +57,7 @@ pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8, reward_asset_index: u8) 
         ctx.accounts.reward_mint.key(),
         u8::MAX,
         vlp_decimals,
-        reward_asset_index,
+        u8::MAX, // Will be updated when reward asset is added
     );
 
     EventQueue::mount(&mut ctx.accounts.event_queue, false)?.initialize(true)?;

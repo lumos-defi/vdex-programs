@@ -391,8 +391,9 @@ impl Dex {
         let out_price = get_oracle_price(aoi.oracle_source, &oracles[1])?;
 
         let fee = if charge {
-            // TODO: swap fee rate?
-            amount.safe_mul(10u64)?.safe_div(FEE_RATE_BASE)? as u64
+            amount
+                .safe_mul(aii.swap_fee_rate.into())?
+                .safe_div(FEE_RATE_BASE)? as u64
         } else {
             0
         };
@@ -503,6 +504,7 @@ pub struct AssetInfo {
     pub fee_amount: u64,
     pub add_liquidity_fee: u64,
     pub remove_liquidity_fee: u64,
+    pub swap_fee_rate: u16,
     pub borrow_fee_rate: u16,
     pub add_liquidity_fee_rate: u16,
     pub remove_liquidity_fee_rate: u16,
@@ -511,7 +513,7 @@ pub struct AssetInfo {
     pub decimals: u8,
     pub nonce: u8,
     pub oracle_source: u8,
-    pub padding: [u8; 252],
+    pub padding: [u8; 250],
 }
 
 #[zero_copy]

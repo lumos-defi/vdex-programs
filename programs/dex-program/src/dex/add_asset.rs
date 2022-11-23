@@ -41,6 +41,7 @@ pub fn handler(
     borrow_fee_rate: u16,
     add_liquidity_fee_rate: u16,
     remove_liquidity_fee_rate: u16,
+    swap_fee_rate: u16,
     target_weight: u16,
 ) -> DexResult {
     OracleSource::try_from(oracle_source).map_err(|_| DexError::InvalidOracleSource)?;
@@ -95,6 +96,7 @@ pub fn handler(
         fee_amount: 0,
         add_liquidity_fee: 0,
         remove_liquidity_fee: 0,
+        swap_fee_rate,
         borrow_fee_rate,
         add_liquidity_fee_rate,
         remove_liquidity_fee_rate,
@@ -103,7 +105,7 @@ pub fn handler(
         decimals,
         nonce,
         oracle_source,
-        padding: [0; 252],
+        padding: [0; 250],
     };
 
     dex.assets[asset_index] = asset;
@@ -111,6 +113,10 @@ pub fn handler(
 
     if dex.usdc_mint == ctx.accounts.mint.key() {
         dex.usdc_asset_index = asset_index as u8;
+    }
+
+    if dex.vlp_pool.reward_mint == ctx.accounts.mint.key() {
+        dex.vlp_pool.reward_asset_index = asset_index as u8;
     }
 
     Ok(())
