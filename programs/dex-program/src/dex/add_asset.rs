@@ -94,8 +94,6 @@ pub fn handler(
         collateral_amount: 0,
         borrowed_amount: 0,
         fee_amount: 0,
-        add_liquidity_fee: 0,
-        remove_liquidity_fee: 0,
         swap_fee_rate,
         borrow_fee_rate,
         add_liquidity_fee_rate,

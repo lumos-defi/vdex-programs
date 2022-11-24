@@ -71,7 +71,7 @@ pub mod dex_program {
     pub fn add_market(
         ctx: Context<AddMarket>,
         symbol: String,
-        minimum_open_amount: u64,
+        minimum_position_value: u64,
         charge_borrow_fee_interval: u64,
         open_fee_rate: u16,
         close_fee_rate: u16,
@@ -84,7 +84,7 @@ pub mod dex_program {
         dex::add_market::handler(
             ctx,
             symbol,
-            minimum_open_amount,
+            minimum_position_value,
             charge_borrow_fee_interval,
             open_fee_rate,
             close_fee_rate,
@@ -97,11 +97,11 @@ pub mod dex_program {
     }
 
     pub fn add_liquidity(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
-        pool::add_liquidity::handler(ctx, amount)
+        pool::add::handler(ctx, amount)
     }
 
     pub fn remove_liquidity(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
-        pool::remove_liquidity::handler(ctx, amount)
+        pool::remove::handler(ctx, amount)
     }
 
     pub fn swap(ctx: Context<Swap>, amount: u64) -> DexResult {

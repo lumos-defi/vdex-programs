@@ -1,7 +1,7 @@
-pub mod add_liquidity;
-pub mod remove_liquidity;
+pub mod add;
+pub mod remove;
 pub mod swap;
 
-pub use add_liquidity::*;
-pub use remove_liquidity::*;
+pub use add::*;
+pub use remove::*;
 pub use swap::*;

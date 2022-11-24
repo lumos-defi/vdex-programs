@@ -519,8 +519,6 @@ pub struct AssetInfo {
     pub collateral_amount: u64,
     pub borrowed_amount: u64,
     pub fee_amount: u64,
-    pub add_liquidity_fee: u64,
-    pub remove_liquidity_fee: u64,
     pub swap_fee_rate: u16,
     pub borrow_fee_rate: u16,
     pub add_liquidity_fee_rate: u16,
