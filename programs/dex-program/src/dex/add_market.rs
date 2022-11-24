@@ -38,7 +38,7 @@ pub struct AddMarket<'info> {
 pub fn handler(
     ctx: Context<AddMarket>,
     symbol: String,
-    minimum_open_amount: u64,
+    minimum_position_value: u64,
     charge_borrow_fee_interval: u64,
     open_fee_rate: u16,
     close_fee_rate: u16,
@@ -91,7 +91,7 @@ pub fn handler(
         order_pool_remaining_pages: [Pubkey::default(); 16],
         global_long: Position::new(true)?,
         global_short: Position::new(false)?,
-        minimum_position_value: minimum_open_amount,
+        minimum_position_value,
         charge_borrow_fee_interval,
         open_fee_rate,
         close_fee_rate,
