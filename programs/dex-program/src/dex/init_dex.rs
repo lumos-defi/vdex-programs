@@ -1,4 +1,3 @@
-// use anchor_client::solana_sdk::program_option::COption;
 use anchor_lang::prelude::*;
 
 use crate::{
@@ -50,7 +49,7 @@ pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
     dex.markets_number = 0;
     dex.usdc_asset_index = 0xff;
     dex.vlp_pool.init(
-        // Dummy VLP token, never mint
+        // Dummy VLP token, could never mint
         Pubkey::default(),
         Pubkey::default(),
         Pubkey::default(),

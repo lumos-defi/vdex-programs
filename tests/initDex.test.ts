@@ -1,7 +1,8 @@
 import { Keypair, PublicKey } from '@solana/web3.js'
 import { createAccountInstruction } from './utils/createAccountInstruction'
 import { getProviderAndProgram, airdrop } from './utils/getProvider'
-import { createMint, createMintWithKeypair } from './utils/createMint'
+import { createMint } from './utils/createMint'
+import { TokenInstructions } from '@project-serum/serum'
 
 describe('Init Dex', () => {
   const { program, provider } = getProviderAndProgram()
@@ -13,13 +14,9 @@ describe('Init Dex', () => {
   let eventQueue: Keypair
   let matchQueue: Keypair
   let userListEntryPage: Keypair
-  let rewardMint: Keypair
-  // let vlpMint: Keypair
 
   let usdcMint: PublicKey
-  // let vlpVault: PublicKey
-  // let vlpProgramSigner: PublicKey
-  // let vlpMintNonce: number
+  let rewardMint: PublicKey
 
   beforeAll(async () => {
     dex = Keypair.generate()
@@ -27,22 +24,11 @@ describe('Init Dex', () => {
     matchQueue = Keypair.generate()
     userListEntryPage = Keypair.generate()
     authority = Keypair.generate()
-    rewardMint = Keypair.generate()
-    // vlpMint = Keypair.generate()
 
     await airdrop(provider, authority.publicKey, 100_000_000_000)
     usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
-    await createMintWithKeypair(rewardMint, authority.publicKey, 6)
 
-    //gen vlp mint with seeds
-    // ;[vlpProgramSigner, vlpMintNonce] = await PublicKey.findProgramAddress(
-    //   [dex.publicKey.toBuffer(), vlpMint.publicKey.toBuffer()],
-    //   program.programId
-    // )
-
-    // await createMintWithKeypair(vlpMint, vlpProgramSigner, VLP_DECIMALS)
-
-    // vlpVault = await createTokenAccount(vlpMint.publicKey, vlpProgramSigner)
+    rewardMint = TokenInstructions.WRAPPED_SOL_MINT
   })
 
   it('should init dex account successfully', async () => {
@@ -55,7 +41,7 @@ describe('Init Dex', () => {
         eventQueue: eventQueue.publicKey,
         matchQueue: matchQueue.publicKey,
         userListEntryPage: userListEntryPage.publicKey,
-        rewardMint: rewardMint.publicKey,
+        rewardMint: rewardMint,
       })
       .preInstructions([
         await program.account.dex.createInstruction(dex),
@@ -94,7 +80,7 @@ describe('Init Dex', () => {
       mint: PublicKey.default,
       vault: PublicKey.default,
       programSigner: PublicKey.default,
-      rewardMint: rewardMint.publicKey,
+      rewardMint: rewardMint,
       rewardTotal: expect.toBNEqual(0),
       stakedTotal: expect.toBNEqual(0),
       accumulateRewardPerShare: expect.toBNEqual(0),
