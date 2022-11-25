@@ -28,7 +28,7 @@ export async function createDexFull(authority: Keypair) {
   const SOL_SYMBOL = 'SOL'
   const SOL_MINT_DECIMAL = 9
   //SOL oracle
-  const SOL_ORACLE_PRICE = 15_000_000 //$15
+  const SOL_ORACLE_PRICE = 20_000_000 //$15
   const SOL_ORACLE_PRICE_EXPO = 6
   const SOL_ORACLE_SOURCE = 0 // 0:mock,1:pyth
 
@@ -187,6 +187,7 @@ export async function createDexFull(authority: Keypair) {
     dex,
     assetMint,
     assetVault,
+    solVault,
     programSigner,
     nonce,
     authority,

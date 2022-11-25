@@ -21,9 +21,6 @@ pub struct AddLiquidity<'info> {
     #[account(mut)]
     vault: AccountInfo<'info>,
 
-    /// CHECK
-    pub program_signer: AccountInfo<'info>,
-
     #[account(
          mut,
          constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *mint.key)
