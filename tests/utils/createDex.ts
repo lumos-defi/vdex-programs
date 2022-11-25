@@ -1,3 +1,4 @@
+import { TokenInstructions } from '@project-serum/serum'
 import { Keypair } from '@solana/web3.js'
 import { createAccountInstruction } from './createAccountInstruction'
 import { createMint } from './createMint'
@@ -9,16 +10,15 @@ export async function createDex(authority: Keypair) {
   const eventQueue = Keypair.generate()
   const matchQueue = Keypair.generate()
   const userListEntryPage = Keypair.generate()
-  const rewardMint = Keypair.generate()
+  const rewardMint = TokenInstructions.WRAPPED_SOL_MINT
   const VLP_DECIMALS = 6
   const USDC_MINT_DECIMALS = 6
-  const REWARD_ASSET_INDEX = 0
 
   await airdrop(provider, authority.publicKey, 10000000000)
   const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
 
   await program.methods
-    .initDex(VLP_DECIMALS, REWARD_ASSET_INDEX)
+    .initDex(VLP_DECIMALS)
     .accounts({
       dex: dex.publicKey,
       usdcMint,
@@ -26,7 +26,7 @@ export async function createDex(authority: Keypair) {
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
-      rewardMint: rewardMint.publicKey,
+      rewardMint,
     })
     .preInstructions([
       await program.account.dex.createInstruction(dex),

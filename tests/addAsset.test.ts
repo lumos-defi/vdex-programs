@@ -1,3 +1,4 @@
+import { TokenInstructions } from '@project-serum/serum'
 import { PublicKey, Keypair } from '@solana/web3.js'
 import { createDex } from './utils/createDex'
 import { createMint } from './utils/createMint'
@@ -13,6 +14,7 @@ describe('Add Dex Asset', () => {
   const BORROW_FEE_RATE = 100 // 1-10000, the percentage will be XXXX_RATE / 10000
   const ADD_LIQUIDITY_FEE_RATE = 100
   const REMOVE_LIQUIDITY_FEE_RATE = 100
+  const SWAP_FEE_RATE = 100
   const TARGET_WEIGHT = 100 //1-1000, the percentage will be weight / 1000
 
   const WRONG_NONCE = 123
@@ -34,7 +36,7 @@ describe('Add Dex Asset', () => {
   beforeEach(async () => {
     authority = Keypair.generate()
     ;({ dex } = await createDex(authority))
-    ;({ mockOracle } = await createMockOracle(authority, MOCK_ORACLE_PRICE, MOCK_ORACLE_PRICE_EXPO))
+    mockOracle = await createMockOracle(authority, MOCK_ORACLE_PRICE, MOCK_ORACLE_PRICE_EXPO)
 
     //mint
     assetMint = await createMint(authority.publicKey, ASSET_MINT_DECIMAL)
@@ -68,6 +70,7 @@ describe('Add Dex Asset', () => {
         BORROW_FEE_RATE,
         ADD_LIQUIDITY_FEE_RATE,
         REMOVE_LIQUIDITY_FEE_RATE,
+        SWAP_FEE_RATE,
         TARGET_WEIGHT
       )
       .accounts({
@@ -91,6 +94,7 @@ describe('Add Dex Asset', () => {
           BORROW_FEE_RATE,
           ADD_LIQUIDITY_FEE_RATE,
           REMOVE_LIQUIDITY_FEE_RATE,
+          SWAP_FEE_RATE,
           TARGET_WEIGHT
         )
         .accounts({
@@ -106,7 +110,7 @@ describe('Add Dex Asset', () => {
     }).rejects.toThrow(expectError)
   })
 
-  it('should add perp asset successfully', async () => {
+  it('should add asset BTC successfully', async () => {
     await program.methods
       .addAsset(
         ASSET_SYMBOL,
@@ -116,6 +120,7 @@ describe('Add Dex Asset', () => {
         BORROW_FEE_RATE,
         ADD_LIQUIDITY_FEE_RATE,
         REMOVE_LIQUIDITY_FEE_RATE,
+        SWAP_FEE_RATE,
         TARGET_WEIGHT
       )
       .accounts({
@@ -149,5 +154,72 @@ describe('Add Dex Asset', () => {
       removeLiquidityFeeRate: REMOVE_LIQUIDITY_FEE_RATE,
       targetWeight: TARGET_WEIGHT,
     })
+  })
+
+  it('should add asset SOL successfully', async () => {
+    //SOL asset
+    const SOL_SYMBOL = 'SOL'
+    const SOL_MINT_DECIMAL = 9
+
+    //SOL oracle
+    const SOL_ORACLE_PRICE = 15_000_000 //$15
+    const SOL_ORACLE_PRICE_EXPO = 6
+    const SOL_ORACLE_SOURCE = 0 // 0:mock,1:pyth
+
+    const solOracle = await createMockOracle(authority, SOL_ORACLE_PRICE, SOL_ORACLE_PRICE_EXPO)
+
+    ;[programSigner, nonce] = await PublicKey.findProgramAddress(
+      [TokenInstructions.WRAPPED_SOL_MINT.toBuffer(), dex.publicKey.toBuffer()],
+      program.programId
+    )
+
+    //vault
+    const solVault = await createTokenAccount(TokenInstructions.WRAPPED_SOL_MINT, programSigner)
+
+    await program.methods
+      .addAsset(
+        SOL_SYMBOL,
+        SOL_MINT_DECIMAL,
+        nonce,
+        SOL_ORACLE_SOURCE,
+        BORROW_FEE_RATE,
+        ADD_LIQUIDITY_FEE_RATE,
+        REMOVE_LIQUIDITY_FEE_RATE,
+        SWAP_FEE_RATE,
+        TARGET_WEIGHT
+      )
+      .accounts({
+        dex: dex.publicKey,
+        mint: TokenInstructions.WRAPPED_SOL_MINT,
+        oracle: solOracle.publicKey,
+        vault: solVault,
+        programSigner,
+        authority: authority.publicKey,
+      })
+      .signers([authority])
+      .rpc()
+
+    const dexInfo = await program.account.dex.fetch(dex.publicKey)
+
+    expect(dexInfo).toMatchObject({
+      magic: expect.toBNEqual(0x6666),
+      assetsNumber: 1,
+    })
+
+    expect(dexInfo.assets[0]).toMatchObject({
+      valid: true,
+      symbol: Buffer.from('SOL\0\0\0\0\0\0\0\0\0\0\0\0\0'),
+      decimals: 9,
+      nonce: nonce,
+      mint: TokenInstructions.WRAPPED_SOL_MINT,
+      vault: solVault,
+      programSigner: programSigner,
+      borrowFeeRate: BORROW_FEE_RATE,
+      addLiquidityFeeRate: ADD_LIQUIDITY_FEE_RATE,
+      removeLiquidityFeeRate: REMOVE_LIQUIDITY_FEE_RATE,
+      targetWeight: TARGET_WEIGHT,
+    })
+
+    expect(dexInfo.vlpPool.rewardAssetIndex).toEqual(0)
   })
 })

@@ -18,5 +18,5 @@ export async function createMockOracle(authority: Keypair, price, expo: number) 
     .signers([authority, mockOracle])
     .rpc()
 
-  return { mockOracle }
+  return mockOracle
 }

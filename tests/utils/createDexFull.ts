@@ -6,22 +6,31 @@ import { createMockOracle } from './createMockOracle'
 import { createTokenAccount } from './createTokenAccount'
 import { airdrop, getProviderAndProgram } from './getProvider'
 import { createMint } from './createMint'
+import { TokenInstructions } from '@project-serum/serum'
 
 export async function createDexFull(authority: Keypair) {
   const { program, provider } = getProviderAndProgram()
 
-  //asset
-  const ASSET_SYMBOL = 'BTC'
-  const ASSET_MINT_DECIMAL = 9
+  //BTC asset
+  const BTC_SYMBOL = 'BTC'
+  const BTC_MINT_DECIMAL = 9
   const BORROW_FEE_RATE = 100 // 1-10000, the percentage will be XXXX_RATE / 10000
   const ADD_LIQUIDITY_FEE_RATE = 100
   const REMOVE_LIQUIDITY_FEE_RATE = 100
+  const SWAP_FEE_RATE = 100
   const TARGET_WEIGHT = 100 //1-1000, the percentage will be weight / 1000
+  //BTC oracle
+  const BTC_ORACLE_PRICE = 20_000_000_000 //$20000
+  const BTC_ORACLE_PRICE_EXPO = 6
+  const BTC_ORACLE_SOURCE = 0 // 0:mock,1:pyth
 
-  //oracle
-  const MOCK_ORACLE_PRICE = 20_000_000_000 //$20000
-  const MOCK_ORACLE_PRICE_EXPO = 6
-  const ORACLE_SOURCE = 0 // 0:mock,1:pyth
+  //SOL asset
+  const SOL_SYMBOL = 'SOL'
+  const SOL_MINT_DECIMAL = 9
+  //SOL oracle
+  const SOL_ORACLE_PRICE = 20_000_000 //$15
+  const SOL_ORACLE_PRICE_EXPO = 6
+  const SOL_ORACLE_SOURCE = 0 // 0:mock,1:pyth
 
   //market
   const MARKET_SYMBOL = 'BTC/USDC'
@@ -39,18 +48,16 @@ export async function createDexFull(authority: Keypair) {
   const matchQueue = Keypair.generate()
   const userListEntryPage = Keypair.generate()
   const VLP_DECIMALS = 6
-  const REWARD_ASSET_INDEX = 0
 
   const orderBook = Keypair.generate()
   const orderPoolEntryPage = Keypair.generate()
-  const rewardMint = Keypair.generate()
 
   await airdrop(provider, authority.publicKey, 10000000000)
   const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
 
   //init dex
   await program.methods
-    .initDex(VLP_DECIMALS, REWARD_ASSET_INDEX)
+    .initDex(VLP_DECIMALS)
     .accounts({
       dex: dex.publicKey,
       usdcMint,
@@ -58,7 +65,7 @@ export async function createDexFull(authority: Keypair) {
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
-      rewardMint: rewardMint.publicKey,
+      rewardMint: TokenInstructions.WRAPPED_SOL_MINT,
     })
     .preInstructions([
       await program.account.dex.createInstruction(dex),
@@ -69,8 +76,8 @@ export async function createDexFull(authority: Keypair) {
     .signers([authority, dex, eventQueue, matchQueue, userListEntryPage])
     .rpc()
 
-  //add asset
-  const { mockOracle } = await createMockOracle(authority, MOCK_ORACLE_PRICE, MOCK_ORACLE_PRICE_EXPO)
+  //Add BTC asset
+  const btcOracle = await createMockOracle(authority, BTC_ORACLE_PRICE, BTC_ORACLE_PRICE_EXPO)
 
   //mint
   const assetMint = await Token.createMint(
@@ -78,12 +85,12 @@ export async function createDexFull(authority: Keypair) {
     authority,
     authority.publicKey,
     null,
-    ASSET_MINT_DECIMAL,
+    BTC_MINT_DECIMAL,
     TOKEN_PROGRAM_ID
   )
 
   //pda
-  const [programSigner, nonce] = await PublicKey.findProgramAddress(
+  let [programSigner, nonce] = await PublicKey.findProgramAddress(
     [assetMint.publicKey.toBuffer(), dex.publicKey.toBuffer()],
     program.programId
   )
@@ -93,20 +100,55 @@ export async function createDexFull(authority: Keypair) {
 
   await program.methods
     .addAsset(
-      ASSET_SYMBOL,
-      ASSET_MINT_DECIMAL,
+      BTC_SYMBOL,
+      BTC_MINT_DECIMAL,
       nonce,
-      ORACLE_SOURCE,
+      BTC_ORACLE_SOURCE,
       BORROW_FEE_RATE,
       ADD_LIQUIDITY_FEE_RATE,
       REMOVE_LIQUIDITY_FEE_RATE,
+      SWAP_FEE_RATE,
       TARGET_WEIGHT
     )
     .accounts({
       dex: dex.publicKey,
       mint: assetMint.publicKey,
-      oracle: mockOracle.publicKey,
+      oracle: btcOracle.publicKey,
       vault: assetVault,
+      programSigner: programSigner,
+      authority: authority.publicKey,
+    })
+    .signers([authority])
+    .rpc()
+
+  //Add SOL asset
+  const solOracle = await createMockOracle(authority, SOL_ORACLE_PRICE, SOL_ORACLE_PRICE_EXPO)
+
+  ;[programSigner, nonce] = await PublicKey.findProgramAddress(
+    [TokenInstructions.WRAPPED_SOL_MINT.toBuffer(), dex.publicKey.toBuffer()],
+    program.programId
+  )
+
+  //vault
+  const solVault = await createTokenAccount(TokenInstructions.WRAPPED_SOL_MINT, programSigner)
+
+  await program.methods
+    .addAsset(
+      SOL_SYMBOL,
+      SOL_MINT_DECIMAL,
+      nonce,
+      SOL_ORACLE_SOURCE,
+      BORROW_FEE_RATE,
+      ADD_LIQUIDITY_FEE_RATE,
+      REMOVE_LIQUIDITY_FEE_RATE,
+      SWAP_FEE_RATE,
+      TARGET_WEIGHT
+    )
+    .accounts({
+      dex: dex.publicKey,
+      mint: TokenInstructions.WRAPPED_SOL_MINT,
+      oracle: solOracle.publicKey,
+      vault: solVault,
       programSigner: programSigner,
       authority: authority.publicKey,
     })
@@ -123,7 +165,7 @@ export async function createDexFull(authority: Keypair) {
       CLOSE_FEE_RATE,
       LIQUIDATE_FEE_RATE,
       DECIMALS,
-      ORACLE_SOURCE,
+      BTC_ORACLE_SOURCE,
       ASSET_INDEX,
       SIGNIFICANT_DECIMALS
     )
@@ -132,7 +174,7 @@ export async function createDexFull(authority: Keypair) {
       orderBook: orderBook.publicKey,
       orderPoolEntryPage: orderPoolEntryPage.publicKey,
       authority: authority.publicKey,
-      oracle: mockOracle.publicKey,
+      oracle: btcOracle.publicKey,
     })
     .preInstructions([
       await createAccountInstruction(orderBook, 128 * 1024),
@@ -145,6 +187,7 @@ export async function createDexFull(authority: Keypair) {
     dex,
     assetMint,
     assetVault,
+    solVault,
     programSigner,
     nonce,
     authority,
@@ -152,7 +195,7 @@ export async function createDexFull(authority: Keypair) {
     userListEntryPage,
     orderBook,
     orderPoolEntryPage,
-    MOCK_ORACLE_PRICE,
+    MOCK_ORACLE_PRICE: BTC_ORACLE_PRICE,
     ADD_LIQUIDITY_FEE_RATE,
   }
 }
