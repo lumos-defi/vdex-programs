@@ -32,7 +32,7 @@ describe('Test Create Market', () => {
     orderPoolEntryPage = Keypair.generate()
     authority = Keypair.generate()
     ;({ dex } = await createDex(authority))
-    ;({ mockOracle } = await createMockOracle(authority, MOCK_ORACLE_PRICE, MOCK_ORACLE_PRICE_EXPO))
+    mockOracle = await createMockOracle(authority, MOCK_ORACLE_PRICE, MOCK_ORACLE_PRICE_EXPO)
   })
 
   it('should add same market twice failed', async () => {
