@@ -2,13 +2,11 @@ import { Keypair, PublicKey } from '@solana/web3.js'
 import { createAccountInstruction } from './utils/createAccountInstruction'
 import { getProviderAndProgram, airdrop } from './utils/getProvider'
 import { createMint, createMintWithKeypair } from './utils/createMint'
-// import { createTokenAccount } from './utils/createTokenAccount'
 
 describe('Init Dex', () => {
   const { program, provider } = getProviderAndProgram()
   const VLP_DECIMALS = 6
   const USDC_MINT_DECIMALS = 6
-  const REWARD_ASSET_INDEX = 0
 
   let dex: Keypair
   let authority: Keypair
@@ -49,7 +47,7 @@ describe('Init Dex', () => {
 
   it('should init dex account successfully', async () => {
     await program.methods
-      .initDex(VLP_DECIMALS, REWARD_ASSET_INDEX)
+      .initDex(VLP_DECIMALS)
       .accounts({
         dex: dex.publicKey,
         usdcMint: usdcMint,
@@ -77,18 +75,6 @@ describe('Init Dex', () => {
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
       usdcMint: usdcMint,
-      // vlpPool: expect.objectContaining({
-      //   mint: vlpMint,
-      //   vault: vlpVault.publicKey,
-      //   programSigner: vlpProgramSigner,
-      //   rewardMint: rewardMint.publicKey,
-      //   nonce: vlpMintNonce,
-      //   decimals: VLP_DECIMALS,
-      //   rewardTotal: expect.toBNEqual(0),
-      //   stakedTotal: expect.toBNEqual(0),
-      //   accumulateRewardPerShare: expect.toBNEqual(0),
-      //   rewardAssetIndex: 0xff,
-      // }),
       assets: expect.arrayContaining([
         expect.objectContaining({
           valid: false,
@@ -102,6 +88,19 @@ describe('Init Dex', () => {
           decimals: 0,
         }),
       ]),
+    })
+
+    expect(dexInfo.vlpPool).toMatchObject({
+      mint: PublicKey.default,
+      vault: PublicKey.default,
+      programSigner: PublicKey.default,
+      rewardMint: rewardMint.publicKey,
+      rewardTotal: expect.toBNEqual(0),
+      stakedTotal: expect.toBNEqual(0),
+      accumulateRewardPerShare: expect.toBNEqual(0),
+      rewardAssetIndex: 0xff,
+      decimals: VLP_DECIMALS,
+      nonce: 255,
     })
   })
 })

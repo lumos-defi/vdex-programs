@@ -5,9 +5,7 @@ use crate::{
     utils::{SafeMath, REWARD_SHARE_POW_DECIMALS},
 };
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
-// #[account(zero_copy)]
-
+#[zero_copy]
 pub struct StakingPool {
     pub mint: Pubkey,
     pub vault: Pubkey,
