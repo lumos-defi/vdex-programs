@@ -316,7 +316,6 @@ impl UserTestContext {
             &self.dex,
             &asset_info.mint,
             &asset_info.vault,
-            &asset_info.program_signer,
             &self.dex_info.borrow().event_queue,
             &self.user_state,
             deposit_amount,

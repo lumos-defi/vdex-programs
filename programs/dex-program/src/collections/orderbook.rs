@@ -5,7 +5,7 @@ use crate::utils::math::SafeMath;
 use anchor_lang::prelude::*;
 use num_enum::TryFromPrimitive;
 use std::cell::RefMut;
-use std::mem::{self, swap};
+use std::mem::{self, swap, ManuallyDrop};
 
 const RBT_MAGIC: u16 = 0x5600;
 
@@ -133,14 +133,13 @@ pub struct OrderBook<'a> {
 }
 
 impl<'a> OrderBook<'a> {
-    pub fn mount(price_account: &AccountInfo, should_initialized: bool) -> DexResult<Self> {
-        let rbt_data_size = price_account.data_len();
-        let rbt_data_ptr = match price_account.try_borrow_mut_data() {
-            Ok(p) => RefMut::map(p, |data| *data).as_mut_ptr(),
-            Err(_) => return Err(error!(DexError::FailedMountAccount)),
-        };
-
-        let header = unsafe { rbt_data_ptr.cast::<RBTHeader>().as_mut() };
+    fn mount_internal(
+        data_ptr: *mut u8,
+        account_size: usize,
+        should_initialized: bool,
+    ) -> DexResult<Self> {
+        let rbt_data_ptr = data_ptr;
+        let header = unsafe { data_ptr.cast::<RBTHeader>().as_mut() };
 
         let initialized = if let Some(th) = header {
             th.magic == RBT_MAGIC
@@ -158,9 +157,25 @@ impl<'a> OrderBook<'a> {
 
         Ok(Self {
             rbt_data_ptr,
-            rbt_data_size,
+            rbt_data_size: account_size,
             header: unsafe { rbt_data_ptr.cast::<RBTHeader>().as_mut() }.unwrap(),
         })
+    }
+    pub fn mount(account: &AccountInfo, should_initialized: bool) -> DexResult<Self> {
+        let data_ptr = match account.try_borrow_mut_data() {
+            Ok(p) => RefMut::map(p, |data| *data).as_mut_ptr(),
+            Err(_) => return Err(error!(DexError::FailedMountAccount)),
+        };
+        Self::mount_internal(data_ptr, account.data_len(), should_initialized)
+    }
+
+    pub fn mount_buf(buf: Vec<u8>) -> DexResult<Self> {
+        let (data_ptr, data_size) = {
+            let mut me = ManuallyDrop::new(buf);
+            (me.as_mut_ptr(), me.len())
+        };
+
+        Self::mount_internal(data_ptr, data_size, true)
     }
 
     pub fn initialize(&mut self) -> DexResult {
@@ -1305,6 +1320,20 @@ impl<'a> OrderBook<'a> {
         match node {
             Some(n) => Some(n.price),
             None => None,
+        }
+    }
+
+    pub fn bid_max_price(&self) -> u64 {
+        match self.bid_maximum() {
+            Some(n) => n.price,
+            None => 0,
+        }
+    }
+
+    pub fn ask_min_price(&self) -> u64 {
+        match self.ask_minimum() {
+            Some(n) => n.price,
+            None => u64::MAX,
         }
     }
 }
