@@ -1322,6 +1322,20 @@ impl<'a> OrderBook<'a> {
             None => None,
         }
     }
+
+    pub fn bid_max_price(&self) -> u64 {
+        match self.bid_maximum() {
+            Some(n) => n.price,
+            None => 0,
+        }
+    }
+
+    pub fn ask_min_price(&self) -> u64 {
+        match self.ask_minimum() {
+            Some(n) => n.price,
+            None => u64::MAX,
+        }
+    }
 }
 
 #[cfg(test)]
