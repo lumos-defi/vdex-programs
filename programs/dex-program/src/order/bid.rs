@@ -180,9 +180,12 @@ pub fn handler(
         .new_slot()
         .map_err(|_| DexError::NoFreeSlotInOrderPool)?;
 
-    order
-        .data
-        .init(price, amount, ctx.accounts.user_state.key().to_bytes());
+    order.data.init(
+        price,
+        amount,
+        ctx.accounts.authority.key().to_bytes(),
+        ctx.accounts.user_state.key().to_bytes(),
+    );
 
     // Save order in user state
     let user_order_slot = us.borrow_mut().new_bid_order(

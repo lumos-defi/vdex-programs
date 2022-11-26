@@ -7,6 +7,7 @@ use crate::{
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Order {
+    pub user: [u8; 32],
     pub user_state: [u8; 32],
     pub price: u64,
     pub size: u64,
@@ -18,9 +19,10 @@ pub struct Order {
 }
 
 impl Order {
-    pub fn init(&mut self, price: u64, size: u64, user_state: [u8; 32]) {
+    pub fn init(&mut self, price: u64, size: u64, user: [u8; 32], user_state: [u8; 32]) {
         self.price = price;
         self.size = size;
+        self.user = user;
         self.user_state = user_state;
     }
 
