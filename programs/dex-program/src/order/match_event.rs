@@ -2,33 +2,19 @@ use crate::{collections::SingleEventQueue, errors::DexResult};
 
 pub struct MatchEvent {
     pub user: [u8; 32],
-    pub user_state: [u8; 32],
     pub order_slot: u32,
     pub user_order_slot: u8,
     _padding: [u8; 3],
 }
 
 pub trait AppendSingleEvent {
-    fn append(
-        &mut self,
-        user: [u8; 32],
-        user_state: [u8; 32],
-        order_slot: u32,
-        user_order_slot: u8,
-    ) -> DexResult;
+    fn append(&mut self, user: [u8; 32], order_slot: u32, user_order_slot: u8) -> DexResult;
 }
 
 impl AppendSingleEvent for SingleEventQueue<'_, MatchEvent> {
-    fn append(
-        &mut self,
-        user: [u8; 32],
-        user_state: [u8; 32],
-        order_slot: u32,
-        user_order_slot: u8,
-    ) -> DexResult {
+    fn append(&mut self, user: [u8; 32], order_slot: u32, user_order_slot: u8) -> DexResult {
         let new_event = self.new_tail()?;
         new_event.data.user = user;
-        new_event.data.user_state = user_state;
 
         new_event.data.order_slot = order_slot;
         new_event.data.user_order_slot = user_order_slot;
@@ -60,18 +46,12 @@ mod test {
     }
 
     fn append_event(q: &mut SingleEventQueue<MatchEvent>, i: usize) {
-        q.append(
-            random_pubkey(i).to_bytes(),
-            random_pubkey(i).to_bytes(),
-            i as u32,
-            i as u8,
-        )
-        .assert_ok();
+        q.append(random_pubkey(i).to_bytes(), i as u32, i as u8)
+            .assert_ok();
     }
 
     fn assert_event(event: &MatchEvent, i: usize) {
         assert_eq!(event.user, random_pubkey(i).to_bytes());
-        assert_eq!(event.user_state, random_pubkey(i).to_bytes());
         assert_eq!(event.order_slot, i as u32);
         assert_eq!(event.user_order_slot, i as u8);
     }

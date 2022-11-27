@@ -88,11 +88,6 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
 
     let SingleEvent { data } = match_queue.read_head()?;
 
-    require!(
-        ctx.accounts.user_state.key().to_bytes() == data.user_state,
-        DexError::UserStateMismatch
-    );
-
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     let order = us.borrow().get_order(data.user_order_slot)?;
     us.borrow_mut().unlink_order(data.user_order_slot)?;
@@ -101,6 +96,11 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         order.order_slot,
         data.order_slot,
         DexError::OrderSlotMismatch
+    );
+
+    require!(
+        data.user == ctx.accounts.user.key().to_bytes(),
+        DexError::InvalidUser
     );
 
     require!(

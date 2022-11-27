@@ -211,6 +211,9 @@ pub enum DexError {
 
     #[msg("Invalid reward asset")]
     InvalidRewardAsset,
+
+    #[msg("Invalid user")]
+    InvalidUser,
 }
 
 pub type DexResult<T = ()> = Result<T>;
