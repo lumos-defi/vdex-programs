@@ -82,7 +82,7 @@ pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
 
     let mut filled_bid_orders = 0u32;
     loop {
-        let (user_order_slot, order_slot, user_state) = match order_book.get_next_match_order(
+        let (user_order_slot, order_slot, user) = match order_book.get_next_match_order(
             market_price,
             OrderSide::BID,
             OrderType::LIMIT,
@@ -91,17 +91,17 @@ pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
             Some((order, _)) => {
                 let user_order_slot = order.data.user_order_slot;
                 let order_slot = order.index();
-                let user_state = order.data.user_state;
+                let user = order.data.user;
 
                 order_book.fill_order(u64::MAX, OrderSide::BID, order, &order_pool)?;
 
-                (user_order_slot, order_slot, user_state)
+                (user_order_slot, order_slot, user)
             }
             None => break,
         };
 
         match_queue
-            .append(&user_state, order_slot, user_order_slot)
+            .append(user, order_slot, user_order_slot)
             .map_err(|_| DexError::FailedAppendMatchEvent)?;
 
         filled_bid_orders += 1;
@@ -112,7 +112,7 @@ pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
 
     let mut filled_ask_orders = 0u32;
     loop {
-        let (user_order_slot, order_slot, user_state) = match order_book.get_next_match_order(
+        let (user_order_slot, order_slot, user) = match order_book.get_next_match_order(
             market_price,
             OrderSide::ASK,
             OrderType::LIMIT,
@@ -121,17 +121,17 @@ pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
             Some((order, _)) => {
                 let user_order_slot = order.data.user_order_slot;
                 let order_slot = order.index();
-                let user_state = order.data.user_state;
+                let user = order.data.user;
 
                 order_book.fill_order(u64::MAX, OrderSide::BID, order, &order_pool)?;
 
-                (user_order_slot, order_slot, user_state)
+                (user_order_slot, order_slot, user)
             }
             None => break,
         };
 
         match_queue
-            .append(&user_state, order_slot, user_order_slot)
+            .append(user, order_slot, user_order_slot)
             .map_err(|_| DexError::FailedAppendMatchEvent)?;
 
         filled_ask_orders += 1;

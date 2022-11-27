@@ -96,7 +96,7 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
         .map_err(|_| DexError::NoFreeSlotInOrderPool)?;
     order
         .data
-        .init(price, size, ctx.accounts.user_state.key().to_bytes());
+        .init(price, size, ctx.accounts.authority.key().to_bytes());
 
     // Save order in user state
     let user_order_slot =

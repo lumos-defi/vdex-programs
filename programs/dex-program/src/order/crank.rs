@@ -18,6 +18,19 @@ pub struct Crank<'info> {
     #[account(mut, owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
+    /// CHECK
+    pub user: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(mut, seeds = [dex.key().as_ref(), user.key().as_ref()], bump)]
+    pub user_state: UncheckedAccount<'info>,
+
+    #[account(
+        mut,
+        constraint = (user_mint_acc.owner == *user.key && user_mint_acc.mint == *market_mint.key)
+    )]
+    pub user_mint_acc: Box<Account<'info, TokenAccount>>,
+
     /// Possibly used for bid order that needs swap assets
     /// CHECK
     pub in_mint_oracle: AccountInfo<'info>,
@@ -35,16 +48,6 @@ pub struct Crank<'info> {
 
     /// CHECK
     pub market_mint_program_signer: AccountInfo<'info>,
-
-    #[account(
-        mut,
-        constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *market_mint.key)
-    )]
-    pub user_mint_acc: Box<Account<'info, TokenAccount>>,
-
-    /// CHECK
-    #[account(mut, seeds = [dex.key().as_ref(), authority.key().as_ref()], bump)]
-    pub user_state: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -85,11 +88,6 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
 
     let SingleEvent { data } = match_queue.read_head()?;
 
-    require!(
-        ctx.accounts.user_state.key().to_bytes() == data.user_state,
-        DexError::UserStateMismatch
-    );
-
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     let order = us.borrow().get_order(data.user_order_slot)?;
     us.borrow_mut().unlink_order(data.user_order_slot)?;
@@ -98,6 +96,11 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         order.order_slot,
         data.order_slot,
         DexError::OrderSlotMismatch
+    );
+
+    require!(
+        data.user == ctx.accounts.user.key().to_bytes(),
+        DexError::InvalidUser
     );
 
     require!(
@@ -118,6 +121,15 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             &dex.assets[dex.usdc_asset_index as usize],
         )
     };
+
+    require!(
+        mai.valid
+            && mai.mint == ctx.accounts.market_mint.key()
+            && mai.vault == ctx.accounts.market_mint_vault.key()
+            && mai.program_signer == ctx.accounts.market_mint_program_signer.key(),
+        DexError::InvalidMarketIndex
+    );
+
     let minimum_position_value = mi.minimum_position_value;
 
     let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
@@ -193,14 +205,6 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             ctx.accounts.dex.to_account_info().key.as_ref(),
             &[mai.nonce],
         ];
-
-        require!(
-            mai.valid
-                && mai.mint == ctx.accounts.market_mint.key()
-                && mai.vault == ctx.accounts.market_mint_vault.key()
-                && mai.program_signer == ctx.accounts.market_mint_program_signer.key(),
-            DexError::InvalidMarketIndex
-        );
 
         let (borrow, collateral, pnl, close_fee, borrow_fee) = us.borrow_mut().close_position(
             order.market,

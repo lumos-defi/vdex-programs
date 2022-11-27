@@ -80,6 +80,22 @@ impl Dex {
         self.asset_as_mut(index)
     }
 
+    #[cfg(feature = "client-support")]
+    pub fn market_asset_as_ref(&self, market: u8, long: bool) -> DexResult<&AssetInfo> {
+        require!(market < self.markets_number, DexError::InvalidMarketIndex);
+
+        let mi = &self.markets[market as usize];
+        require!(mi.valid, DexError::InvalidMarketIndex);
+
+        let index = if long {
+            mi.asset_index
+        } else {
+            self.usdc_asset_index
+        };
+
+        self.asset_as_ref(index)
+    }
+
     pub fn find_asset_by_mint(&self, mint: Pubkey) -> DexResult<(u8, &AssetInfo)> {
         let index = self
             .assets
