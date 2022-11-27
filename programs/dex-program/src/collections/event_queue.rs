@@ -7,6 +7,7 @@ use core::slice;
 use std::cell::RefMut;
 use std::cmp::Ordering;
 use std::io::{Read, Write};
+#[cfg(feature = "client-support")]
 use std::mem::ManuallyDrop;
 
 #[repr(C)]
@@ -233,6 +234,7 @@ impl<'a> EventQueue<'a> {
         Self::mount_internal(data_ptr, account_size, should_initialized)
     }
 
+    #[cfg(feature = "client-support")]
     pub fn mount_buf(buf: Vec<u8>) -> DexResult<Self> {
         let (data_ptr, data_size) = {
             let mut me = ManuallyDrop::new(buf);

@@ -1,5 +1,4 @@
 use std::cell::{RefCell, RefMut};
-use std::mem::{self, ManuallyDrop};
 
 use crate::collections::small_list::*;
 use crate::dex::{state::*, StakingPool, UserStake};
@@ -7,6 +6,9 @@ use crate::utils::{time::get_timestamp, SafeMath, NIL32, USER_STATE_MAGIC_NUMBER
 use anchor_lang::prelude::*;
 
 use crate::errors::{DexError, DexResult};
+use std::mem;
+#[cfg(feature = "client-support")]
+use std::mem::ManuallyDrop;
 
 #[repr(C)]
 // #[derive(Clone, Copy)]
@@ -242,6 +244,7 @@ impl<'a> UserState<'a> {
         UserState::mount_internal(data_ptr, account.data_len(), should_initialized)
     }
 
+    #[cfg(feature = "client-support")]
     pub fn mount_buf(buf: Vec<u8>) -> DexResult<RefCell<Self>> {
         let (data_ptr, data_size) = {
             let mut me = ManuallyDrop::new(buf);

@@ -80,6 +80,7 @@ impl Dex {
         self.asset_as_mut(index)
     }
 
+    #[cfg(feature = "client-support")]
     pub fn market_asset_as_ref(&self, market: u8, long: bool) -> DexResult<&AssetInfo> {
         require!(market < self.markets_number, DexError::InvalidMarketIndex);
 

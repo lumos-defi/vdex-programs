@@ -5,7 +5,9 @@ use crate::utils::math::SafeMath;
 use anchor_lang::prelude::*;
 use num_enum::TryFromPrimitive;
 use std::cell::RefMut;
-use std::mem::{self, swap, ManuallyDrop};
+#[cfg(feature = "client-support")]
+use std::mem::ManuallyDrop;
+use std::mem::{self, swap};
 
 const RBT_MAGIC: u16 = 0x5600;
 
@@ -169,6 +171,7 @@ impl<'a> OrderBook<'a> {
         Self::mount_internal(data_ptr, account.data_len(), should_initialized)
     }
 
+    #[cfg(feature = "client-support")]
     pub fn mount_buf(buf: Vec<u8>) -> DexResult<Self> {
         let (data_ptr, data_size) = {
             let mut me = ManuallyDrop::new(buf);
@@ -1323,6 +1326,7 @@ impl<'a> OrderBook<'a> {
         }
     }
 
+    #[cfg(feature = "client-support")]
     pub fn bid_max_price(&self) -> u64 {
         match self.bid_maximum() {
             Some(n) => n.price,
@@ -1330,6 +1334,7 @@ impl<'a> OrderBook<'a> {
         }
     }
 
+    #[cfg(feature = "client-support")]
     pub fn ask_min_price(&self) -> u64 {
         match self.ask_minimum() {
             Some(n) => n.price,

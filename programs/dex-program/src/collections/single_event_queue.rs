@@ -2,7 +2,9 @@ use crate::errors::{DexError, DexResult};
 use anchor_lang::prelude::*;
 use std::cell::RefMut;
 use std::marker::PhantomData;
-use std::mem::{self, ManuallyDrop};
+use std::mem;
+#[cfg(feature = "client-support")]
+use std::mem::ManuallyDrop;
 
 #[repr(C)]
 pub struct SingleEventQueueHeader {
@@ -65,6 +67,7 @@ impl<'a, T> SingleEventQueue<'a, T> {
         Self::mount_internal(data_ptr, account_size, should_initialized)
     }
 
+    #[cfg(feature = "client-support")]
     pub fn mount_buf(buf: Vec<u8>) -> DexResult<Self> {
         let (data_ptr, data_size) = {
             let mut me = ManuallyDrop::new(buf);

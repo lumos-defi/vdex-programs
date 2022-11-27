@@ -2,15 +2,16 @@ pub mod errors;
 mod tests;
 
 use std::marker::Copy;
-use std::mem::ManuallyDrop;
 use std::{cell::RefMut, marker::PhantomData, mem};
 
 use anchor_lang::prelude::{AccountInfo, Pubkey};
 use std::convert::TryFrom;
 
 use self::errors::Error;
-
 use super::MountMode;
+
+#[cfg(feature = "client-support")]
+use std::mem::ManuallyDrop;
 
 const MAGIC_HEADER: u32 = 0xd1c34400;
 const NIL_LIST_INDEX: PagedListIndex = PagedListIndex {
@@ -60,6 +61,7 @@ struct Page<'a, TSlot> {
 }
 
 impl<'a, TSlot> Page<'a, TSlot> {
+    #[cfg(feature = "client-support")]
     fn mount_buf<THeader>(
         buf: Vec<u8>,
         expected_magic: u32,
@@ -266,6 +268,7 @@ impl<'a, TSlot> IntoIterator for &'a PagedList<'_, TSlot> {
 }
 
 impl<'a, TSlot> PagedList<'a, TSlot> {
+    #[cfg(feature = "client-support")]
     pub fn mount_buf(
         first_buf: Vec<u8>,
         remaining_bufs: Vec<Vec<u8>>,
@@ -469,6 +472,7 @@ impl<'a, TSlot> PagedList<'a, TSlot> {
     }
 
     //todo: when mount bufs, we don't check pubkeys
+    #[cfg(feature = "client-support")]
     fn get_pages_from_bufs(
         first_buf: Vec<u8>,
         remaining_bufs: Vec<Vec<u8>>,
