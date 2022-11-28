@@ -80,7 +80,6 @@ impl Dex {
         self.asset_as_mut(index)
     }
 
-    #[cfg(feature = "client-support")]
     pub fn market_asset_as_ref(&self, market: u8, long: bool) -> DexResult<&AssetInfo> {
         require!(market < self.markets_number, DexError::InvalidMarketIndex);
 
@@ -263,8 +262,8 @@ impl Dex {
         Ok((out_amount.safe_sub(fee)?, fee))
     }
 
-    pub fn has_sufficient_fund(&mut self, market: u8, long: bool, borrow: u64) -> DexResult {
-        let ai = self.market_asset(market, long)?;
+    pub fn has_sufficient_liquidity(&self, market: u8, long: bool, borrow: u64) -> DexResult {
+        let ai = self.market_asset_as_ref(market, long)?;
         if ai.liquidity_amount > borrow {
             Ok(())
         } else {
@@ -652,13 +651,13 @@ impl Position {
         Ok(())
     }
 
-    pub fn size(
+    pub fn size_and_borrow(
         long: bool,
         price: u64,
         amount: u64,
         leverage: u32,
         mfr: &MarketFeeRates,
-    ) -> DexResult<u64> {
+    ) -> DexResult<(u64, u64)> {
         let (collateral, _) =
             Position::calc_collateral_and_fee(amount, leverage, mfr.open_fee_rate)?;
 
@@ -671,7 +670,13 @@ impl Position {
                 .safe_div(price as u128)
         }? as u64;
 
-        Ok(size)
+        let borrow = if long {
+            Ok(size as u128)
+        } else {
+            collateral.safe_mul(leverage as u64)
+        }? as u64;
+
+        Ok((size, borrow))
     }
 
     pub fn open(
