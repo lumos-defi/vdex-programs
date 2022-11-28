@@ -5,38 +5,51 @@ import { BN } from '@project-serum/anchor'
 import { createDexFull } from './utils/createDexFull'
 import { getOracleAccounts } from './utils/getOracleAccounts'
 import { createUserState } from './utils/createUserState'
+import { TokenInstructions } from '@project-serum/serum'
+import { createWSOLAccount } from './utils/createTokenAccount'
 
 describe('Test Remove Liquidity', () => {
   const { program, provider } = getProviderAndProgram()
   const MINT_AMOUNT = 10_000_000_000 //10 BTC
   const DEPOSIT_AMOUNT = 1_000_000_000 //1 BTC
+
+  const ADD_FEE = 10_000_000
+  const REMOVE_FEE = 10_000_000 - 100_000
+
   const WITHDRAW_VLP_AMOUNT = 19800_000_000 // 19800 vlp vlp_decimals=6
+  const SOL_MINT_AMOUNT = 2000_000_000_000
+  const SOL_DEPOSIT_AMOUNT = 1000_000_000_000
+
   let oracleAccounts = new Array<AccountMeta>()
   let dex: Keypair
   let authority: Keypair
 
   let assetMint: Token
   let assetVault: PublicKey
-  let programSigner: PublicKey
+  let solVault: PublicKey
+  let mintProgramSigner: PublicKey
 
   let alice: Keypair
-  let aliceAssetToken: PublicKey
-  let userState: PublicKey
+  let bob: Keypair
+  let aliceMintAcc: PublicKey
+  let aliceUserState: PublicKey
+  let bobUserState: PublicKey
   let eventQueue: Keypair
 
   beforeEach(async () => {
     authority = Keypair.generate()
     alice = Keypair.generate()
+    bob = Keypair.generate()
 
-    await airdrop(provider, alice.publicKey, 10000000000)
-    ;({ dex, assetMint, assetVault, programSigner, eventQueue } = await createDexFull(authority))
+    await airdrop(provider, bob.publicKey, SOL_MINT_AMOUNT)
+    ;({ dex, assetMint, assetVault, solVault, mintProgramSigner, eventQueue } = await createDexFull(authority))
 
     //create alice asset associatedTokenAccount
-    aliceAssetToken = await assetMint.createAssociatedTokenAccount(alice.publicKey)
+    aliceMintAcc = await assetMint.createAssociatedTokenAccount(alice.publicKey)
 
     //mint asset to alice
     await assetMint.mintTo(
-      aliceAssetToken,
+      aliceMintAcc,
       authority.publicKey, //mint authority
       [authority],
       MINT_AMOUNT
@@ -45,7 +58,27 @@ describe('Test Remove Liquidity', () => {
     oracleAccounts = await getOracleAccounts(dex.publicKey)
 
     //create userState
-    userState = await createUserState(alice, dex)
+    aliceUserState = await createUserState(alice, dex)
+    bobUserState = await createUserState(bob, dex)
+
+    // Add some SOL
+    const [bobWSOLAcc, _] = await createWSOLAccount(bob, SOL_DEPOSIT_AMOUNT)
+
+    await program.methods
+      .addLiquidity(new BN(SOL_DEPOSIT_AMOUNT))
+      .accounts({
+        dex: dex.publicKey,
+        mint: TokenInstructions.WRAPPED_SOL_MINT,
+        vault: solVault,
+        userMintAcc: bobWSOLAcc,
+        userState: bobUserState,
+        eventQueue: eventQueue.publicKey,
+        authority: bob.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .remainingAccounts(oracleAccounts)
+      .signers([bob])
+      .rpc()
 
     //add liquidity
     await program.methods
@@ -54,9 +87,8 @@ describe('Test Remove Liquidity', () => {
         dex: dex.publicKey,
         mint: assetMint.publicKey,
         vault: assetVault,
-        programSigner: programSigner,
-        userMintAcc: aliceAssetToken,
-        userState: userState,
+        userMintAcc: aliceMintAcc,
+        userState: aliceUserState,
         eventQueue: eventQueue.publicKey,
         authority: alice.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -73,10 +105,10 @@ describe('Test Remove Liquidity', () => {
         dex: dex.publicKey,
         mint: assetMint.publicKey,
         vault: assetVault,
-        programSigner: programSigner,
-        userMintAcc: aliceAssetToken,
+        programSigner: mintProgramSigner,
+        userMintAcc: aliceMintAcc,
         authority: alice.publicKey,
-        userState: userState,
+        userState: aliceUserState,
         eventQueue: eventQueue.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
@@ -84,18 +116,13 @@ describe('Test Remove Liquidity', () => {
       .signers([alice])
       .rpc()
 
-    const aliceAssetTokenAccount = await (
-      await program.provider.connection.getTokenAccountBalance(aliceAssetToken)
-    ).value
-
     const dexInfo = await program.account.dex.fetch(dex.publicKey)
-
     expect(dexInfo.assets[0]).toMatchObject({
       valid: true,
       symbol: Buffer.from('BTC\0\0\0\0\0\0\0\0\0\0\0\0\0'),
-      liquidityAmount: expect.toBNEqual(0),
+      liquidityAmount: expect.toBNEqual(ADD_FEE + REMOVE_FEE),
     })
-
+    const aliceAssetTokenAccount = await (await program.provider.connection.getTokenAccountBalance(aliceMintAcc)).value
     expect(aliceAssetTokenAccount).toMatchObject({
       amount: (MINT_AMOUNT - 19_900_000).toString(), //fee:{add_liquidity:0.01,remove_liquidity:0.0099}
     })

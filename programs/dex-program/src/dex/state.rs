@@ -254,7 +254,10 @@ impl Dex {
             .safe_mul(ai.remove_liquidity_fee_rate as u64)?
             .safe_div(FEE_RATE_BASE)? as u64;
 
-        ai.liquidity_amount = ai.liquidity_amount.safe_sub(out_amount)?;
+        ai.liquidity_amount = ai
+            .liquidity_amount
+            .safe_sub(out_amount)
+            .map_err(|_| DexError::InsufficientLiquidity)?;
         ai.fee_amount = ai.fee_amount.safe_add(fee)?;
 
         Ok((out_amount.safe_sub(fee)?, fee))

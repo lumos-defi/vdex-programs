@@ -52,7 +52,7 @@ pub struct RemoveLiquidity<'info> {
 // dex.markets.map({
 //    market index price oracle account
 // })
-pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
+pub fn handler(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
 
     let assets_oracles_len = dex.assets.iter().filter(|a| a.valid).count();
@@ -70,7 +70,11 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
     );
 
     let (index, ai) = dex.find_asset_by_mint(ctx.accounts.mint.key())?;
-    require_eq!(ai.vault, *ctx.accounts.vault.key, DexError::InvalidVault);
+    require!(
+        ai.vault == ctx.accounts.vault.key()
+            && ai.program_signer == ctx.accounts.program_signer.key(),
+        DexError::InvalidVault
+    );
     let seeds = &[
         ctx.accounts.mint.key.as_ref(),
         ctx.accounts.dex.to_account_info().key.as_ref(),
@@ -78,7 +82,11 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
     ];
     let signer = &[&seeds[..]];
 
-    let (withdraw, fee) = dex.remove_liquidity(index, amount, &ctx.remaining_accounts)?;
+    let us = UserState::mount(&ctx.accounts.user_state, true)?;
+    let actual_vlp_amount = us.borrow().withdrawable_vlp_amount(vlp_amount);
+
+    let (withdraw, fee) =
+        dex.remove_liquidity(index, actual_vlp_amount, &ctx.remaining_accounts)?;
 
     if withdraw > 0 {
         // Withdraw assets
@@ -99,9 +107,8 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
     // Update rewards
     dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len])?;
 
-    let us = UserState::mount(&ctx.accounts.user_state, true)?;
     us.borrow_mut()
-        .leave_staking_vlp(&mut dex.vlp_pool, amount)?;
+        .leave_staking_vlp(&mut dex.vlp_pool, actual_vlp_amount)?;
 
     // Save to event queue
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
@@ -111,7 +118,7 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
         false,
         index,
         withdraw,
-        amount,
+        vlp_amount,
         fee,
     )
 }

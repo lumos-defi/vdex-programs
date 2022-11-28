@@ -437,6 +437,10 @@ impl<'a> UserState<'a> {
     pub fn leave_staking_vlp(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
         self.meta.vlp.leave_staking(pool, amount)
     }
+
+    pub fn withdrawable_vlp_amount(&self, amount: u64) -> u64 {
+        self.meta.vlp.staked.min(amount)
+    }
 }
 
 #[cfg(test)]
