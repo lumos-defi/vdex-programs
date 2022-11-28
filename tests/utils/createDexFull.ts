@@ -90,19 +90,19 @@ export async function createDexFull(authority: Keypair) {
   )
 
   //pda
-  let [programSigner, nonce] = await PublicKey.findProgramAddress(
+  const [mintProgramSigner, mintNonce] = await PublicKey.findProgramAddress(
     [assetMint.publicKey.toBuffer(), dex.publicKey.toBuffer()],
     program.programId
   )
 
   //vault
-  const assetVault = await createTokenAccount(assetMint.publicKey, programSigner)
+  const assetVault = await createTokenAccount(assetMint.publicKey, mintProgramSigner)
 
   await program.methods
     .addAsset(
       BTC_SYMBOL,
       BTC_MINT_DECIMAL,
-      nonce,
+      mintNonce,
       BTC_ORACLE_SOURCE,
       BORROW_FEE_RATE,
       ADD_LIQUIDITY_FEE_RATE,
@@ -115,7 +115,7 @@ export async function createDexFull(authority: Keypair) {
       mint: assetMint.publicKey,
       oracle: btcOracle.publicKey,
       vault: assetVault,
-      programSigner: programSigner,
+      programSigner: mintProgramSigner,
       authority: authority.publicKey,
     })
     .signers([authority])
@@ -124,19 +124,19 @@ export async function createDexFull(authority: Keypair) {
   //Add SOL asset
   const solOracle = await createMockOracle(authority, SOL_ORACLE_PRICE, SOL_ORACLE_PRICE_EXPO)
 
-  ;[programSigner, nonce] = await PublicKey.findProgramAddress(
+  const [solProgramSigner, solNonce] = await PublicKey.findProgramAddress(
     [TokenInstructions.WRAPPED_SOL_MINT.toBuffer(), dex.publicKey.toBuffer()],
     program.programId
   )
 
   //vault
-  const solVault = await createTokenAccount(TokenInstructions.WRAPPED_SOL_MINT, programSigner)
+  const solVault = await createTokenAccount(TokenInstructions.WRAPPED_SOL_MINT, solProgramSigner)
 
   await program.methods
     .addAsset(
       SOL_SYMBOL,
       SOL_MINT_DECIMAL,
-      nonce,
+      solNonce,
       SOL_ORACLE_SOURCE,
       BORROW_FEE_RATE,
       ADD_LIQUIDITY_FEE_RATE,
@@ -149,7 +149,7 @@ export async function createDexFull(authority: Keypair) {
       mint: TokenInstructions.WRAPPED_SOL_MINT,
       oracle: solOracle.publicKey,
       vault: solVault,
-      programSigner: programSigner,
+      programSigner: solProgramSigner,
       authority: authority.publicKey,
     })
     .signers([authority])
@@ -188,8 +188,10 @@ export async function createDexFull(authority: Keypair) {
     assetMint,
     assetVault,
     solVault,
-    programSigner,
-    nonce,
+    mintProgramSigner,
+    mintNonce,
+    solProgramSigner,
+    solNonce,
     authority,
     eventQueue,
     userListEntryPage,
