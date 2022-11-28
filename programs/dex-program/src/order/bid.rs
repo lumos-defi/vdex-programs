@@ -138,11 +138,13 @@ pub fn handler(
         out
     };
 
-    let size = Position::size(long, price, actual_amount, leverage, &mfr)?;
+    let (size, borrow) = Position::size_and_borrow(long, price, actual_amount, leverage, &mfr)?;
     require!(
         size.safe_mul(price)? as u64 >= minimum_position_value,
         DexError::PositionTooSmall
     );
+
+    dex.has_sufficient_liquidity(market, long, borrow)?;
 
     // Transfer token in
     let cpi_accounts = Transfer {
