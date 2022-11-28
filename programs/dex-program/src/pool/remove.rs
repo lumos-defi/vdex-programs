@@ -52,7 +52,7 @@ pub struct RemoveLiquidity<'info> {
 // dex.markets.map({
 //    market index price oracle account
 // })
-pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
+pub fn handler(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
 
     let assets_oracles_len = dex.assets.iter().filter(|a| a.valid).count();
@@ -83,9 +83,10 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
     let signer = &[&seeds[..]];
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let vlp_amount = us.borrow().withdrawable_vlp_amount(amount);
+    let actual_vlp_amount = us.borrow().withdrawable_vlp_amount(vlp_amount);
 
-    let (withdraw, fee) = dex.remove_liquidity(index, vlp_amount, &ctx.remaining_accounts)?;
+    let (withdraw, fee) =
+        dex.remove_liquidity(index, actual_vlp_amount, &ctx.remaining_accounts)?;
 
     if withdraw > 0 {
         // Withdraw assets
@@ -107,7 +108,7 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
     dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len])?;
 
     us.borrow_mut()
-        .leave_staking_vlp(&mut dex.vlp_pool, vlp_amount)?;
+        .leave_staking_vlp(&mut dex.vlp_pool, actual_vlp_amount)?;
 
     // Save to event queue
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
@@ -117,7 +118,7 @@ pub fn handler(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
         false,
         index,
         withdraw,
-        amount,
+        vlp_amount,
         fee,
     )
 }

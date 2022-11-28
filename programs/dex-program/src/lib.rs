@@ -100,8 +100,8 @@ pub mod dex_program {
         pool::add::handler(ctx, amount)
     }
 
-    pub fn remove_liquidity(ctx: Context<RemoveLiquidity>, amount: u64) -> DexResult {
-        pool::remove::handler(ctx, amount)
+    pub fn remove_liquidity(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
+        pool::remove::handler(ctx, vlp_amount)
     }
 
     pub fn swap(ctx: Context<Swap>, amount: u64) -> DexResult {
