@@ -18,27 +18,30 @@ pub struct LiquidatePosition<'info> {
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
-    pub mint: AccountInfo<'info>,
+    pub user: AccountInfo<'info>,
 
     /// CHECK
-    pub oracle: AccountInfo<'info>,
-
-    /// CHECK
-    #[account(mut)]
-    pub vault: AccountInfo<'info>,
-
-    /// CHECK
-    pub program_signer: AccountInfo<'info>,
+    #[account(mut, seeds = [dex.key().as_ref(), user.key().as_ref()], bump)]
+    pub user_state: UncheckedAccount<'info>,
 
     #[account(
         mut,
-        constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *mint.key)
+        constraint = (user_mint_acc.owner == *user.key && user_mint_acc.mint == *market_mint.key)
     )]
     pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
     /// CHECK
-    #[account(mut, seeds = [dex.key().as_ref(), authority.key().as_ref()], bump)]
-    pub user_state: UncheckedAccount<'info>,
+    pub market_mint: AccountInfo<'info>,
+
+    /// CHECK
+    pub market_oracle: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(mut)]
+    pub market_mint_vault: AccountInfo<'info>,
+
+    /// CHECK
+    pub program_signer: AccountInfo<'info>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -74,28 +77,35 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
 
     let mi = &dex.markets[market as usize];
     require!(
-        mi.valid && mi.oracle == ctx.accounts.oracle.key(),
+        mi.valid && mi.oracle == ctx.accounts.market_oracle.key(),
         DexError::InvalidMarketIndex
     );
 
-    let ai = &dex.assets[mi.asset_index as usize];
+    let (_, mai) = if long {
+        (mi.asset_index, &dex.assets[mi.asset_index as usize])
+    } else {
+        (
+            dex.usdc_asset_index,
+            &dex.assets[dex.usdc_asset_index as usize],
+        )
+    };
+
     require!(
-        ai.valid
-            && ai.mint == ctx.accounts.mint.key()
-            && ai.vault == ctx.accounts.vault.key()
-            && ai.program_signer == ctx.accounts.program_signer.key(),
+        mai.valid
+            && mai.mint == ctx.accounts.market_mint.key()
+            && mai.vault == ctx.accounts.market_mint_vault.key(),
         DexError::InvalidMarketIndex
     );
 
     let seeds = &[
-        ctx.accounts.mint.key.as_ref(),
+        ctx.accounts.market_mint.key.as_ref(),
         ctx.accounts.dex.to_account_info().key.as_ref(),
-        &[ai.nonce],
+        &[mai.nonce],
     ];
     // Get oracle price
-    let price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
+    let price = get_oracle_price(mi.oracle_source, &ctx.accounts.market_oracle)?;
 
-    let mfr = mi.get_fee_rates(ai.borrow_fee_rate);
+    let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
 
     // User close position
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
@@ -113,13 +123,13 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
     // Should the position be liquidated?
     let threshold = collateral.safe_mul(15u64)?.safe_div(100u128)? as u64;
     if withdrawable > threshold {
-        return Err(error!(DexError::NeedNoLiquidation));
+        return Err(error!(DexError::RequireNoLiquidation));
     }
 
     if withdrawable > 0 {
         let signer = &[&seeds[..]];
         let cpi_accounts = Transfer {
-            from: ctx.accounts.vault.to_account_info(),
+            from: ctx.accounts.market_mint_vault.to_account_info(),
             to: ctx.accounts.user_mint_acc.to_account_info(),
             authority: ctx.accounts.program_signer.to_account_info(),
         };

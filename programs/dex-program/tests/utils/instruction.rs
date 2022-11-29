@@ -326,7 +326,7 @@ pub async fn compose_remove_liquidity_ix(
             user_state: *user_state,
         })
         .accounts(remaining_accounts)
-        .args(dex_program::instruction::RemoveLiquidity { amount })
+        .args(dex_program::instruction::RemoveLiquidity { vlp_amount: amount })
         .instructions()
         .unwrap()
         .pop()

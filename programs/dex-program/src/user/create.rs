@@ -30,5 +30,10 @@ pub fn handler(
 ) -> DexResult {
     let user_state = &mut ctx.accounts.user_state;
 
-    UserState::initialize(user_state, order_slot_count, position_slot_count)
+    UserState::initialize(
+        user_state,
+        order_slot_count,
+        position_slot_count,
+        ctx.accounts.authority.key(),
+    )
 }
