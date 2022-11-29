@@ -14,6 +14,8 @@ use std::mem::ManuallyDrop;
 // #[derive(Clone, Copy)]
 pub struct MetaInfo {
     pub magic: u32,
+    pub owner: Pubkey,
+    pub delegate: Pubkey,
     pub user_list_index: u32,
     pub vlp: UserStake,
     pub serial_number: u32,
@@ -178,6 +180,7 @@ impl<'a> UserState<'a> {
         account: &'a AccountInfo,
         max_order_count: u8,
         max_position_count: u8,
+        owner: Pubkey,
     ) -> DexResult {
         let data_ptr = match account.try_borrow_mut_data() {
             Ok(p) => RefMut::map(p, |data| *data).as_mut_ptr(),
@@ -191,6 +194,7 @@ impl<'a> UserState<'a> {
 
         basic.user_list_index = NIL32;
         basic.serial_number = 0;
+        basic.owner = owner;
 
         let user_state = Self::mount(account, false)?;
 
@@ -252,6 +256,29 @@ impl<'a> UserState<'a> {
         };
 
         UserState::mount_internal(data_ptr, data_size, true)
+    }
+
+    #[cfg(feature = "client-support")]
+    pub fn require_liquidate(
+        &self,
+        market: u8,
+        long: bool,
+        market_price: u64,
+        mfr: &MarketFeeRates,
+    ) -> DexResult {
+        let position = self.find_or_new_position(market, false)?;
+        let (_, collateral, pnl, close_fee, borrow_fee) =
+            position
+                .data
+                .close(u64::MAX, market_price, long, mfr, true)?;
+
+        if pnl < 0 {
+            let loss = (pnl.abs() as u64) + close_fee + borrow_fee;
+            if loss < collateral.safe_mul(10u64)?.safe_div(100u128)? as u64 {
+                return Ok(());
+            }
+        }
+        return Err(error!(DexError::RequireNoLiquidation));
     }
 
     #[inline]
@@ -474,7 +501,13 @@ mod test {
         println!("required account size {}", required_size);
 
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, order_slot_count, position_slot_count).assert_ok();
+        UserState::initialize(
+            &account,
+            order_slot_count,
+            position_slot_count,
+            Pubkey::default(),
+        )
+        .assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
 
@@ -514,7 +547,7 @@ mod test {
         let bump = Bump::new();
         let required_size = UserState::required_account_size(8u8, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+        UserState::initialize(&account, 8u8, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
 
@@ -587,7 +620,7 @@ mod test {
         let bump = Bump::new();
         let required_size = UserState::required_account_size(8u8, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+        UserState::initialize(&account, 8u8, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
         let mfr = mock_mfr();
@@ -664,7 +697,7 @@ mod test {
         let bump = Bump::new();
         let required_size = UserState::required_account_size(8u8, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+        UserState::initialize(&account, 8u8, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
         let mfr = mock_mfr();
@@ -707,7 +740,7 @@ mod test {
         let bump = Bump::new();
         let required_size = UserState::required_account_size(8u8, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+        UserState::initialize(&account, 8u8, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
         let mfr = mock_mfr();
@@ -750,7 +783,7 @@ mod test {
         let bump = Bump::new();
         let required_size = UserState::required_account_size(8u8, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+        UserState::initialize(&account, 8u8, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
         let mfr = mock_mfr();
@@ -796,7 +829,7 @@ mod test {
         let bump = Bump::new();
         let required_size = UserState::required_account_size(8u8, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, 8u8, 8u8).assert_ok();
+        UserState::initialize(&account, 8u8, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
         let mfr = mock_mfr();
@@ -843,7 +876,7 @@ mod test {
         let max_order_count = 8u8;
         let required_size = UserState::required_account_size(max_order_count, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+        UserState::initialize(&account, max_order_count, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
         for i in 0..max_order_count {
@@ -879,7 +912,7 @@ mod test {
         let max_order_count = 8u8;
         let required_size = UserState::required_account_size(max_order_count, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+        UserState::initialize(&account, max_order_count, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
 
@@ -922,7 +955,7 @@ mod test {
         let max_order_count = 8u8;
         let required_size = UserState::required_account_size(max_order_count, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+        UserState::initialize(&account, max_order_count, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
 
@@ -957,7 +990,7 @@ mod test {
         let max_order_count = 8u8;
         let required_size = UserState::required_account_size(max_order_count, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+        UserState::initialize(&account, max_order_count, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
 
@@ -988,7 +1021,7 @@ mod test {
         let max_order_count = 8u8;
         let required_size = UserState::required_account_size(max_order_count, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+        UserState::initialize(&account, max_order_count, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
         us.borrow_mut()
@@ -1027,7 +1060,7 @@ mod test {
         let max_order_count = 8u8;
         let required_size = UserState::required_account_size(max_order_count, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+        UserState::initialize(&account, max_order_count, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
         us.borrow_mut()
@@ -1074,7 +1107,7 @@ mod test {
         let max_order_count = 8u8;
         let required_size = UserState::required_account_size(max_order_count, 8u8);
         let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, max_order_count, 8u8).assert_ok();
+        UserState::initialize(&account, max_order_count, 8u8, Pubkey::default()).assert_ok();
 
         let us = UserState::mount(&account, true).assert_unwrap();
 

@@ -123,7 +123,7 @@ pub enum DexError {
     FoundNoPosition,
 
     #[msg("Need no liquidation")]
-    NeedNoLiquidation,
+    RequireNoLiquidation,
 
     #[msg("Invalid vlp mint")]
     InvalidVlpMint,
