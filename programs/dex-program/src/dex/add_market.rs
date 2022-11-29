@@ -96,13 +96,14 @@ pub fn handler(
         open_fee_rate,
         close_fee_rate,
         liquidate_fee_rate,
+        liquidate_threshold: 10,
         valid: true,
         decimals,
         oracle_source,
         asset_index,
         significant_decimals,
         order_pool_remaining_pages_number: 0,
-        padding: [0; 252],
+        padding: [0; 250],
     };
 
     dex.markets[market_index] = market;

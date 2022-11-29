@@ -272,13 +272,18 @@ impl<'a> UserState<'a> {
                 .data
                 .close(u64::MAX, market_price, long, mfr, true)?;
 
+        println!("pnl...{} {}", pnl, collateral);
         if pnl < 0 {
             let loss = (pnl.abs() as u64) + close_fee + borrow_fee;
-            if loss < collateral.safe_mul(10u64)?.safe_div(100u128)? as u64 {
+            if loss
+                >= collateral
+                    .safe_mul((100 - mfr.liquidate_threshold) as u64)?
+                    .safe_div(100u128)? as u64
+            {
                 return Ok(());
             }
         }
-        return Err(error!(DexError::RequireNoLiquidation));
+        Err(error!(DexError::RequireNoLiquidation))
     }
 
     #[inline]
@@ -538,6 +543,7 @@ mod test {
             open_fee_rate: 20,
             close_fee_rate: 20,
             liquidate_fee_rate: 50,
+            liquidate_threshold: 10,
             base_decimals: 9,
         }
     }
@@ -1143,5 +1149,29 @@ mod test {
         us.borrow_mut()
             .close_position(0, size / 2, usdc(19500.), false, &mfr, false)
             .assert_ok();
+    }
+
+    #[test]
+    fn test_require_liquidate() {
+        let bump = Bump::new();
+        let max_order_count = 8u8;
+        let required_size = UserState::required_account_size(max_order_count, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, max_order_count, 8u8, Pubkey::default()).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+
+        // Mock position
+        let mfr = mock_mfr();
+        us.borrow_mut()
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .assert_ok();
+
+        us.borrow()
+            .require_liquidate(0, false, usdc(22000.), &mfr)
+            .assert_ok();
+        us.borrow()
+            .require_liquidate(0, false, usdc(15000.), &mfr)
+            .assert_err();
     }
 }

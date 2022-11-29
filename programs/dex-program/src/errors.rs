@@ -200,8 +200,8 @@ pub enum DexError {
     #[msg("Order slot mismatch")]
     OrderSlotMismatch,
 
-    #[msg("Close size too large")]
-    CloseSizeTooLarge,
+    #[msg("Zero close size")]
+    ZeroCloseSize,
 
     #[msg("AUM below zero")]
     AUMBelowZero,

@@ -567,13 +567,14 @@ pub struct MarketInfo {
     pub open_fee_rate: u16,
     pub close_fee_rate: u16,
     pub liquidate_fee_rate: u16,
+    pub liquidate_threshold: u16,
     pub valid: bool,
     pub decimals: u8,
     pub oracle_source: u8,
     pub asset_index: u8,
     pub significant_decimals: u8,
     pub order_pool_remaining_pages_number: u8,
-    pub padding: [u8; 252],
+    pub padding: [u8; 250],
 }
 
 pub struct MarketFeeRates {
@@ -583,6 +584,7 @@ pub struct MarketFeeRates {
     pub open_fee_rate: u16,
     pub close_fee_rate: u16,
     pub liquidate_fee_rate: u16,
+    pub liquidate_threshold: u16,
     pub base_decimals: u8,
 }
 
@@ -595,6 +597,7 @@ impl MarketInfo {
             open_fee_rate: self.open_fee_rate,
             close_fee_rate: self.close_fee_rate,
             liquidate_fee_rate: self.liquidate_fee_rate,
+            liquidate_threshold: self.liquidate_threshold,
             base_decimals: self.decimals,
         }
     }
@@ -745,13 +748,19 @@ impl Position {
         liquidate: bool,
     ) -> DexResult<(u64, u64, i64, u64, u64)> {
         let unclosing_size = self.size.safe_sub(self.closing_size)?;
-        require!(unclosing_size >= size, DexError::CloseSizeTooLarge);
+        let closing_size = if size > unclosing_size {
+            unclosing_size
+        } else {
+            size
+        };
 
-        let mut collateral_unlocked = size
+        require!(closing_size > 0, DexError::ZeroCloseSize);
+
+        let mut collateral_unlocked = closing_size
             .safe_mul(self.collateral)?
             .safe_div(self.size as u128)? as u64;
 
-        let mut fund_returned = size
+        let mut fund_returned = closing_size
             .safe_mul(self.borrowed_amount)?
             .safe_div(self.size as u128)? as u64;
 
@@ -777,20 +786,23 @@ impl Position {
             mfr.close_fee_rate
         } as u64;
         let close_fee = if self.long {
-            size.safe_mul(rate)?.safe_div(FEE_RATE_BASE)? as u64
+            closing_size.safe_mul(rate)?.safe_div(FEE_RATE_BASE)? as u64
         } else {
-            size.safe_mul(price)?
+            closing_size
+                .safe_mul(price)?
                 .safe_mul(rate as u128)?
                 .safe_div(10u64.pow(mfr.base_decimals as u32 + FEE_RATE_DECIMALS) as u128)?
                 as u64
         };
 
         let total_fee = borrow_fee.safe_add(close_fee)?;
-        let pnl = self.pnl(size, price, self.average_price, mfr.base_decimals)?;
+        let pnl = self.pnl(closing_size, price, self.average_price, mfr.base_decimals)?;
         let pnl_with_fee = pnl.i_safe_sub(total_fee as i64)?;
 
         // Update the position
-        self.size = unclosing_size.safe_sub(size)?.safe_add(self.closing_size)?;
+        self.size = unclosing_size
+            .safe_sub(closing_size)?
+            .safe_add(self.closing_size)?;
 
         self.borrowed_amount = self.borrowed_amount.safe_sub(fund_returned)?;
         self.collateral = self.collateral.safe_sub(collateral_unlocked)?;
