@@ -16,7 +16,7 @@ use pool::*;
 use position::*;
 use user::*;
 
-declare_id!("2aJZ6AufDU5NRzXLg5Ww4S4Nf2tx7xZDQD6he2gjsKyq");
+declare_id!("AzGjndwsJTbc1XRzPkmuFk11V88dNLMiQwGqkqkS1vBD");
 
 #[program]
 pub mod dex_program {
