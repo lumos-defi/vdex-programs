@@ -121,8 +121,11 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         dex.settle_pnl(market, long, collateral, borrow, pnl, close_fee, borrow_fee)?;
 
     // Should the position be liquidated?
-    let threshold = collateral.safe_mul(15u64)?.safe_div(100u128)? as u64;
-    if withdrawable > threshold {
+    if withdrawable
+        > collateral
+            .safe_mul(mfr.liquidate_threshold as u64)?
+            .safe_div(100u128)? as u64
+    {
         return Err(error!(DexError::RequireNoLiquidation));
     }
 
