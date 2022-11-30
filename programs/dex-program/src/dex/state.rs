@@ -58,11 +58,15 @@ impl Dex {
         })
     }
 
-    fn vlp_info(&self) -> DexResult<(u64, u8)> {
+    fn vlp_info(&self) -> DexResult<(u64, u8, u8)> {
         // If VLP is dummy token (not minted), then total supply can be read from vlp_pool.staked_total.
         // Otherwise should read the token's total supply
 
-        Ok((self.vlp_pool.staked_total, self.vlp_pool.decimals))
+        Ok((
+            self.vlp_pool.staked_total,
+            self.vlp_pool.decimals,
+            self.vlp_pool.reward_asset_index,
+        ))
     }
 
     pub fn market_asset(&mut self, market: u8, long: bool) -> DexResult<&mut AssetInfo> {
@@ -180,6 +184,7 @@ impl Dex {
         &mut self,
         index: u8,
         amount: u64,
+        reward_asset_debt: u64,
         oracles: &[AccountInfo],
     ) -> DexResult<(u64, u64)> {
         require!(amount > 0, DexError::InvalidAmount);
@@ -187,7 +192,18 @@ impl Dex {
         let aum = self.aum(oracles)?;
         require!(aum >= 0, DexError::AUMBelowZero);
 
-        let (vlp_supply, vlp_decimals) = self.vlp_info()?;
+        let (vlp_supply, vlp_decimals, reward_asset_index) = self.vlp_info()?;
+        if index == reward_asset_index {
+            // If adding reward asset, amount should be larger than reward asset debt.
+            require!(
+                reward_asset_debt < amount,
+                DexError::InsufficientRewardAsset
+            );
+        } else {
+            // If not adding reward asset, reward asset debt should be zero.
+            require!(reward_asset_debt == 0, DexError::InsufficientRewardAsset);
+        }
+
         let oracle_index = self.to_oracle_index(index)?;
 
         let ai = self.asset_as_mut(index)?;
@@ -197,7 +213,11 @@ impl Dex {
             .safe_div(FEE_RATE_BASE)? as u64;
 
         let added = amount.safe_sub(fee)?;
-        ai.liquidity_amount = ai.liquidity_amount.safe_add(added)?;
+        ai.liquidity_amount = ai
+            .liquidity_amount
+            .safe_add(added)?
+            .safe_sub(reward_asset_debt)
+            .map_err(|_| DexError::InsufficientRewardAsset)?;
         ai.fee_amount = ai.fee_amount.safe_add(fee)?;
 
         require!(
@@ -231,7 +251,7 @@ impl Dex {
         let aum = self.aum(oracles)?;
         require!(aum >= 0, DexError::AUMBelowZero);
 
-        let (vlp_supply, vlp_decimals) = self.vlp_info()?;
+        let (vlp_supply, vlp_decimals, _) = self.vlp_info()?;
         require!(vlp_supply > 0, DexError::VLPSupplyZero);
         let oracle_index = self.to_oracle_index(index)?;
 
@@ -421,7 +441,11 @@ impl Dex {
         Ok((out, fee))
     }
 
-    fn collect_fees(&mut self, reward_asset: usize, oracles: &[AccountInfo]) -> DexResult<u64> {
+    fn collect_fees(
+        &mut self,
+        reward_asset: usize,
+        oracles: &[AccountInfo],
+    ) -> DexResult<(u64, u64)> {
         let rai = self.asset_as_ref(reward_asset as u8)?;
         let reward_oracle_index = self.to_oracle_index(reward_asset as u8)?;
 
@@ -439,6 +463,7 @@ impl Dex {
             DexError::InvalidOracle
         );
 
+        let mut reward_asset_debt = 0u64;
         let mut oracle_offset = 0usize;
         for i in 0..self.assets_number as usize {
             let ai = self.asset_as_ref(i as u8)?;
@@ -476,28 +501,41 @@ impl Dex {
                 .safe_add(self.assets[i].fee_amount)?;
             self.assets[i].fee_amount = 0;
 
-            self.assets[reward_asset].liquidity_amount = self.assets[reward_asset]
-                .liquidity_amount
-                .safe_sub(collected)?;
+            // Update reward asset
             self.assets[reward_asset].fee_amount =
                 self.assets[reward_asset].fee_amount.safe_add(collected)?;
+
+            if self.assets[reward_asset].liquidity_amount >= collected {
+                self.assets[reward_asset].liquidity_amount = self.assets[reward_asset]
+                    .liquidity_amount
+                    .safe_sub(collected)?;
+            } else {
+                // If the reward asset liquidity is low, write down the debt
+                // The debt will be paid when adding reward asset liquidity afterwards
+                reward_asset_debt = reward_asset_debt
+                    .safe_add(collected.safe_sub(self.assets[reward_asset].liquidity_amount)?)?;
+                self.assets[reward_asset].liquidity_amount = 0;
+            }
 
             oracle_offset += 1;
         }
 
-        Ok(self.assets[reward_asset as usize].fee_amount)
+        Ok((
+            reward_asset_debt,
+            self.assets[reward_asset as usize].fee_amount,
+        ))
     }
 
-    pub fn collect_rewards(&mut self, oracles: &[AccountInfo]) -> DexResult {
+    pub fn collect_rewards(&mut self, oracles: &[AccountInfo]) -> DexResult<u64> {
         let index = self.vlp_pool.reward_asset_index;
         require!(
             index < self.assets_number && self.assets[index as usize].valid,
             DexError::InvalidRewardAsset
         );
 
-        let rewards = self.collect_fees(index as usize, oracles)?;
+        let (debt, rewards) = self.collect_fees(index as usize, oracles)?;
         if rewards == 0 {
-            return Ok(());
+            return Ok(debt);
         }
 
         self.vlp_pool.add_reward(rewards)?;
@@ -505,7 +543,7 @@ impl Dex {
         let ai = self.asset_as_mut(index)?;
         ai.fee_amount = 0;
 
-        Ok(())
+        Ok(debt)
     }
 
     pub fn swap_in(&mut self, index: u8, amount: u64, fee: u64) -> DexResult {
@@ -2014,7 +2052,9 @@ mod test {
         let oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle, btc_oracle2];
 
         // Add 1000 SOL, add liquidity fee rate = 0.1%
-        let (vlp_amount, fee) = dex.add_liquidity(3, sol(1000.), &oracles).assert_unwrap();
+        let (vlp_amount, fee) = dex
+            .add_liquidity(3, sol(1000.), 0, &oracles)
+            .assert_unwrap();
 
         // vlp_amount = 19980_00000000
         assert_eq!(vlp_amount, vlp((1000.0 - 1.0) * 20.0));
@@ -2023,7 +2063,9 @@ mod test {
         dex.vlp_pool.increase_staking(vlp_amount).assert_ok();
 
         // Add another 1000 SOL
-        let (vlp_amount, fee) = dex.add_liquidity(3, sol(1000.), &oracles).assert_unwrap();
+        let (vlp_amount, fee) = dex
+            .add_liquidity(3, sol(1000.), 0, &oracles)
+            .assert_unwrap();
 
         // vlp_amount = 19980_00000000
         assert_eq!(vlp_amount, vlp((1000.0 - 1.0) * 20.0));
@@ -2049,13 +2091,15 @@ mod test {
         );
 
         // Add 1 BTC
-        let (vlp_amount, fee) = dex.add_liquidity(1, btc(1.), &oracles).assert_unwrap();
+        let (vlp_amount, fee) = dex.add_liquidity(1, btc(1.), 0, &oracles).assert_unwrap();
         assert_eq!(vlp_amount, vlp((1.0 - 0.001) * 20000.0));
         assert_eq!(fee, btc(0.001));
         dex.vlp_pool.increase_staking(vlp_amount).assert_ok();
 
         // Add 10000 usdc
-        let (vlp_amount, fee) = dex.add_liquidity(2, usdc(10000.), &oracles).assert_unwrap();
+        let (vlp_amount, fee) = dex
+            .add_liquidity(2, usdc(10000.), 0, &oracles)
+            .assert_unwrap();
         assert_eq!(vlp_amount, vlp((10000.0 - 10.) * 1.0));
         assert_eq!(fee, usdc(10.));
         dex.vlp_pool.increase_staking(vlp_amount).assert_ok();
