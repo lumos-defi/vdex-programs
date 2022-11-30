@@ -139,6 +139,7 @@ pub async fn create_token_account(
     account: &Keypair,
     mint: &Pubkey,
     manager: &Pubkey,
+    extra_lamports: u64,
 ) -> Result<(), TransportError> {
     let rent = context.banks_client.get_rent().await.unwrap();
     let account_rent = rent.minimum_balance(spl_token::state::Account::LEN);
@@ -148,7 +149,7 @@ pub async fn create_token_account(
             system_instruction::create_account(
                 &payer.pubkey(),
                 &account.pubkey(),
-                account_rent,
+                account_rent + extra_lamports,
                 spl_token::state::Account::LEN as u64,
                 &spl_token::id(),
             ),

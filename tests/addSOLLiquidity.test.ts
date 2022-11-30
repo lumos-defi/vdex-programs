@@ -34,13 +34,11 @@ describe('Test Add Liquidity', () => {
   })
 
   it('should add SOL succeed', async () => {
-    let aliceBalance = await program.provider.connection.getBalance(alice.publicKey)
-    console.log(aliceBalance)
-    const [aliceWSOLAcc, accountLamports] = await createWSOLAccount(alice, DEPOSIT_AMOUNT)
+    // let aliceBalance = await program.provider.connection.getBalance(alice.publicKey)
+    const [aliceWSOLAcc, _] = await createWSOLAccount(alice, DEPOSIT_AMOUNT)
 
-    aliceBalance = await program.provider.connection.getBalance(alice.publicKey)
-    console.log(aliceBalance)
-    expect(aliceBalance).toBeLessThan(MINT_AMOUNT - DEPOSIT_AMOUNT - accountLamports)
+    // aliceBalance = await program.provider.connection.getBalance(alice.publicKey)
+    // expect(aliceBalance).toBeLessThan(MINT_AMOUNT - DEPOSIT_AMOUNT - accountLamports)
 
     await program.methods
       .addLiquidity(new BN(DEPOSIT_AMOUNT))

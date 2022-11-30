@@ -10,7 +10,7 @@ use safe_transmute::to_bytes::{transmute_to_bytes, transmute_to_bytes_mut};
 use super::LEVERAGE_DECIMALS;
 
 pub const USDC_DECIMALS: u8 = 6;
-pub const SOL_DECIMALS: u8 = 6;
+pub const SOL_DECIMALS: u8 = 9;
 pub const BTC_DECIMALS: u8 = 9;
 pub const ETH_DECIMALS: u8 = 9;
 
