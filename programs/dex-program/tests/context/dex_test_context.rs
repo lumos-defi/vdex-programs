@@ -73,7 +73,6 @@ impl DexTestContext {
 
         let dex = Keypair::new();
         let usdc_mint = Keypair::new();
-        let sol_mint = Keypair::new();
 
         //oracle
         let usdc_mock_oracle = Keypair::new();
@@ -88,7 +87,6 @@ impl DexTestContext {
             &admin,
             &dex,
             &usdc_mint,
-            &sol_mint,
         )
         .await;
 
@@ -211,7 +209,7 @@ impl DexTestContext {
                 &program,
                 &admin,
                 &dex,
-                &sol_mint,
+                &Keypair::new(),
                 symbol,
                 decimals,
                 convert_to_big_number(oracle_price.into(), oracle_expo),
@@ -334,7 +332,6 @@ impl DexTestContext {
             user.mint_usdc(INIT_WALLET_USDC_ASSET_AMOUNT).await;
             user.mint_btc(INIT_WALLET_BTC_ASSET_AMOUNT).await;
             user.mint_eth(INIT_WALLET_ETH_ASSET_AMOUNT).await;
-            user.mint_sol(INIT_WALLET_SOL_ASSET_AMOUNT).await;
 
             users.push(user);
         }
@@ -349,11 +346,11 @@ impl DexTestContext {
         }
 
         DexTestContext {
-            context: context,
+            context,
             program,
             admin,
             dex: dex.pubkey(),
-            dex_info: dex_info,
+            dex_info,
             user_context: users,
         }
     }
@@ -447,16 +444,21 @@ pub async fn add_asset(
     .unwrap();
 
     println!("init mock oralce {}", mock_oracle.pubkey());
-    //create mint
-    create_mint(context, payer, &mint, decimals, &payer.pubkey())
-        .await
-        .unwrap();
+    let mint_pubkey = if symbol == "SOL" {
+        spl_token::native_mint::id()
+    } else {
+        //create mint
+        create_mint(context, payer, &mint, decimals, &payer.pubkey())
+            .await
+            .unwrap();
+        mint.pubkey()
+    };
 
-    println!("symbol: {}, mint account:{:?}", symbol, &mint.pubkey());
+    println!("symbol: {}, mint account:{:?}", symbol, &mint_pubkey);
 
     //get program signer
     let (program_signer, nonce) = Pubkey::find_program_address(
-        &[&mint.pubkey().to_bytes(), &dex.pubkey().to_bytes()],
+        &[&mint_pubkey.to_bytes(), &dex.pubkey().to_bytes()],
         &program.id(),
     );
 
@@ -467,8 +469,9 @@ pub async fn add_asset(
         context,
         payer,
         &asset_vault,
-        &mint.pubkey(),
+        &mint_pubkey,
         &program_signer,
+        0,
     )
     .await
     .unwrap();
@@ -480,7 +483,7 @@ pub async fn add_asset(
         program,
         payer,
         dex,
-        &mint.pubkey(),
+        &mint_pubkey,
         &asset_vault.pubkey(),
         &program_signer,
         symbol.to_string(),
@@ -515,12 +518,11 @@ pub async fn init_dex(
     payer: &Keypair,
     dex: &Keypair,
     usdc_mint: &Keypair,
-    sol_mint: &Keypair,
 ) {
     let event_queue = Keypair::new();
     let match_queue = Keypair::new();
     let user_list_entry_page = Keypair::new();
-    let reward_mint = sol_mint;
+    let reward_mint = spl_token::native_mint::id();
 
     let vlp_decimals = TEST_VLP_DECIMALS;
 

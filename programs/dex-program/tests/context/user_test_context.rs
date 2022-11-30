@@ -260,6 +260,11 @@ impl UserTestContext {
     }
 
     async fn mint_asset(&self, mint: &Pubkey, mint_authority: &Keypair, amount: u64) {
+        if *mint == spl_token::native_mint::id() {
+            transfer(&mut self.context.borrow_mut(), &self.user.pubkey(), amount).await;
+            return;
+        }
+
         let user_mint_acc = get_associated_token_address(&self.user.pubkey(), &mint);
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
@@ -380,9 +385,8 @@ impl UserTestContext {
             .await;
     }
 
-    pub async fn assert_sol_amount(&self, user_asset_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_asset_acc, DexAsset::SOL as usize, amount)
-            .await;
+    pub async fn balance(&self) -> u64 {
+        self.get_account(self.user.pubkey()).await.lamports
     }
 
     pub async fn assert_asset_amount(&self, user_asset_acc: &Pubkey, asset: usize, amount: f64) {

@@ -27,7 +27,7 @@ pub async fn compose_init_dex_ixs(
     event_queue: &Keypair,
     match_queue: &Keypair,
     user_list_entry_page: &Keypair,
-    reward_mint: &Keypair,
+    reward_mint: &Pubkey,
     vlp_decimals: u8,
 ) -> Vec<Instruction> {
     let rent = context.banks_client.get_rent().await.unwrap();
@@ -73,7 +73,7 @@ pub async fn compose_init_dex_ixs(
             event_queue: event_queue.pubkey(),
             match_queue: match_queue.pubkey(),
             user_list_entry_page: user_list_entry_page.pubkey(),
-            reward_mint: reward_mint.pubkey(),
+            reward_mint: *reward_mint,
         })
         .args(dex_program::instruction::InitDex { vlp_decimals })
         .instructions()

@@ -87,23 +87,21 @@ describe('Test Add Liquidity', () => {
     }).rejects.toThrow()
 
     const [aliceWSOLAcc, _] = await createWSOLAccount(alice, SOL_DEPOSIT_AMOUNT)
-    await expect(async () => {
-      await program.methods
-        .addLiquidity(new BN(SOL_DEPOSIT_AMOUNT))
-        .accounts({
-          dex: dex.publicKey,
-          mint: TokenInstructions.WRAPPED_SOL_MINT,
-          vault: solVault,
-          userMintAcc: aliceWSOLAcc,
-          userState,
-          eventQueue: eventQueue.publicKey,
-          authority: alice.publicKey,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        })
-        .remainingAccounts(oracleAccounts)
-        .signers([alice])
-        .rpc()
-    }).rejects.toThrow()
+    await program.methods
+      .addLiquidity(new BN(SOL_DEPOSIT_AMOUNT))
+      .accounts({
+        dex: dex.publicKey,
+        mint: TokenInstructions.WRAPPED_SOL_MINT,
+        vault: solVault,
+        userMintAcc: aliceWSOLAcc,
+        userState,
+        eventQueue: eventQueue.publicKey,
+        authority: alice.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .remainingAccounts(oracleAccounts)
+      .signers([alice])
+      .rpc()
   })
 
   it('should add liquidity succeed, if SOL is added first', async () => {
