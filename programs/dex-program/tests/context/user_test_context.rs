@@ -483,18 +483,21 @@ impl UserTestContext {
         .unwrap();
     }
 
-    pub async fn assert_usdc_balance(&self, user_asset_acc: &Pubkey, amount: f64) {
-        self.assert_mint_balance(user_asset_acc, DexAsset::USDC as usize, amount)
+    pub async fn assert_usdc_balance(&self, amount: f64) {
+        let user_asset_acc = self.get_user_usdc_token_pubkey().await;
+        self.assert_mint_balance(&user_asset_acc, DexAsset::USDC as usize, amount)
             .await;
     }
 
-    pub async fn assert_btc_balance(&self, user_asset_acc: &Pubkey, amount: f64) {
-        self.assert_mint_balance(user_asset_acc, DexAsset::BTC as usize, amount)
+    pub async fn assert_btc_balance(&self, amount: f64) {
+        let user_asset_acc = self.get_user_btc_token_pubkey().await;
+        self.assert_mint_balance(&user_asset_acc, DexAsset::BTC as usize, amount)
             .await;
     }
 
-    pub async fn assert_eth_balance(&self, user_asset_acc: &Pubkey, amount: f64) {
-        self.assert_mint_balance(user_asset_acc, DexAsset::ETH as usize, amount)
+    pub async fn assert_eth_balance(&self, amount: f64) {
+        let user_asset_acc = self.get_user_eth_token_pubkey().await;
+        self.assert_mint_balance(&user_asset_acc, DexAsset::ETH as usize, amount)
             .await;
     }
 
@@ -570,9 +573,9 @@ impl UserTestContext {
         user_mint_acc
     }
 
-    pub async fn assert_vlp_total(&mut self, amount: f64) {
-        self.refresh_dex_info().await;
-        let staked_total = self.dex_info.borrow().vlp_pool.staked_total;
+    pub async fn assert_vlp_total(&self, amount: f64) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let staked_total = di.borrow().vlp_pool.staked_total;
 
         assert_eq!(
             staked_total,
