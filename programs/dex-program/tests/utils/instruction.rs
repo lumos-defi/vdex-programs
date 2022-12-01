@@ -9,8 +9,8 @@ use anchor_client::{
 use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
     accounts::{
-        AddAsset, AddLiquidity, AddMarket, CreateUserState, FeedMockOraclePrice, InitDex,
-        InitMockOracle, RemoveLiquidity,
+        AddAsset, AddLiquidity, AddMarket, ClosePosition, CreateUserState, FeedMockOraclePrice,
+        InitDex, InitMockOracle, OpenPosition, RemoveLiquidity,
     },
     dex::Dex,
 };
@@ -333,4 +333,96 @@ pub async fn compose_remove_liquidity_ix(
         .unwrap();
 
     remove_liquidity_ix
+}
+
+pub async fn compose_open_market_position_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    in_mint: &Pubkey,
+    in_mint_oracle: &Pubkey,
+    in_mint_vault: &Pubkey,
+    market_mint: &Pubkey,
+    market_mint_oracle: &Pubkey,
+    market_mint_vault: &Pubkey,
+    market_oracle: &Pubkey,
+    user_mint_acc: &Pubkey,
+    user_state: &Pubkey,
+    event_queue: &Pubkey,
+    user_list_entry_page: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    market: u8,
+    long: bool,
+    amount: u64,
+    leverage: u32,
+) -> Instruction {
+    program
+        .request()
+        .accounts(OpenPosition {
+            dex: *dex,
+            in_mint: *in_mint,
+            in_mint_oracle: *in_mint_oracle,
+            in_mint_vault: *in_mint_vault,
+            market_mint: *market_mint,
+            market_mint_oracle: *market_mint_oracle,
+            market_mint_vault: *market_mint_vault,
+            market_oracle: *market_oracle,
+            user_mint_acc: *user_mint_acc,
+            user_state: *user_state,
+            authority: payer.pubkey(),
+            event_queue: *event_queue,
+            user_list_entry_page: *user_list_entry_page,
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::OpenPosition {
+            market,
+            long,
+            amount,
+            leverage,
+        })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_close_market_position_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    mint: &Pubkey,
+    oracle: &Pubkey,
+    vault: &Pubkey,
+    program_signer: &Pubkey,
+    user_mint_acc: &Pubkey,
+    user_state: &Pubkey,
+    event_queue: &Pubkey,
+    user_list_entry_page: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    market: u8,
+    long: bool,
+    size: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(ClosePosition {
+            dex: *dex,
+            mint: *mint,
+            oracle: *oracle,
+            vault: *vault,
+            program_signer: *program_signer,
+            user_mint_acc: *user_mint_acc,
+            user_state: *user_state,
+            authority: payer.pubkey(),
+            event_queue: *event_queue,
+            user_list_entry_page: *user_list_entry_page,
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::ClosePosition { market, long, size })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
 }
