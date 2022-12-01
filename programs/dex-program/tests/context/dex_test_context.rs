@@ -3,8 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::utils::{
     compose_add_asset_ix, compose_add_market_ixs, compose_init_dex_ixs,
     constant::{
-        INIT_WALLET_BTC_ASSET_AMOUNT, INIT_WALLET_ETH_ASSET_AMOUNT, INIT_WALLET_SOL_ASSET_AMOUNT,
-        INIT_WALLET_USDC_ASSET_AMOUNT, TEST_BTC_ADD_LIQUIDITY_FEE_RATE, TEST_BTC_ASSET_INDEX,
+        INIT_ADD_SOL_AMOUNT, TEST_BTC_ADD_LIQUIDITY_FEE_RATE, TEST_BTC_ASSET_INDEX,
         TEST_BTC_BORROW_FEE_RATE, TEST_BTC_CHARGE_BORROW_FEE_INTERVAL, TEST_BTC_CLOSE_FEE_RATE,
         TEST_BTC_DECIMALS, TEST_BTC_LIQUIDITY_FEE_RATE, TEST_BTC_MARKET_DECIMALS,
         TEST_BTC_MARKET_SYMBOL, TEST_BTC_MINIMUM_POSITION_VALUE, TEST_BTC_OPEN_FEE_RATE,
@@ -328,20 +327,13 @@ impl DexTestContext {
         let mut users: Vec<UserTestContext> = vec![];
         for _ in 0..5 {
             let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
-            //mint to user
-            user.mint_usdc(INIT_WALLET_USDC_ASSET_AMOUNT).await;
-            user.mint_btc(INIT_WALLET_BTC_ASSET_AMOUNT).await;
-            user.mint_eth(INIT_WALLET_ETH_ASSET_AMOUNT).await;
-
             users.push(user);
         }
 
         //init reward asset
         {
             let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
-            user.mint_sol(INIT_WALLET_SOL_ASSET_AMOUNT).await;
-            user.add_liquidity_with_sol(INIT_WALLET_SOL_ASSET_AMOUNT)
-                .await;
+            user.add_liquidity_with_sol(INIT_ADD_SOL_AMOUNT).await;
             users.push(user);
         }
 

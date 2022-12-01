@@ -304,18 +304,22 @@ impl UserTestContext {
     }
 
     pub async fn add_liquidity_with_usdc(&self, amount: f64) {
+        self.mint_usdc(amount).await;
         self.add_liquidity(DexAsset::USDC as u8, amount).await;
     }
 
     pub async fn add_liquidity_with_btc(&self, amount: f64) {
+        self.mint_btc(amount).await;
         self.add_liquidity(DexAsset::BTC as u8, amount).await;
     }
 
     pub async fn add_liquidity_with_eth(&self, amount: f64) {
+        self.mint_eth(amount).await;
         self.add_liquidity(DexAsset::ETH as u8, amount).await;
     }
 
     pub async fn add_liquidity_with_sol(&self, amount: f64) {
+        self.mint_sol(amount).await;
         self.add_liquidity(DexAsset::SOL as u8, amount).await;
     }
 

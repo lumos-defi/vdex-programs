@@ -7,7 +7,9 @@ use anchor_client::solana_sdk::account::ReadableAccount;
 use solana_program_test::tokio;
 
 use context::DexTestContext;
-use utils::convert_to_big_number;
+use utils::{
+    add_fee, convert_to_big_number, minus_add_fee, DexAsset, DexMarket, INIT_ADD_SOL_AMOUNT,
+};
 
 #[tokio::test]
 async fn test_init_context() {
@@ -19,6 +21,34 @@ async fn test_init_context() {
         assert!(dtc.dex_info.borrow().assets[2].symbol == *b"ETH\0\0\0\0\0\0\0\0\0\0\0\0\0");
         assert!(dtc.dex_info.borrow().assets[3].symbol == *b"SOL\0\0\0\0\0\0\0\0\0\0\0\0\0");
     }
+
+    let user = &dtc.user_context[0];
+
+    user.assert_liquidity(DexAsset::BTC, 0.0).await;
+    user.assert_liquidity(DexAsset::ETH, 0.0).await;
+    user.assert_liquidity(DexAsset::USDC, 0.0).await;
+    user.assert_liquidity(DexAsset::SOL, minus_add_fee(INIT_ADD_SOL_AMOUNT))
+        .await;
+
+    user.assert_borrow(DexAsset::BTC, 0.0).await;
+    user.assert_borrow(DexAsset::ETH, 0.0).await;
+    user.assert_borrow(DexAsset::USDC, 0.0).await;
+
+    user.assert_fee(DexAsset::BTC, 0.0).await;
+    user.assert_fee(DexAsset::ETH, 0.0).await;
+    user.assert_fee(DexAsset::USDC, 0.0).await;
+    user.assert_fee(DexAsset::SOL, add_fee(INIT_ADD_SOL_AMOUNT))
+        .await;
+
+    user.assert_collateral(DexAsset::BTC, 0.0).await;
+    user.assert_collateral(DexAsset::ETH, 0.0).await;
+    user.assert_collateral(DexAsset::USDC, 0.0).await;
+
+    user.assert_global_long(DexMarket::BTC, 0.0, 0.0).await;
+    user.assert_global_short(DexMarket::BTC, 0.0, 0.0).await;
+
+    user.assert_global_long(DexMarket::ETH, 0.0, 0.0).await;
+    user.assert_global_short(DexMarket::ETH, 0.0, 0.0).await;
 }
 
 #[tokio::test]
