@@ -5,6 +5,10 @@ const ADD_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
 const REMOVE_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
 const SWAP_FEE_RATE: u16 = 10;
 
+const OPEN_FEE_RATE: u16 = 30; // 0.3% (30 / 10000)
+const CLOSE_FEE_RATE: u16 = 50; // 0.5%   (50 /  10000)
+const LIQUIDATE_FEE_RATE: u16 = 80; // 0.8%   (80 /  10000)
+
 //USDC ASSET
 pub const TEST_USDC_SYMBOL: &str = "USDC";
 pub const TEST_USDC_DECIMALS: u8 = 6;
@@ -57,9 +61,9 @@ pub const TEST_SOL_TARGET_WEIGHT: u16 = 200; //1-1000 //20%
 pub const TEST_BTC_MARKET_SYMBOL: &str = "BTC";
 pub const TEST_BTC_MINIMUM_POSITION_VALUE: u64 = 10_000;
 pub const TEST_BTC_CHARGE_BORROW_FEE_INTERVAL: u64 = 3600;
-pub const TEST_BTC_OPEN_FEE_RATE: u16 = 30; // 0.3% (30 / 10000)
-pub const TEST_BTC_CLOSE_FEE_RATE: u16 = 50; // 0.5%   (50 /  10000)
-pub const TEST_BTC_LIQUIDITY_FEE_RATE: u16 = 80; // 0.8%   (80 /  10000)
+pub const TEST_BTC_OPEN_FEE_RATE: u16 = OPEN_FEE_RATE; // 0.3% (30 / 10000)
+pub const TEST_BTC_CLOSE_FEE_RATE: u16 = CLOSE_FEE_RATE; // 0.5%   (50 /  10000)
+pub const TEST_BTC_LIQUIDATE_FEE_RATE: u16 = LIQUIDATE_FEE_RATE; // 0.8%   (80 /  10000)
 pub const TEST_BTC_MARKET_DECIMALS: u8 = 9;
 pub const TEST_BTC_ORACLE_SOURCE: u8 = 0; // 0: mock,1: pyth
 pub const TEST_BTC_ASSET_INDEX: u8 = 1; // 0:usdc, 1:btc, 2:eth, 3:sol
@@ -69,9 +73,9 @@ pub const TEST_BTC_SIGNIFICANT_DECIMALS: u8 = 2;
 pub const TEST_ETH_MARKET_SYMBOL: &str = "ETH";
 pub const TEST_ETH_MINIMUM_POSITION_VALUE: u64 = 10_000;
 pub const TEST_ETH_CHARGE_BORROW_FEE_INTERVAL: u64 = 3600;
-pub const TEST_ETH_OPEN_FEE_RATE: u16 = 30; // 0.3% (30 / 10000)
-pub const TEST_ETH_CLOSE_FEE_RATE: u16 = 50; // 0.5%   (50 /  10000)
-pub const TEST_ETH_LIQUIDITY_FEE_RATE: u16 = 80; // 0.8%   (80 /  10000)
+pub const TEST_ETH_OPEN_FEE_RATE: u16 = OPEN_FEE_RATE; // 0.3% (30 / 10000)
+pub const TEST_ETH_CLOSE_FEE_RATE: u16 = CLOSE_FEE_RATE; // 0.5%   (50 /  10000)
+pub const TEST_ETH_LIQUIDATE_FEE_RATE: u16 = LIQUIDATE_FEE_RATE; // 0.8%   (80 /  10000)
 pub const TEST_ETH_MARKET_DECIMALS: u8 = 9;
 pub const TEST_ETH_ORACLE_SOURCE: u8 = 0; // 0: mock,1: pyth
 pub const TEST_ETH_ASSET_INDEX: u8 = 2; // 0:usdc, 1:btc, 2:eth, 3:sol
@@ -81,9 +85,9 @@ pub const TEST_ETH_SIGNIFICANT_DECIMALS: u8 = 2;
 pub const TEST_SOL_MARKET_SYMBOL: &str = "SOL";
 pub const TEST_SOL_MINIMUM_POSITION_VALUE: u64 = 10_000;
 pub const TEST_SOL_CHARGE_BORROW_FEE_INTERVAL: u64 = 3600;
-pub const TEST_SOL_OPEN_FEE_RATE: u16 = 30; // 0.3% (30 / 10000)
-pub const TEST_SOL_CLOSE_FEE_RATE: u16 = 50; // 0.5%   (50 /  10000)
-pub const TEST_SOL_LIQUIDITY_FEE_RATE: u16 = 80; // 0.8%   (80 /  10000)
+pub const TEST_SOL_OPEN_FEE_RATE: u16 = OPEN_FEE_RATE; // 0.3% (30 / 10000)
+pub const TEST_SOL_CLOSE_FEE_RATE: u16 = CLOSE_FEE_RATE; // 0.5%   (50 /  10000)
+pub const TEST_SOL_LIQUIDATE_FEE_RATE: u16 = LIQUIDATE_FEE_RATE; // 0.8%   (80 /  10000)
 pub const TEST_SOL_MARKET_DECIMALS: u8 = 9;
 pub const TEST_SOL_ORACLE_SOURCE: u8 = 0; // 0: mock,1: pyth
 pub const TEST_SOL_ASSET_INDEX: u8 = 3; // 0:usdc, 1:btc, 2:eth, 3:sol
@@ -103,6 +107,18 @@ pub fn minus_add_fee(a: f64) -> f64 {
 
 pub fn minus_remove_fee(a: f64) -> f64 {
     a - remove_fee(a)
+}
+
+pub fn open_fee(a: f64) -> f64 {
+    a * OPEN_FEE_RATE as f64 / 10000.0
+}
+
+pub fn close_fee(a: f64) -> f64 {
+    a * CLOSE_FEE_RATE as f64 / 10000.0
+}
+
+pub fn minus_open_fee(a: f64) -> f64 {
+    a - open_fee(a)
 }
 
 // Add SOL when creating dex

@@ -16,6 +16,7 @@ use anchor_client::{
 use anchor_lang::prelude::{AccountInfo, AccountMeta, Pubkey};
 
 use crate::utils::constant::TEST_VLP_DECIMALS;
+use crate::utils::TestResult;
 use dex_program::{
     dex::{Dex, MockOracle},
     user::UserState,
@@ -345,13 +346,19 @@ impl UserTestContext {
         .unwrap();
     }
 
-    async fn open(&self, in_asset: u8, market: u8, long: bool, amount: f64, leverage: u32) {
+    pub async fn open(
+        &self,
+        in_asset: DexAsset,
+        market: DexMarket,
+        long: bool,
+        amount: f64,
+        leverage: u32,
+    ) {
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
         let ai = self.dex_info.borrow().assets[in_asset as usize];
         let open_amount = convert_to_big_number(amount, ai.decimals);
 
-        assert!(market < di.markets_number);
         let mi = di.markets[market as usize];
 
         let in_mint = ai.mint;
@@ -390,7 +397,7 @@ impl UserTestContext {
             &di.event_queue,
             &di.user_list_entry_page,
             remaining_accounts,
-            market,
+            market as u8,
             long,
             open_amount,
             leverage,
@@ -399,11 +406,10 @@ impl UserTestContext {
         .unwrap();
     }
 
-    async fn close(&self, market: u8, long: bool, size: f64) {
+    pub async fn close(&self, market: DexMarket, long: bool, size: f64) {
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
-        assert!(market < di.markets_number);
         let mi = di.markets[market as usize];
         let close_size = convert_to_big_number(size, mi.decimals);
 
@@ -435,7 +441,7 @@ impl UserTestContext {
             &di.event_queue,
             &di.user_list_entry_page,
             remaining_accounts,
-            market,
+            market as u8,
             long,
             close_size,
         )
@@ -629,5 +635,56 @@ impl UserTestContext {
 
         assert_eq!(expect_price, mi.global_short.average_price);
         assert_eq!(expect_size, mi.global_short.size);
+    }
+
+    pub async fn assert_position(
+        &self,
+        market: DexMarket,
+        long: bool,
+        price: f64,
+        size: f64,
+        collateral: f64,
+        borrow: f64,
+        closing_size: f64,
+    ) {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let mi = di.borrow().markets[market as usize];
+
+        let position = ref_us
+            .find_or_new_position(market as u8, false)
+            .assert_unwrap();
+
+        let decimals = if long {
+            mi.decimals
+        } else {
+            TEST_USDC_DECIMALS
+        };
+
+        let expect_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
+        let expect_size = convert_to_big_number(size, decimals);
+        let expect_collateral = convert_to_big_number(collateral, decimals);
+        let expect_borrow = convert_to_big_number(borrow, decimals);
+        let expect_closing_size = convert_to_big_number(closing_size, decimals);
+
+        if long {
+            assert_eq!(expect_price, position.data.long.average_price);
+            assert_eq!(expect_size, position.data.long.size);
+            assert_eq!(expect_collateral, position.data.long.collateral);
+            assert_eq!(expect_borrow, position.data.long.borrowed_amount);
+            assert_eq!(expect_closing_size, position.data.long.closing_size);
+        } else {
+            assert_eq!(expect_price, position.data.short.average_price);
+            assert_eq!(expect_size, position.data.short.size);
+            assert_eq!(expect_collateral, position.data.short.collateral);
+            assert_eq!(expect_borrow, position.data.short.borrowed_amount);
+            assert_eq!(expect_closing_size, position.data.short.closing_size);
+        }
     }
 }
