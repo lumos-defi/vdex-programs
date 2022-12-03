@@ -3,6 +3,7 @@
 .DS_Store
 target
 **/target
+!target/deploy/dex_program.so
 **/*.rs.bk
 node_modules
 *.log

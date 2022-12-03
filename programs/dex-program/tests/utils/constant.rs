@@ -101,12 +101,20 @@ pub fn remove_fee(a: f64) -> f64 {
     a * REMOVE_LIQUIDITY_FEE_RATE as f64 / 10000.0
 }
 
+pub fn swap_fee(a: f64) -> f64 {
+    a * SWAP_FEE_RATE as f64 / 10000.0
+}
+
 pub fn minus_add_fee(a: f64) -> f64 {
     a - add_fee(a)
 }
 
 pub fn minus_remove_fee(a: f64) -> f64 {
     a - remove_fee(a)
+}
+
+pub fn minus_swap_fee(a: f64) -> f64 {
+    a - swap_fee(a)
 }
 
 pub fn open_fee(a: f64) -> f64 {

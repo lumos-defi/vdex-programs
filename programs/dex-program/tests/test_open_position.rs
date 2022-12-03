@@ -5,7 +5,7 @@ mod utils;
 
 use solana_program_test::tokio;
 
-use crate::utils::{add_fee, minus_add_fee, DexAsset, DexMarket};
+use crate::utils::{add_fee, minus_add_fee, minus_swap_fee, swap_fee, DexAsset, DexMarket};
 use context::DexTestContext;
 
 fn collateral_to_size(collateral: f64, leverage: f64, price: f64, base_decimals: u8) -> f64 {
@@ -15,7 +15,7 @@ fn collateral_to_size(collateral: f64, leverage: f64, price: f64, base_decimals:
 }
 
 #[tokio::test]
-async fn test_btc_open_long() {
+async fn test_btc_open_long_with_btc() {
     let dtc = DexTestContext::new().await;
     let user = &dtc.user_context[0];
     let alice = &dtc.user_context[1];
@@ -64,7 +64,72 @@ async fn test_btc_open_long() {
 }
 
 #[tokio::test]
-async fn test_btc_open_short() {
+async fn test_btc_open_long_with_eth() {
+    let dtc = DexTestContext::new().await;
+    let user = &dtc.user_context[0];
+    let alice = &dtc.user_context[1];
+
+    // Prepare liquidity & price
+    user.add_liquidity_with_btc(10.).await;
+    user.add_liquidity_with_eth(1000.).await;
+    user.feed_btc_price(20000.).await;
+    user.feed_btc_price(2000.).await;
+
+    // Assert BTC pool
+    user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
+        .await;
+    user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
+    user.assert_borrow(DexAsset::BTC, 0.).await;
+    user.assert_collateral(DexAsset::BTC, 0.).await;
+
+    // Assert ETH pool
+    user.assert_liquidity(DexAsset::ETH, minus_add_fee(1000.))
+        .await;
+    user.assert_fee(DexAsset::ETH, add_fee(1000.)).await;
+    user.assert_borrow(DexAsset::ETH, 0.).await;
+    user.assert_collateral(DexAsset::ETH, 0.).await;
+
+    // Alice open long
+    let input_eth = 1.0;
+    alice.mint_eth(input_eth).await;
+
+    alice
+        .open(DexAsset::ETH, DexMarket::BTC, true, input_eth, 10)
+        .await;
+    alice.assert_eth_balance(0.).await;
+
+    let swapped_btc = input_eth * 2000.0 / 20000.;
+    let expected_swap_fee = swap_fee(swapped_btc);
+    let expected_input_btc = minus_swap_fee(swapped_btc);
+
+    let expected_open_fee = 0.002912621;
+    let expected_collateral = expected_input_btc - expected_open_fee;
+    let expected_size = expected_collateral * 10.;
+
+    alice
+        .assert_position(
+            DexMarket::BTC,
+            true,
+            20000.,
+            expected_size,
+            expected_collateral,
+            expected_size,
+            0.,
+        )
+        .await;
+
+    // Check liquidity pool
+    user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.) - expected_size)
+        .await;
+    user.assert_fee(DexAsset::BTC, add_fee(10.) + expected_open_fee)
+        .await;
+    user.assert_borrow(DexAsset::BTC, expected_size).await;
+    user.assert_collateral(DexAsset::BTC, expected_collateral)
+        .await;
+}
+
+#[tokio::test]
+async fn test_btc_open_short_with_usdc() {
     let dtc = DexTestContext::new().await;
     let user = &dtc.user_context[0];
     let alice = &dtc.user_context[1];
