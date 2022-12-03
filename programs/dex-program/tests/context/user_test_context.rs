@@ -6,8 +6,8 @@ use std::{
 
 use crate::utils::{
     convert_to_big_number, create_associated_token_account, get_dex_info, get_keypair, get_program,
-    get_token_balance, mint_tokens, set_add_liquidity, set_feed_mock_oracle, set_remove_liquidity,
-    set_user_state, transfer, DexAsset, DexMarket,
+    get_token_balance, mint_tokens, set_add_liquidity, set_close, set_feed_mock_oracle, set_open,
+    set_remove_liquidity, set_user_state, transfer, DexAsset, DexMarket, TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{account::Account, signature::Keypair, signer::Signer},
@@ -16,6 +16,7 @@ use anchor_client::{
 use anchor_lang::prelude::{AccountInfo, AccountMeta, Pubkey};
 
 use crate::utils::constant::TEST_VLP_DECIMALS;
+use crate::utils::TestResult;
 use dex_program::{
     dex::{Dex, MockOracle},
     user::UserState,
@@ -227,6 +228,17 @@ impl UserTestContext {
         remaining_accounts
     }
 
+    pub async fn get_user_list_remaining_accounts(&self) -> Vec<AccountMeta> {
+        let mut remaining_accounts: Vec<AccountMeta> = Vec::new();
+
+        for i in 0..self.dex_info.borrow().user_list_remaining_pages_number as usize {
+            let page = self.dex_info.borrow().user_list_remaining_pages[i];
+            remaining_accounts.append(&mut vec![AccountMeta::new(page, false)])
+        }
+
+        remaining_accounts
+    }
+
     pub async fn mint_usdc(&self, amount: f64) {
         let usdc_asset = self.dex_info.borrow().assets[DexAsset::USDC as usize];
         let mint_amount = convert_to_big_number(amount, usdc_asset.decimals);
@@ -293,18 +305,22 @@ impl UserTestContext {
     }
 
     pub async fn add_liquidity_with_usdc(&self, amount: f64) {
+        self.mint_usdc(amount).await;
         self.add_liquidity(DexAsset::USDC as u8, amount).await;
     }
 
     pub async fn add_liquidity_with_btc(&self, amount: f64) {
+        self.mint_btc(amount).await;
         self.add_liquidity(DexAsset::BTC as u8, amount).await;
     }
 
     pub async fn add_liquidity_with_eth(&self, amount: f64) {
+        self.mint_eth(amount).await;
         self.add_liquidity(DexAsset::ETH as u8, amount).await;
     }
 
     pub async fn add_liquidity_with_sol(&self, amount: f64) {
+        self.mint_sol(amount).await;
         self.add_liquidity(DexAsset::SOL as u8, amount).await;
     }
 
@@ -325,6 +341,109 @@ impl UserTestContext {
             &self.user_state,
             deposit_amount,
             remaining_accounts,
+        )
+        .await
+        .unwrap();
+    }
+
+    pub async fn open(
+        &self,
+        in_asset: DexAsset,
+        market: DexMarket,
+        long: bool,
+        amount: f64,
+        leverage: u32,
+    ) {
+        let di = self.dex_info.borrow();
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+        let ai = self.dex_info.borrow().assets[in_asset as usize];
+        let open_amount = convert_to_big_number(amount, ai.decimals);
+
+        let mi = di.markets[market as usize];
+
+        let in_mint = ai.mint;
+        let in_mint_oracle = ai.oracle;
+        let in_mint_vault = ai.vault;
+
+        let mai = if long {
+            di.assets[mi.asset_index as usize]
+        } else {
+            di.assets[di.usdc_asset_index as usize]
+        };
+
+        let market_mint = mai.mint;
+        let market_mint_oracle = mai.oracle;
+        let market_mint_vault = mai.vault;
+
+        let market_oracle = mi.oracle;
+
+        let user_state = self.user_state;
+
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
+
+        set_open::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &in_mint,
+            &in_mint_oracle,
+            &in_mint_vault,
+            &market_mint,
+            &market_mint_oracle,
+            &market_mint_vault,
+            &market_oracle,
+            &user_state,
+            &di.event_queue,
+            &di.user_list_entry_page,
+            remaining_accounts,
+            market as u8,
+            long,
+            open_amount,
+            leverage,
+        )
+        .await
+        .unwrap();
+    }
+
+    pub async fn close(&self, market: DexMarket, long: bool, size: f64) {
+        let di = self.dex_info.borrow();
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let mi = di.markets[market as usize];
+        let close_size = convert_to_big_number(size, mi.decimals);
+
+        let mai = if long {
+            di.assets[mi.asset_index as usize]
+        } else {
+            di.assets[di.usdc_asset_index as usize]
+        };
+
+        let mint = mai.mint;
+        let vault = mai.vault;
+        let program_signer = mai.program_signer;
+
+        let oracle = mi.oracle;
+
+        let user_state = self.user_state;
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
+
+        set_close::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &mint,
+            &oracle,
+            &vault,
+            &program_signer,
+            &user_state,
+            &di.event_queue,
+            &di.user_list_entry_page,
+            remaining_accounts,
+            market as u8,
+            long,
+            close_size,
         )
         .await
         .unwrap();
@@ -370,18 +489,21 @@ impl UserTestContext {
         .unwrap();
     }
 
-    pub async fn assert_usdc_amount(&self, user_asset_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_asset_acc, DexAsset::USDC as usize, amount)
+    pub async fn assert_usdc_balance(&self, amount: f64) {
+        let user_asset_acc = self.get_user_usdc_token_pubkey().await;
+        self.assert_mint_balance(&user_asset_acc, DexAsset::USDC as usize, amount)
             .await;
     }
 
-    pub async fn assert_btc_amount(&self, user_asset_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_asset_acc, DexAsset::BTC as usize, amount)
+    pub async fn assert_btc_balance(&self, amount: f64) {
+        let user_asset_acc = self.get_user_btc_token_pubkey().await;
+        self.assert_mint_balance(&user_asset_acc, DexAsset::BTC as usize, amount)
             .await;
     }
 
-    pub async fn assert_eth_amount(&self, user_asset_acc: &Pubkey, amount: f64) {
-        self.assert_asset_amount(user_asset_acc, DexAsset::ETH as usize, amount)
+    pub async fn assert_eth_balance(&self, amount: f64) {
+        let user_asset_acc = self.get_user_eth_token_pubkey().await;
+        self.assert_mint_balance(&user_asset_acc, DexAsset::ETH as usize, amount)
             .await;
     }
 
@@ -389,7 +511,7 @@ impl UserTestContext {
         self.get_account(self.user.pubkey()).await.lamports
     }
 
-    pub async fn assert_asset_amount(&self, user_asset_acc: &Pubkey, asset: usize, amount: f64) {
+    pub async fn assert_mint_balance(&self, user_asset_acc: &Pubkey, asset: usize, amount: f64) {
         let asset_info = self.dex_info.borrow().assets[asset];
         let asset_amount =
             get_token_balance(&mut self.context.borrow_mut().banks_client, user_asset_acc).await;
@@ -400,7 +522,7 @@ impl UserTestContext {
         );
     }
 
-    pub async fn assert_user_vlp_amount(&self, amount: f64) {
+    pub async fn assert_vlp(&self, amount: f64) {
         let mut user_state_account = self.get_account(self.user_state).await;
         let user_state_account_info: AccountInfo =
             (&self.user_state, true, &mut user_state_account).into();
@@ -457,13 +579,112 @@ impl UserTestContext {
         user_mint_acc
     }
 
-    pub async fn assert_pool_vlp_amount(&mut self, amount: f64) {
-        self.refresh_dex_info().await;
-        let staked_total = self.dex_info.borrow().vlp_pool.staked_total;
+    pub async fn assert_vlp_total(&self, amount: f64) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let staked_total = di.borrow().vlp_pool.staked_total;
 
         assert_eq!(
             staked_total,
             convert_to_big_number(amount.into(), TEST_VLP_DECIMALS)
         );
+    }
+
+    pub async fn assert_liquidity(&self, asset: DexAsset, amount: f64) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let ai = di.borrow().assets[asset as usize];
+        let expect = convert_to_big_number(amount, ai.decimals);
+        assert_eq!(expect, ai.liquidity_amount);
+    }
+
+    pub async fn assert_fee(&self, asset: DexAsset, fee: f64) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let ai = di.borrow().assets[asset as usize];
+        let expect = convert_to_big_number(fee, ai.decimals);
+        assert_eq!(expect, ai.fee_amount);
+    }
+
+    pub async fn assert_borrow(&self, asset: DexAsset, fee: f64) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let ai = di.borrow().assets[asset as usize];
+        let expect = convert_to_big_number(fee, ai.decimals);
+        assert_eq!(expect, ai.borrowed_amount);
+    }
+
+    pub async fn assert_collateral(&self, asset: DexAsset, fee: f64) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let ai = di.borrow().assets[asset as usize];
+        let expect = convert_to_big_number(fee, ai.decimals);
+        assert_eq!(expect, ai.collateral_amount);
+    }
+
+    pub async fn assert_global_long(&self, market: DexMarket, price: f64, size: f64) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let mi = di.borrow().markets[market as usize];
+        let expect_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
+        let expect_size = convert_to_big_number(size, mi.decimals);
+
+        assert_eq!(expect_price, mi.global_long.average_price);
+        assert_eq!(expect_size, mi.global_long.size);
+    }
+
+    pub async fn assert_global_short(&self, market: DexMarket, price: f64, size: f64) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let mi = di.borrow().markets[market as usize];
+        let expect_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
+        let expect_size = convert_to_big_number(size, mi.decimals);
+
+        assert_eq!(expect_price, mi.global_short.average_price);
+        assert_eq!(expect_size, mi.global_short.size);
+    }
+
+    pub async fn assert_position(
+        &self,
+        market: DexMarket,
+        long: bool,
+        price: f64,
+        size: f64,
+        collateral: f64,
+        borrow: f64,
+        closing_size: f64,
+    ) {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let mi = di.borrow().markets[market as usize];
+
+        let position = ref_us
+            .find_or_new_position(market as u8, false)
+            .assert_unwrap();
+
+        let decimals = if long {
+            mi.decimals
+        } else {
+            TEST_USDC_DECIMALS
+        };
+
+        let expect_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
+        let expect_size = convert_to_big_number(size, decimals);
+        let expect_collateral = convert_to_big_number(collateral, decimals);
+        let expect_borrow = convert_to_big_number(borrow, decimals);
+        let expect_closing_size = convert_to_big_number(closing_size, decimals);
+
+        if long {
+            assert_eq!(expect_price, position.data.long.average_price);
+            assert_eq!(expect_size, position.data.long.size);
+            assert_eq!(expect_collateral, position.data.long.collateral);
+            assert_eq!(expect_borrow, position.data.long.borrowed_amount);
+            assert_eq!(expect_closing_size, position.data.long.closing_size);
+        } else {
+            assert_eq!(expect_price, position.data.short.average_price);
+            assert_eq!(expect_size, position.data.short.size);
+            assert_eq!(expect_collateral, position.data.short.collateral);
+            assert_eq!(expect_borrow, position.data.short.borrowed_amount);
+            assert_eq!(expect_closing_size, position.data.short.closing_size);
+        }
     }
 }
