@@ -5,14 +5,8 @@ mod utils;
 
 use solana_program_test::tokio;
 
-use crate::utils::{add_fee, minus_add_fee, DexAsset, DexMarket};
+use crate::utils::{add_fee, collateral_to_size, minus_add_fee, DexAsset, DexMarket};
 use context::DexTestContext;
-
-fn collateral_to_size(collateral: f64, leverage: f64, price: f64, base_decimals: u8) -> f64 {
-    let adjust_decimals = 10f64.powi(base_decimals as i32 - 6);
-
-    collateral * leverage * adjust_decimals / price
-}
 
 #[tokio::test]
 async fn test_open_btc_long_with_btc() {
