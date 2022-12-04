@@ -611,8 +611,16 @@ impl UserTestContext {
     pub async fn assert_fee(&self, asset: DexAsset, fee: f64) {
         let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
         let ai = di.borrow().assets[asset as usize];
+
         let expect = convert_to_big_number(fee, ai.decimals);
         assert_eq!(expect, ai.fee_amount);
+    }
+
+    pub async fn assert_fee_big(&self, asset: DexAsset, big_fee: u64) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let ai = di.borrow().assets[asset as usize];
+
+        assert_eq!(big_fee, ai.fee_amount);
     }
 
     pub async fn assert_borrow(&self, asset: DexAsset, fee: f64) {

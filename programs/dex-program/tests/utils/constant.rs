@@ -35,7 +35,7 @@ pub const TEST_BTC_TARGET_WEIGHT: u16 = 300; //1-1000 //30%
 
 //ETH asset
 pub const TEST_ETH_SYMBOL: &str = "ETH";
-pub const TEST_ETH_DECIMALS: u8 = 9;
+pub const TEST_ETH_DECIMALS: u8 = 6;
 pub const TEST_ETH_ORACLE_PRICE: f64 = 2_000.0;
 pub const TEST_ETH_ORACLE_EXPO: u8 = 8;
 
