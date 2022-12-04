@@ -7,7 +7,8 @@ use std::{
 use crate::utils::{
     convert_to_big_number, create_associated_token_account, get_dex_info, get_keypair, get_program,
     get_token_balance, mint_tokens, set_add_liquidity, set_close, set_feed_mock_oracle, set_open,
-    set_remove_liquidity, set_user_state, transfer, DexAsset, DexMarket, TEST_USDC_DECIMALS,
+    set_remove_liquidity, set_user_state, transfer, DexAsset, DexMarket, TEST_SOL_DECIMALS,
+    TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{account::Account, signature::Keypair, signer::Signer},
@@ -316,6 +317,7 @@ impl UserTestContext {
 
     pub async fn add_liquidity_with_eth(&self, amount: f64) {
         self.mint_eth(amount).await;
+        self.assert_eth_balance(amount).await;
         self.add_liquidity(DexAsset::ETH as u8, amount).await;
     }
 
@@ -586,6 +588,16 @@ impl UserTestContext {
         assert_eq!(
             staked_total,
             convert_to_big_number(amount.into(), TEST_VLP_DECIMALS)
+        );
+    }
+
+    pub async fn assert_vlp_rewards(&self, amount: f64) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+        let reward_total = di.borrow().vlp_pool.reward_total;
+
+        assert_eq!(
+            reward_total,
+            convert_to_big_number(amount.into(), TEST_SOL_DECIMALS)
         );
     }
 

@@ -73,21 +73,20 @@ async fn test_btc_open_long_with_eth() {
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;
     user.feed_btc_price(20000.).await;
-    user.feed_btc_price(2000.).await;
+    user.feed_eth_price(2000.).await;
 
     // Assert BTC pool
     user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
         .await;
-    user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
     user.assert_borrow(DexAsset::BTC, 0.).await;
     user.assert_collateral(DexAsset::BTC, 0.).await;
-
+    assert!(false);
     // Assert ETH pool
-    user.assert_liquidity(DexAsset::ETH, minus_add_fee(1000.))
-        .await;
-    user.assert_fee(DexAsset::ETH, add_fee(1000.)).await;
-    user.assert_borrow(DexAsset::ETH, 0.).await;
-    user.assert_collateral(DexAsset::ETH, 0.).await;
+    // user.assert_liquidity(DexAsset::ETH, minus_add_fee(1000.))
+    //     .await;
+    // user.assert_fee(DexAsset::ETH, add_fee(1000.)).await;
+    // user.assert_borrow(DexAsset::ETH, 0.).await;
+    // user.assert_collateral(DexAsset::ETH, 0.).await;
 
     // Alice open long
     let input_eth = 1.0;
@@ -98,34 +97,36 @@ async fn test_btc_open_long_with_eth() {
         .await;
     alice.assert_eth_balance(0.).await;
 
-    let swapped_btc = input_eth * 2000.0 / 20000.;
-    let expected_swap_fee = swap_fee(swapped_btc);
-    let expected_input_btc = minus_swap_fee(swapped_btc);
+    let swap_fee = swap_fee(input_eth);
+    assert_eq!(swap_fee, 0.001);
 
-    let expected_open_fee = 0.002912621;
-    let expected_collateral = expected_input_btc - expected_open_fee;
-    let expected_size = expected_collateral * 10.;
+    let swapped_btc = (input_eth - swap_fee) * 2000.0 / 20000.;
+    assert_eq!(swapped_btc, 0.0999);
 
-    alice
-        .assert_position(
-            DexMarket::BTC,
-            true,
-            20000.,
-            expected_size,
-            expected_collateral,
-            expected_size,
-            0.,
-        )
-        .await;
+    // let expected_open_fee = 0.002912621;
+    // let expected_collateral = swapped_btc - expected_open_fee;
+    // let expected_size = expected_collateral * 10.;
+
+    // alice
+    //     .assert_position(
+    //         DexMarket::BTC,
+    //         true,
+    //         20000.,
+    //         expected_size,
+    //         expected_collateral,
+    //         expected_size,
+    //         0.,
+    //     )
+    //     .await;
 
     // Check liquidity pool
-    user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.) - expected_size)
-        .await;
-    user.assert_fee(DexAsset::BTC, add_fee(10.) + expected_open_fee)
-        .await;
-    user.assert_borrow(DexAsset::BTC, expected_size).await;
-    user.assert_collateral(DexAsset::BTC, expected_collateral)
-        .await;
+    // user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.) - expected_size)
+    //     .await;
+    // user.assert_fee(DexAsset::BTC, add_fee(10.) + expected_open_fee)
+    //     .await;
+    // user.assert_borrow(DexAsset::BTC, expected_size).await;
+    // user.assert_collateral(DexAsset::BTC, expected_collateral)
+    //     .await;
 }
 
 #[tokio::test]
