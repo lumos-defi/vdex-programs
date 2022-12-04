@@ -99,4 +99,12 @@ async fn test_convert_to_big_number() {
         let z = convert_to_big_number(x.into(), decimals) + convert_to_big_number(y, decimals);
         assert_eq!(z, convert_to_big_number(x + y, decimals));
     }
+
+    // TODO: lost precision
+    // {
+    //     let x: f64 = 1.001;
+    //     let y: u64 = 1001000;
+
+    //     assert_eq!(y, convert_to_big_number(x, 6));
+    // }
 }

@@ -337,3 +337,9 @@ pub fn convert_to_big_number(number: f64, decimals: u8) -> u64 {
 pub fn convert_to_big_number_i(number: f64, decimals: u8) -> i64 {
     (number * 10i64.pow(decimals as u32) as f64) as i64
 }
+
+pub fn collateral_to_size(collateral: f64, leverage: f64, price: f64, base_decimals: u8) -> f64 {
+    let adjust_decimals = 10f64.powi(base_decimals as i32 - 6);
+
+    collateral * leverage * adjust_decimals / price
+}
