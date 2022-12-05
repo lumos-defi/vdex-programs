@@ -109,10 +109,17 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
         .close_position(market, size, price, long, &mfr, false)?;
 
     // Check if satisfies the minimum size
-    require!(
-        value(collateral, price, mi.decimals)? >= mi.minimum_position_value,
-        DexError::PositionTooSmall
-    );
+    if long {
+        require!(
+            value(collateral, price, mi.decimals)? >= mi.minimum_position_value,
+            DexError::PositionTooSmall
+        );
+    } else {
+        require!(
+            collateral >= mi.minimum_position_value,
+            DexError::PositionTooSmall
+        );
+    }
 
     // Update market global position
     dex.decrease_global_position(market, long, size, collateral)?;

@@ -59,7 +59,7 @@ async fn test_open_btc_short_fail_minimum() {
     alice.mint_usdc(25.).await;
 
     alice
-        .assert_open_fail(DexAsset::USDC, DexMarket::BTC, false, 2000., 10 * 1000)
+        .assert_open_fail(DexAsset::USDC, DexMarket::BTC, false, 25., 10 * 1000)
         .await;
     alice.assert_usdc_balance(25.).await;
 

@@ -178,10 +178,17 @@ pub fn handler(
             .open_position(market, price, actual_amount, long, leverage, &mfr)?;
 
     // Check if satisfy the minimum open size
-    require!(
-        value(collateral, price, mfr.base_decimals)? >= minimum_position_value,
-        DexError::PositionTooSmall
-    );
+    if long {
+        require!(
+            value(collateral, price, mfr.base_decimals)? >= minimum_position_value,
+            DexError::PositionTooSmall
+        );
+    } else {
+        require!(
+            collateral >= minimum_position_value,
+            DexError::PositionTooSmall
+        );
+    }
 
     // Update asset info (collateral amount, borrow amount, fee)
     dex.borrow_fund(market, long, collateral, borrow, open_fee)?;
