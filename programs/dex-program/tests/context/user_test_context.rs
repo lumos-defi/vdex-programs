@@ -5,13 +5,13 @@ use std::{
 };
 
 use crate::utils::{
-    convert_to_big_number, create_associated_token_account, get_dex_info, get_keypair, get_program,
-    get_token_balance, mint_tokens, set_add_liquidity, set_close, set_feed_mock_oracle, set_open,
-    set_remove_liquidity, set_user_state, transfer, DexAsset, DexMarket, TEST_SOL_DECIMALS,
-    TEST_USDC_DECIMALS,
+    assert_eq_with_dust, convert_to_big_number, create_associated_token_account, get_dex_info,
+    get_keypair, get_program, get_token_balance, mint_tokens, set_add_liquidity, set_close,
+    set_feed_mock_oracle, set_open, set_remove_liquidity, set_user_state, transfer, DexAsset,
+    DexMarket, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
 };
 use anchor_client::{
-    solana_sdk::{account::Account, signature::Keypair, signer::Signer},
+    solana_sdk::{account::Account, signature::Keypair, signer::Signer, transport::TransportError},
     Program,
 };
 use anchor_lang::prelude::{AccountInfo, AccountMeta, Pubkey};
@@ -355,7 +355,7 @@ impl UserTestContext {
         long: bool,
         amount: f64,
         leverage: u32,
-    ) {
+    ) -> Result<(), TransportError> {
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
         let ai = self.dex_info.borrow().assets[in_asset as usize];
@@ -405,10 +405,40 @@ impl UserTestContext {
             leverage,
         )
         .await
-        .unwrap();
     }
 
-    pub async fn close(&self, market: DexMarket, long: bool, size: f64) {
+    pub async fn assert_open(
+        &self,
+        in_asset: DexAsset,
+        market: DexMarket,
+        long: bool,
+        amount: f64,
+        leverage: u32,
+    ) {
+        self.open(in_asset, market, long, amount, leverage)
+            .await
+            .assert_ok();
+    }
+
+    pub async fn assert_open_fail(
+        &self,
+        in_asset: DexAsset,
+        market: DexMarket,
+        long: bool,
+        amount: f64,
+        leverage: u32,
+    ) {
+        self.open(in_asset, market, long, amount, leverage)
+            .await
+            .assert_err();
+    }
+
+    pub async fn close(
+        &self,
+        market: DexMarket,
+        long: bool,
+        size: f64,
+    ) -> Result<(), TransportError> {
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
@@ -448,7 +478,14 @@ impl UserTestContext {
             close_size,
         )
         .await
-        .unwrap();
+    }
+
+    pub async fn assert_close(&self, market: DexMarket, long: bool, size: f64) {
+        self.close(market, long, size).await.assert_ok();
+    }
+
+    pub async fn assert_close_fail(&self, market: DexMarket, long: bool, size: f64) {
+        self.close(market, long, size).await.assert_err();
     }
 
     pub async fn remove_liquidity_withdraw_usdc(&self, vlp_amount: f64) {
@@ -518,10 +555,19 @@ impl UserTestContext {
         let asset_amount =
             get_token_balance(&mut self.context.borrow_mut().banks_client, user_asset_acc).await;
 
-        assert_eq!(
+        // assert_eq!(
+        //     asset_amount,
+        //     convert_to_big_number(amount.into(), asset_info.decimals)
+        // );
+
+        println!(
+            "{} {} {}",
+            amount,
             asset_amount,
             convert_to_big_number(amount.into(), asset_info.decimals)
         );
+
+        assert!(asset_amount - convert_to_big_number(amount.into(), asset_info.decimals) <= 2);
     }
 
     pub async fn assert_vlp(&self, amount: f64) {
@@ -534,7 +580,7 @@ impl UserTestContext {
 
         let vlp_amount = ref_us.meta.vlp.staked;
 
-        assert_eq!(vlp_amount, convert_to_big_number(amount, TEST_VLP_DECIMALS));
+        assert_eq_with_dust(vlp_amount, convert_to_big_number(amount, TEST_VLP_DECIMALS));
     }
 
     // pub async fn assert_vlp_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
@@ -585,9 +631,9 @@ impl UserTestContext {
         let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
         let staked_total = di.borrow().vlp_pool.staked_total;
 
-        assert_eq!(
+        assert_eq_with_dust(
             staked_total,
-            convert_to_big_number(amount.into(), TEST_VLP_DECIMALS)
+            convert_to_big_number(amount.into(), TEST_VLP_DECIMALS),
         );
     }
 
@@ -595,9 +641,9 @@ impl UserTestContext {
         let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
         let reward_total = di.borrow().vlp_pool.reward_total;
 
-        assert_eq!(
+        assert_eq_with_dust(
             reward_total,
-            convert_to_big_number(amount.into(), TEST_SOL_DECIMALS)
+            convert_to_big_number(amount.into(), TEST_SOL_DECIMALS),
         );
     }
 
@@ -605,7 +651,7 @@ impl UserTestContext {
         let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
         let ai = di.borrow().assets[asset as usize];
         let expect = convert_to_big_number(amount, ai.decimals);
-        assert_eq!(expect, ai.liquidity_amount);
+        assert_eq_with_dust(expect, ai.liquidity_amount);
     }
 
     pub async fn assert_fee(&self, asset: DexAsset, fee: f64) {
@@ -613,28 +659,28 @@ impl UserTestContext {
         let ai = di.borrow().assets[asset as usize];
 
         let expect = convert_to_big_number(fee, ai.decimals);
-        assert_eq!(expect, ai.fee_amount);
+        assert_eq_with_dust(expect, ai.fee_amount);
     }
 
     pub async fn assert_fee_big(&self, asset: DexAsset, big_fee: u64) {
         let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
         let ai = di.borrow().assets[asset as usize];
 
-        assert_eq!(big_fee, ai.fee_amount);
+        assert_eq_with_dust(big_fee, ai.fee_amount);
     }
 
     pub async fn assert_borrow(&self, asset: DexAsset, fee: f64) {
         let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
         let ai = di.borrow().assets[asset as usize];
         let expect = convert_to_big_number(fee, ai.decimals);
-        assert_eq!(expect, ai.borrowed_amount);
+        assert_eq_with_dust(expect, ai.borrowed_amount);
     }
 
     pub async fn assert_collateral(&self, asset: DexAsset, fee: f64) {
         let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
         let ai = di.borrow().assets[asset as usize];
         let expect = convert_to_big_number(fee, ai.decimals);
-        assert_eq!(expect, ai.collateral_amount);
+        assert_eq_with_dust(expect, ai.collateral_amount);
     }
 
     pub async fn assert_global_long(&self, market: DexMarket, price: f64, size: f64) {
@@ -643,8 +689,8 @@ impl UserTestContext {
         let expect_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
         let expect_size = convert_to_big_number(size, mi.decimals);
 
-        assert_eq!(expect_price, mi.global_long.average_price);
-        assert_eq!(expect_size, mi.global_long.size);
+        assert_eq_with_dust(expect_price, mi.global_long.average_price);
+        assert_eq_with_dust(expect_size, mi.global_long.size);
     }
 
     pub async fn assert_global_short(&self, market: DexMarket, price: f64, size: f64) {
@@ -653,8 +699,8 @@ impl UserTestContext {
         let expect_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
         let expect_size = convert_to_big_number(size, mi.decimals);
 
-        assert_eq!(expect_price, mi.global_short.average_price);
-        assert_eq!(expect_size, mi.global_short.size);
+        assert_eq_with_dust(expect_price, mi.global_short.average_price);
+        assert_eq_with_dust(expect_size, mi.global_short.size);
     }
 
     pub async fn assert_position(
@@ -688,23 +734,23 @@ impl UserTestContext {
         };
 
         let expect_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
-        let expect_size = convert_to_big_number(size, decimals);
+        let expect_size = convert_to_big_number(size, mi.decimals);
         let expect_collateral = convert_to_big_number(collateral, decimals);
         let expect_borrow = convert_to_big_number(borrow, decimals);
-        let expect_closing_size = convert_to_big_number(closing_size, decimals);
+        let expect_closing_size = convert_to_big_number(closing_size, mi.decimals);
 
         if long {
-            assert_eq!(expect_price, position.data.long.average_price);
-            assert_eq!(expect_size, position.data.long.size);
-            assert_eq!(expect_collateral, position.data.long.collateral);
-            assert_eq!(expect_borrow, position.data.long.borrowed_amount);
-            assert_eq!(expect_closing_size, position.data.long.closing_size);
+            assert_eq_with_dust(expect_price, position.data.long.average_price);
+            assert_eq_with_dust(expect_size, position.data.long.size);
+            assert_eq_with_dust(expect_collateral, position.data.long.collateral);
+            assert_eq_with_dust(expect_borrow, position.data.long.borrowed_amount);
+            assert_eq_with_dust(expect_closing_size, position.data.long.closing_size);
         } else {
-            assert_eq!(expect_price, position.data.short.average_price);
-            assert_eq!(expect_size, position.data.short.size);
-            assert_eq!(expect_collateral, position.data.short.collateral);
-            assert_eq!(expect_borrow, position.data.short.borrowed_amount);
-            assert_eq!(expect_closing_size, position.data.short.closing_size);
+            assert_eq_with_dust(expect_price, position.data.short.average_price);
+            assert_eq_with_dust(expect_size, position.data.short.size);
+            assert_eq_with_dust(expect_collateral, position.data.short.collateral);
+            assert_eq_with_dust(expect_borrow, position.data.short.borrowed_amount);
+            assert_eq_with_dust(expect_closing_size, position.data.short.closing_size);
         }
     }
 }
