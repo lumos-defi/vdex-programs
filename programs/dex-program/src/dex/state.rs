@@ -191,18 +191,7 @@ impl Dex {
 
         let aum = self.aum(oracles)?;
         require!(aum >= 0, DexError::AUMBelowZero);
-
         let (vlp_supply, vlp_decimals, reward_asset_index) = self.vlp_info()?;
-        if index == reward_asset_index {
-            // If adding reward asset, amount should be larger than reward asset debt.
-            require!(
-                reward_asset_debt < amount,
-                DexError::InsufficientRewardAsset
-            );
-        } else {
-            // If not adding reward asset, reward asset debt should be zero.
-            require!(reward_asset_debt == 0, DexError::InsufficientRewardAsset);
-        }
 
         let oracle_index = self.to_oracle_index(index)?;
 
@@ -213,6 +202,15 @@ impl Dex {
             .safe_div(FEE_RATE_BASE)? as u64;
 
         let added = amount.safe_sub(fee)?;
+
+        if index == reward_asset_index {
+            // If adding reward asset, amount should be larger than reward asset debt.
+            require!(reward_asset_debt < added, DexError::InsufficientRewardAsset);
+        } else {
+            // If not adding reward asset, reward asset debt should be zero.
+            require!(reward_asset_debt == 0, DexError::InsufficientRewardAsset);
+        }
+
         ai.liquidity_amount = ai
             .liquidity_amount
             .safe_add(added)?
