@@ -560,7 +560,7 @@ mod test {
         let mfr = mock_mfr();
         let (size, collateral, borrow, open_fee) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), btc(1.0), true, 20, &mfr)
+            .open_position(0, usdc(20000.), btc(1.0), true, 20 * 1000, &mfr)
             .assert_unwrap();
 
         let expected_open_fee = btc(0.038461538);
@@ -595,7 +595,7 @@ mod test {
 
         let (size, collateral, borrow, open_fee) = us
             .borrow_mut()
-            .open_position(0, usdc(26000.), btc(1.0), true, 20, &mfr)
+            .open_position(0, usdc(26000.), btc(1.0), true, 20 * 1000, &mfr)
             .assert_unwrap();
 
         assert_eq!(open_fee, expected_open_fee);
@@ -633,7 +633,14 @@ mod test {
         let leverage = 10u64;
         let (size, collateral, borrow, open_fee) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2000.0), false, leverage as u32, &mfr)
+            .open_position(
+                0,
+                usdc(20000.),
+                usdc(2000.0),
+                false,
+                leverage as u32 * 1000,
+                &mfr,
+            )
             .assert_unwrap();
 
         let expected_open_fee = usdc(39.215686);
@@ -672,7 +679,14 @@ mod test {
 
         let (size, collateral, borrow, open_fee) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2000.0), false, leverage as u32, &mfr)
+            .open_position(
+                0,
+                usdc(20000.),
+                usdc(2000.0),
+                false,
+                leverage as u32 * 1000,
+                &mfr,
+            )
             .assert_unwrap();
 
         assert_eq!(open_fee, expected_open_fee);
@@ -710,7 +724,14 @@ mod test {
         let leverage = 20u64;
         let (size, collateral, borrow, _) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), btc(1.0), true, leverage as u32, &mfr)
+            .open_position(
+                0,
+                usdc(20000.),
+                btc(1.0),
+                true,
+                leverage as u32 * 1000,
+                &mfr,
+            )
             .assert_unwrap();
 
         const HOURS_2: u64 = 2;
@@ -753,7 +774,14 @@ mod test {
         let leverage = 5u64;
         let (size, collateral, borrow, _) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), btc(1.0), true, leverage as u32, &mfr)
+            .open_position(
+                0,
+                usdc(20000.),
+                btc(1.0),
+                true,
+                leverage as u32 * 1000,
+                &mfr,
+            )
             .assert_unwrap();
 
         const HOURS_2: u64 = 2;
@@ -796,7 +824,14 @@ mod test {
         let leverage = 10u64;
         let (size, collateral, borrow, _) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2000.), false, leverage as u32, &mfr)
+            .open_position(
+                0,
+                usdc(20000.),
+                usdc(2000.),
+                false,
+                leverage as u32 * 1000,
+                &mfr,
+            )
             .assert_unwrap();
 
         const HOURS_2: u64 = 2;
@@ -842,7 +877,14 @@ mod test {
         let leverage = 10u64;
         let (size, collateral, borrow, _) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2000.), false, leverage as u32, &mfr)
+            .open_position(
+                0,
+                usdc(20000.),
+                usdc(2000.),
+                false,
+                leverage as u32 * 1000,
+                &mfr,
+            )
             .assert_unwrap();
 
         const HOURS_2: u64 = 2;
@@ -941,7 +983,7 @@ mod test {
         // Mock position
         let mfr = mock_mfr();
         us.borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10 * 1000, &mfr)
             .assert_unwrap();
 
         // Create ask orders
@@ -969,7 +1011,7 @@ mod test {
         let mfr = mock_mfr();
         let (size, _, _, _) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10 * 1000, &mfr)
             .assert_unwrap();
 
         let user_order_slot = us
@@ -1004,7 +1046,7 @@ mod test {
         let mfr = mock_mfr();
         let (size, _, _, _) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10 * 1000, &mfr)
             .assert_unwrap();
 
         us.borrow_mut()
@@ -1041,7 +1083,7 @@ mod test {
         let mfr = mock_mfr();
         let (size, _, _, _) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10 * 1000, &mfr)
             .assert_unwrap();
 
         us.borrow_mut()
@@ -1080,7 +1122,7 @@ mod test {
         let mfr = mock_mfr();
         let (size, _, _, _) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10 * 1000, &mfr)
             .assert_unwrap();
 
         us.borrow_mut()
@@ -1121,7 +1163,7 @@ mod test {
         let mfr = mock_mfr();
         let (size, _, _, _) = us
             .borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2010.), false, 10, &mfr)
+            .open_position(0, usdc(20000.), usdc(2010.), false, 10 * 1000, &mfr)
             .assert_unwrap();
 
         us.borrow_mut()
@@ -1164,7 +1206,7 @@ mod test {
         // Mock position
         let mfr = mock_mfr();
         us.borrow_mut()
-            .open_position(0, usdc(20000.), usdc(2000.), false, 10, &mfr)
+            .open_position(0, usdc(20000.), usdc(2000.), false, 10 * 1000, &mfr)
             .assert_ok();
 
         us.borrow()
