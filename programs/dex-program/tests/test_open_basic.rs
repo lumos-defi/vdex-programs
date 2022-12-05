@@ -27,7 +27,7 @@ async fn test_open_btc_long_with_btc() {
     alice.mint_btc(0.1).await;
 
     alice
-        .open(DexAsset::BTC, DexMarket::BTC, true, 0.1, 10)
+        .open(DexAsset::BTC, DexMarket::BTC, true, 0.1, 10 * 1000)
         .await;
     alice.assert_btc_balance(0.).await;
 
@@ -76,7 +76,7 @@ async fn test_open_btc_short_with_usdc() {
     alice.mint_usdc(2000.).await;
 
     alice
-        .open(DexAsset::USDC, DexMarket::BTC, false, 2000., 10)
+        .open(DexAsset::USDC, DexMarket::BTC, false, 2000., 10 * 1000)
         .await;
     alice.assert_usdc_balance(0.).await;
 

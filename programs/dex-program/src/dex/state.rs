@@ -4,7 +4,7 @@ use crate::{
     errors::{DexError, DexResult},
     utils::{
         swap, time::get_timestamp, value, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_BASE,
-        FEE_RATE_DECIMALS, USD_POW_DECIMALS,
+        FEE_RATE_DECIMALS, LEVERAGE_DECIMALS, USD_POW_DECIMALS,
     },
 };
 
@@ -701,18 +701,23 @@ impl Position {
             Position::calc_collateral_and_fee(amount, leverage, mfr.open_fee_rate)?;
 
         let size = if long {
-            collateral.safe_mul(leverage as u64)
+            collateral
+                .safe_mul(leverage as u64)?
+                .safe_div(LEVERAGE_DECIMALS)
         } else {
             collateral
                 .safe_mul(leverage as u64)?
                 .safe_mul(10u128.pow(mfr.base_decimals.into()))?
-                .safe_div(price as u128)
+                .safe_div(price as u128)?
+                .safe_div(LEVERAGE_DECIMALS)
         }? as u64;
 
         let borrow = if long {
             Ok(size as u128)
         } else {
-            collateral.safe_mul(leverage as u64)
+            collateral
+                .safe_mul(leverage as u64)?
+                .safe_div(LEVERAGE_DECIMALS)
         }? as u64;
 
         Ok((size, borrow))
@@ -729,12 +734,15 @@ impl Position {
             Position::calc_collateral_and_fee(amount, leverage, mfr.open_fee_rate)?;
 
         let size = if self.long {
-            collateral.safe_mul(leverage as u64)
+            collateral
+                .safe_mul(leverage as u64)?
+                .safe_div(LEVERAGE_DECIMALS)
         } else {
             collateral
                 .safe_mul(leverage as u64)?
                 .safe_mul(10u128.pow(mfr.base_decimals.into()))?
-                .safe_div(price as u128)
+                .safe_div(price as u128)?
+                .safe_div(LEVERAGE_DECIMALS)
         }? as u64;
 
         // Update cumulative fund fee
@@ -756,7 +764,9 @@ impl Position {
         let borrow = if self.long {
             Ok(size as u128)
         } else {
-            collateral.safe_mul(leverage as u64)
+            collateral
+                .safe_mul(leverage as u64)?
+                .safe_div(LEVERAGE_DECIMALS)
         }? as u64;
 
         let merged_size = self.size.safe_add(size)?;
@@ -897,7 +907,9 @@ impl Position {
     }
 
     pub fn calc_collateral_and_fee(amount: u64, leverage: u32, rate: u16) -> DexResult<(u64, u64)> {
-        let temp = (leverage as u64).safe_mul(rate as u64)? as u64;
+        let temp = (leverage as u64)
+            .safe_mul(rate as u64)?
+            .safe_div(LEVERAGE_DECIMALS)? as u64;
 
         let dividend = amount.safe_mul(temp)?;
         let divisor = (FEE_RATE_BASE as u128).safe_add(temp as u128)?;
@@ -1387,8 +1399,9 @@ mod test {
         let mfr = dex.markets[0].get_fee_rates(20);
 
         let mut long = Position::new(true).assert_unwrap();
-        let (size, collateral, borrow, open_fee) =
-            long.open(usdc(20000.), btc(1.0), 20, &mfr).assert_unwrap();
+        let (size, collateral, borrow, open_fee) = long
+            .open(usdc(20000.), btc(1.0), 20 * 1000, &mfr)
+            .assert_unwrap();
 
         let expected_open_fee = btc(0.038461538);
         let expected_collateral = btc(1.0) - expected_open_fee;
@@ -1409,7 +1422,8 @@ mod test {
         long.mock_after_hours(HOURS_2);
 
         // Long more
-        long.open(usdc(26000.), btc(1.0), 20, &mfr).assert_unwrap();
+        long.open(usdc(26000.), btc(1.0), 20 * 1000, &mfr)
+            .assert_unwrap();
         assert_eq!(open_fee, expected_open_fee);
         assert_eq!(collateral, expected_collateral);
         assert_eq!(size, expected_collateral * 20);
@@ -1435,7 +1449,7 @@ mod test {
         let mut long = Position::new(true).assert_unwrap();
         let leverage = 20u64;
         let (size, collateral, borrow, _) = long
-            .open(usdc(20000.), btc(1.0), leverage as u32, &mfr)
+            .open(usdc(20000.), btc(1.0), leverage as u32 * 1000, &mfr)
             .assert_unwrap();
 
         const HOURS_2: u64 = 2;
@@ -1468,7 +1482,7 @@ mod test {
         let mut long = Position::new(true).assert_unwrap();
         let leverage = 5u64;
         let (size, collateral, borrow, _) = long
-            .open(usdc(20000.), btc(1.0), leverage as u32, &mfr)
+            .open(usdc(20000.), btc(1.0), leverage as u32 * 1000, &mfr)
             .assert_unwrap();
 
         const HOURS_2: u64 = 2;
@@ -1500,7 +1514,7 @@ mod test {
         let mut short = Position::new(false).assert_unwrap();
         let leverage = 10u64;
         let (size, collateral, borrow, open_fee) = short
-            .open(usdc(20000.), usdc(2000.), leverage as u32, &mfr)
+            .open(usdc(20000.), usdc(2000.), leverage as u32 * 1000, &mfr)
             .assert_unwrap();
 
         let expected_open_fee = usdc(39.215686);
@@ -1527,7 +1541,7 @@ mod test {
 
         // Short more
         short
-            .open(usdc(20000.), usdc(2000.0), leverage as u32, &mfr)
+            .open(usdc(20000.), usdc(2000.0), leverage as u32 * 1000, &mfr)
             .assert_unwrap();
         assert_eq!(open_fee, expected_open_fee);
         assert_eq!(collateral, expected_collateral);
@@ -1555,7 +1569,7 @@ mod test {
         let mut short = Position::new(false).assert_unwrap();
         let leverage = 10u64;
         let (size, collateral, borrow, _) = short
-            .open(usdc(20000.), usdc(2000.), leverage as u32, &mfr)
+            .open(usdc(20000.), usdc(2000.), leverage as u32 * 1000, &mfr)
             .assert_unwrap();
 
         const HOURS_2: u64 = 2;
@@ -1591,7 +1605,7 @@ mod test {
         let mut short = Position::new(false).assert_unwrap();
         let leverage = 10u64;
         let (size, collateral, borrow, _) = short
-            .open(usdc(20000.), usdc(2000.), leverage as u32, &mfr)
+            .open(usdc(20000.), usdc(2000.), leverage as u32 * 1000, &mfr)
             .assert_unwrap();
 
         const HOURS_2: u64 = 2;

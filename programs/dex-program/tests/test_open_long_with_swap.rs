@@ -45,7 +45,7 @@ async fn test_open_btc_long_with_eth() {
     alice.mint_eth(input_eth).await;
 
     alice
-        .open(DexAsset::ETH, DexMarket::BTC, true, input_eth, 10)
+        .open(DexAsset::ETH, DexMarket::BTC, true, input_eth, 10 * 1000)
         .await;
     alice.assert_eth_balance(0.).await;
 
@@ -134,7 +134,7 @@ async fn test_open_btc_long_with_usdc() {
     alice.mint_usdc(input_usdc).await;
 
     alice
-        .open(DexAsset::USDC, DexMarket::BTC, true, input_usdc, 10)
+        .open(DexAsset::USDC, DexMarket::BTC, true, input_usdc, 10 * 1000)
         .await;
     alice.assert_usdc_balance(0.).await;
 
@@ -219,7 +219,7 @@ async fn test_open_btc_long_with_sol() {
     alice.mint_sol(input_sol).await;
 
     alice
-        .open(DexAsset::SOL, DexMarket::BTC, true, input_sol, 10)
+        .open(DexAsset::SOL, DexMarket::BTC, true, input_sol, 10 * 1000)
         .await;
 
     let swap_fee = swap_fee(input_sol);
