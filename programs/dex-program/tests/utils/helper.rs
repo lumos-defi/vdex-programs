@@ -338,8 +338,16 @@ pub fn convert_to_big_number_i(number: f64, decimals: u8) -> i64 {
     (number * 10i64.pow(decimals as u32) as f64) as i64
 }
 
-pub fn collateral_to_size(collateral: f64, leverage: f64, price: f64, base_decimals: u8) -> f64 {
-    let adjust_decimals = 10f64.powi(base_decimals as i32 - 6);
+pub fn collateral_to_size(collateral: f64, leverage: f64, price: f64, decimals: u8) -> f64 {
+    let temp = collateral * leverage / price;
+    let decimals_powf = 10u64.pow(decimals as u32) as f64;
 
-    collateral * leverage * adjust_decimals / price
+    (((temp * decimals_powf) as u64) as f64) / decimals_powf
+}
+
+pub fn assert_eq_with_dust(expect: u64, real: u64) {
+    let difference = expect as i64 - real as i64;
+    if difference.abs() > 1 {
+        assert_eq!(expect, real);
+    }
 }

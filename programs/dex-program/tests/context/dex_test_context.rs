@@ -226,7 +226,8 @@ impl DexTestContext {
         //6. add BTC market
         {
             let symbol: &str = TEST_BTC_MARKET_SYMBOL;
-            let minimum_position_value: u64 = TEST_BTC_MINIMUM_POSITION_VALUE;
+            let minimum_position_value: u64 =
+                convert_to_big_number(TEST_BTC_MINIMUM_POSITION_VALUE as f64, 6);
             let charge_borrow_fee_interval: u64 = TEST_BTC_CHARGE_BORROW_FEE_INTERVAL;
             let open_fee_rate: u16 = TEST_BTC_OPEN_FEE_RATE;
             let close_fee_rate: u16 = TEST_BTC_CLOSE_FEE_RATE;
@@ -259,7 +260,8 @@ impl DexTestContext {
         //7. add ETH market
         {
             let symbol: &str = TEST_ETH_MARKET_SYMBOL;
-            let minimum_position_value: u64 = TEST_ETH_MINIMUM_POSITION_VALUE;
+            let minimum_position_value: u64 =
+                convert_to_big_number(TEST_ETH_MINIMUM_POSITION_VALUE as f64, 6);
             let charge_borrow_fee_interval: u64 = TEST_ETH_CHARGE_BORROW_FEE_INTERVAL;
             let open_fee_rate: u16 = TEST_ETH_OPEN_FEE_RATE;
             let close_fee_rate: u16 = TEST_ETH_CLOSE_FEE_RATE;
@@ -292,7 +294,8 @@ impl DexTestContext {
         //8. add SOL market
         {
             let symbol: &str = TEST_SOL_MARKET_SYMBOL;
-            let minimum_position_value: u64 = TEST_SOL_MINIMUM_POSITION_VALUE;
+            let minimum_position_value: u64 =
+                convert_to_big_number(TEST_SOL_MINIMUM_POSITION_VALUE as f64, 6);
             let charge_borrow_fee_interval: u64 = TEST_SOL_CHARGE_BORROW_FEE_INTERVAL;
             let open_fee_rate: u16 = TEST_SOL_OPEN_FEE_RATE; // 0.3% (30 / 10000)
             let close_fee_rate: u16 = TEST_SOL_CLOSE_FEE_RATE; // 0.5%   (50 /  10000)
