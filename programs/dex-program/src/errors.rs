@@ -217,6 +217,9 @@ pub enum DexError {
 
     #[msg("Insufficient reward asset")]
     InsufficientRewardAsset,
+
+    #[msg("Invalid user mint account")]
+    InvalidUserMintAccount,
 }
 
 pub type DexResult<T = ()> = Result<T>;

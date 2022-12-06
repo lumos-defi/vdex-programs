@@ -9,8 +9,9 @@ use anchor_client::{
 use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
     accounts::{
-        AddAsset, AddLiquidity, AddMarket, ClosePosition, CreateUserState, FeedMockOraclePrice,
-        InitDex, InitMockOracle, OpenPosition, RemoveLiquidity,
+        AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClosePosition, Crank,
+        CreateUserState, FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, LimitAsk,
+        LimitBid, OpenPosition, RemoveLiquidity,
     },
     dex::Dex,
 };
@@ -421,6 +422,217 @@ pub async fn compose_close_market_position_ix(
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::ClosePosition { market, long, size })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_bid_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    in_mint: &Pubkey,
+    in_mint_oracle: &Pubkey,
+    in_mint_vault: &Pubkey,
+    market_oracle: &Pubkey,
+    market_mint: &Pubkey,
+    market_mint_oracle: &Pubkey,
+    order_book: &Pubkey,
+    order_pool_entry_page: &Pubkey,
+    user_mint_acc: &Pubkey,
+    user_state: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    market: u8,
+    long: bool,
+    price: u64,
+    amount: u64,
+    leverage: u32,
+) -> Instruction {
+    program
+        .request()
+        .accounts(LimitBid {
+            dex: *dex,
+            in_mint: *in_mint,
+            in_mint_oracle: *in_mint_oracle,
+            in_mint_vault: *in_mint_vault,
+            market_oracle: *market_oracle,
+            market_mint: *market_mint,
+            market_mint_oracle: *market_mint_oracle,
+            order_book: *order_book,
+            order_pool_entry_page: *order_pool_entry_page,
+            user_mint_acc: *user_mint_acc,
+            user_state: *user_state,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::LimitBid {
+            market,
+            long,
+            price,
+            amount,
+            leverage,
+        })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_ask_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    oracle: &Pubkey,
+    order_book: &Pubkey,
+    order_pool_entry_page: &Pubkey,
+    user_state: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    market: u8,
+    long: bool,
+    price: u64,
+    size: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(LimitAsk {
+            dex: *dex,
+            oracle: *oracle,
+            order_book: *order_book,
+            order_pool_entry_page: *order_pool_entry_page,
+            user_state: *user_state,
+            authority: payer.pubkey(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::LimitAsk {
+            market,
+            long,
+            price,
+            size,
+        })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_fill_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    oracle: &Pubkey,
+    match_queue: &Pubkey,
+    order_book: &Pubkey,
+    order_pool_entry_page: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    market: u8,
+) -> Instruction {
+    program
+        .request()
+        .accounts(FillOrder {
+            dex: *dex,
+            oracle: *oracle,
+            match_queue: *match_queue,
+            order_book: *order_book,
+            order_pool_entry_page: *order_pool_entry_page,
+            authority: payer.pubkey(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::FillOrder { market })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_crank_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    user: &Pubkey,
+    user_state: &Pubkey,
+    user_mint_acc: &Pubkey,
+    in_mint_oracle: &Pubkey,
+    market_mint: &Pubkey,
+    market_mint_oracle: &Pubkey,
+    market_mint_vault: &Pubkey,
+    market_mint_program_signer: &Pubkey,
+    match_queue: &Pubkey,
+    event_queue: &Pubkey,
+    user_list_entry_page: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+) -> Instruction {
+    program
+        .request()
+        .accounts(Crank {
+            dex: *dex,
+            user: *user,
+            user_state: *user_state,
+            user_mint_acc: *user_mint_acc,
+            in_mint_oracle: *in_mint_oracle,
+            market_mint: *market_mint,
+            market_mint_oracle: *market_mint_oracle,
+            market_mint_vault: *market_mint_vault,
+            market_mint_program_signer: *market_mint_program_signer,
+            match_queue: *match_queue,
+            event_queue: *event_queue,
+            user_list_entry_page: *user_list_entry_page,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+            system_program: system_program::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::Crank {})
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_cancel_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    user_state: &Pubkey,
+    order_book: &Pubkey,
+    order_pool_entry_page: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    user_order_slot: u8,
+) -> Instruction {
+    program
+        .request()
+        .accounts(CancelOrder {
+            dex: *dex,
+            order_book: *order_book,
+            order_pool_entry_page: *order_pool_entry_page,
+            user_state: *user_state,
+            authority: payer.pubkey(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::CancelOrder { user_order_slot })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_cancel_all_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    user_state: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+) -> Instruction {
+    program
+        .request()
+        .accounts(CancelAllOrders {
+            dex: *dex,
+            user_state: *user_state,
+            authority: payer.pubkey(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::CancelAllOrders {})
         .instructions()
         .unwrap()
         .pop()
