@@ -6,9 +6,10 @@ use std::{
 
 use crate::utils::{
     assert_eq_with_dust, convert_to_big_number, create_associated_token_account, get_dex_info,
-    get_keypair, get_program, get_token_balance, mint_tokens, set_add_liquidity, set_close,
-    set_feed_mock_oracle, set_open, set_remove_liquidity, set_user_state, transfer, DexAsset,
-    DexMarket, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
+    get_keypair, get_program, get_token_balance, mint_tokens, set_add_liquidity, set_ask, set_bid,
+    set_cancel, set_cancel_all, set_close, set_crank, set_feed_mock_oracle, set_fill, set_open,
+    set_remove_liquidity, set_user_state, transfer, DexAsset, DexMarket, TEST_SOL_DECIMALS,
+    TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{account::Account, signature::Keypair, signer::Signer, transport::TransportError},
@@ -19,7 +20,9 @@ use anchor_lang::prelude::{AccountInfo, AccountMeta, Pubkey};
 use crate::utils::constant::TEST_VLP_DECIMALS;
 use crate::utils::TestResult;
 use dex_program::{
+    collections::{SingleEvent, SingleEventQueue},
     dex::{Dex, MockOracle},
+    order::MatchEvent,
     user::UserState,
     utils::USDC_POW_DECIMALS,
 };
@@ -224,6 +227,23 @@ impl UserTestContext {
             if market.valid {
                 remaining_accounts.append(&mut vec![AccountMeta::new(market.oracle, false)])
             }
+        }
+
+        remaining_accounts
+    }
+
+    pub async fn get_market_order_pool_remaining_accounts(&self, market: u8) -> Vec<AccountMeta> {
+        let mut remaining_accounts: Vec<AccountMeta> = Vec::new();
+
+        assert!(market < self.dex_info.borrow().markets_number);
+
+        let mi = &self.dex_info.borrow().markets[market as usize];
+        //process dex market oracle account
+        for i in 0..mi.order_pool_remaining_pages_number as usize {
+            remaining_accounts.append(&mut vec![AccountMeta::new(
+                mi.order_pool_remaining_pages[i],
+                false,
+            )])
         }
 
         remaining_accounts
@@ -752,5 +772,317 @@ impl UserTestContext {
             assert_eq_with_dust(expect_borrow, position.data.short.borrowed_amount);
             assert_eq_with_dust(expect_closing_size, position.data.short.closing_size);
         }
+    }
+
+    pub async fn crank(&self) {
+        let payer = self.generate_random_user().await;
+        let di = self.dex_info.borrow();
+
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let mut match_queue_account = self.get_account(di.match_queue).await;
+        let match_queue_account_info: AccountInfo =
+            (&di.match_queue, true, &mut match_queue_account).into();
+
+        let match_queue =
+            SingleEventQueue::<MatchEvent>::mount(&match_queue_account_info, true).assert_unwrap();
+        if match_queue.read_head().is_err() {
+            return; // No event
+        }
+        let SingleEvent { data } = match_queue.read_head().assert_unwrap();
+
+        let user = Pubkey::new_from_array(data.user);
+        let order = ref_us.get_order(data.user_order_slot).assert_unwrap();
+
+        let in_asset = di.asset_as_ref(order.asset).assert_unwrap();
+
+        let mai = di
+            .market_asset_as_ref(order.market, order.long)
+            .assert_unwrap();
+
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
+
+        let out_mint = if order.open {
+            in_asset.mint // don't care
+        } else {
+            mai.mint
+        };
+
+        set_crank::setup(
+            context,
+            &self.program,
+            &payer,
+            &self.dex,
+            &user,
+            &self.user_state,
+            &in_asset.oracle,
+            &mai.mint,
+            &mai.oracle,
+            &mai.vault,
+            &mai.program_signer,
+            &out_mint,
+            &di.match_queue,
+            &di.event_queue,
+            &di.user_list_entry_page,
+            remaining_accounts,
+        )
+        .await
+        .unwrap();
+    }
+
+    pub async fn fill(&self, market: DexMarket) {
+        let di = self.dex_info.borrow();
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let mi = di.markets[market as usize];
+        let remaining_accounts = self
+            .get_market_order_pool_remaining_accounts(market as u8)
+            .await;
+
+        set_fill::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &mi.oracle,
+            &di.match_queue,
+            &mi.order_book,
+            &mi.order_pool_entry_page,
+            remaining_accounts,
+            market as u8,
+        )
+        .await
+        .unwrap()
+    }
+
+    pub async fn ask(&self, market: DexMarket, long: bool, price: f64, size: f64) {
+        let di = self.dex_info.borrow();
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let mi = di.markets[market as usize];
+        let remaining_accounts = self
+            .get_market_order_pool_remaining_accounts(market as u8)
+            .await;
+
+        set_ask::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &mi.oracle,
+            &mi.order_book,
+            &mi.order_pool_entry_page,
+            &self.user_state,
+            remaining_accounts,
+            market as u8,
+            long,
+            convert_to_big_number(price, TEST_USDC_DECIMALS),
+            convert_to_big_number(size, mi.decimals),
+        )
+        .await
+        .unwrap()
+    }
+
+    pub async fn bid(
+        &self,
+        in_asset: DexAsset,
+        market: DexMarket,
+        long: bool,
+        price: f64,
+        amount: f64,
+        leverage: u32,
+    ) {
+        let di = self.dex_info.borrow();
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+        let ai = self.dex_info.borrow().assets[in_asset as usize];
+        let bid_amount = convert_to_big_number(amount, ai.decimals);
+        let bid_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
+
+        let mi = di.markets[market as usize];
+
+        let in_mint = ai.mint;
+        let in_mint_oracle = ai.oracle;
+        let in_mint_vault = ai.vault;
+
+        let mai = if long {
+            di.assets[mi.asset_index as usize]
+        } else {
+            di.assets[di.usdc_asset_index as usize]
+        };
+
+        let market_mint = mai.mint;
+        let market_mint_oracle = mai.oracle;
+
+        let market_oracle = mi.oracle;
+        let order_book = mi.order_book;
+        let order_pool_entry_page = mi.order_pool_entry_page;
+
+        let user_state = self.user_state;
+
+        let remaining_accounts = self
+            .get_market_order_pool_remaining_accounts(market as u8)
+            .await;
+
+        set_bid::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &in_mint,
+            &in_mint_oracle,
+            &in_mint_vault,
+            &market_oracle,
+            &market_mint,
+            &market_mint_oracle,
+            &order_book,
+            &order_pool_entry_page,
+            &user_state,
+            remaining_accounts,
+            market as u8,
+            long,
+            bid_price,
+            bid_amount,
+            leverage,
+        )
+        .await
+        .unwrap()
+    }
+
+    pub async fn cancel(&self, user_order_slot: u8) {
+        let di = self.dex_info.borrow();
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let order = ref_us.get_order(user_order_slot).assert_unwrap();
+
+        let mi = di.markets[order.market as usize];
+        let remaining_accounts = self
+            .get_market_order_pool_remaining_accounts(order.market)
+            .await;
+
+        set_cancel::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.user_state,
+            &mi.order_book,
+            &mi.order_pool_entry_page,
+            remaining_accounts,
+            user_order_slot,
+        )
+        .await
+        .unwrap()
+    }
+
+    pub async fn cancel_call(&self) {
+        let di = self.dex_info.borrow();
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let mut remaining_accounts: Vec<AccountMeta> = Vec::new();
+
+        for i in 0..di.markets_number as usize {
+            let mi = di.markets[i];
+
+            remaining_accounts.append(&mut vec![AccountMeta::new(mi.order_book, false)]);
+            remaining_accounts.append(&mut vec![AccountMeta::new(mi.order_pool_entry_page, false)]);
+
+            for r in 0..mi.order_pool_remaining_pages_number as usize {
+                remaining_accounts.append(&mut vec![AccountMeta::new(
+                    mi.order_pool_remaining_pages[r],
+                    false,
+                )]);
+            }
+        }
+
+        set_cancel_all::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.user_state,
+            remaining_accounts,
+        )
+        .await
+        .unwrap()
+    }
+
+    pub async fn assert_bid_order(
+        &self,
+        in_asset: DexAsset,
+        market: DexMarket,
+        long: bool,
+        price: f64,
+        amount: f64,
+    ) {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let ai = self.dex_info.borrow().assets[in_asset as usize];
+
+        let bid_amount = convert_to_big_number(amount, ai.decimals);
+        let bid_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
+
+        let slots = ref_us.collect_market_orders(market as u8);
+
+        for slot in slots {
+            let order = ref_us.get_order(slot).assert_unwrap();
+            if order.open
+                && order.asset == in_asset as u8
+                && order.long == long
+                && order.price == bid_price
+                && order.size == bid_amount
+            {
+                return;
+            }
+        }
+
+        // Not found
+        assert!(false);
+    }
+
+    pub async fn assert_ask_order(&self, market: DexMarket, long: bool, price: f64, size: f64) {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let mi = self.dex_info.borrow().markets[market as usize];
+
+        let ask_size = convert_to_big_number(size, mi.decimals);
+        let ask_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
+
+        let slots = ref_us.collect_market_orders(market as u8);
+
+        for slot in slots {
+            let order = ref_us.get_order(slot).assert_unwrap();
+            if !order.open
+                && order.long == long
+                && order.price == ask_price
+                && order.size == ask_size
+            {
+                return;
+            }
+        }
+
+        // Not found
+        assert!(false);
     }
 }

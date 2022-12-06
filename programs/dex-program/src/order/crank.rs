@@ -10,8 +10,9 @@ use crate::{
     user::state::*,
     utils::{SafeMath, USER_LIST_MAGIC_BYTE},
 };
-use anchor_lang::prelude::*;
-use anchor_spl::token::{self, TokenAccount, Transfer};
+
+use anchor_lang::{prelude::*, system_program};
+use anchor_spl::token::{self, CloseAccount, TokenAccount, Transfer};
 
 #[derive(Accounts)]
 pub struct Crank<'info> {
@@ -27,7 +28,7 @@ pub struct Crank<'info> {
 
     #[account(
         mut,
-        constraint = (user_mint_acc.owner == *user.key && user_mint_acc.mint == *market_mint.key)
+        constraint = (user_mint_acc.mint == *market_mint.key)
     )]
     pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
@@ -67,6 +68,10 @@ pub struct Crank<'info> {
     /// CHECK
     #[account(executable, constraint = (token_program.key == &token::ID))]
     pub token_program: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(executable, constraint = (system_program.key == &system_program::ID))]
+    pub system_program: AccountInfo<'info>,
 }
 
 /// Layout of remaining counts:
@@ -200,6 +205,20 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             0,
         )?;
     } else {
+        if ctx.accounts.market_mint.key() == token::spl_token::native_mint::id() {
+            require_eq!(
+                ctx.accounts.user_mint_acc.owner,
+                ctx.accounts.authority.key(),
+                DexError::InvalidUserMintAccount
+            );
+        } else {
+            require_eq!(
+                ctx.accounts.user_mint_acc.owner,
+                ctx.accounts.user.key(),
+                DexError::InvalidUserMintAccount
+            );
+        }
+
         let seeds = &[
             ctx.accounts.market_mint.key.as_ref(),
             ctx.accounts.dex.to_account_info().key.as_ref(),
@@ -230,7 +249,7 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
 
         if withdrawable > 0 {
             let signer = &[&seeds[..]];
-            let cpi_accounts = Transfer {
+            let cpi_transfer = Transfer {
                 from: ctx.accounts.market_mint_vault.to_account_info(),
                 to: ctx.accounts.user_mint_acc.to_account_info(),
                 authority: ctx.accounts.market_mint_program_signer.to_account_info(),
@@ -238,10 +257,32 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
 
             let cpi_ctx = CpiContext::new_with_signer(
                 ctx.accounts.token_program.clone(),
-                cpi_accounts,
+                cpi_transfer,
                 signer,
             );
             token::transfer(cpi_ctx, withdrawable)?;
+
+            // If market mint is SOL,we can't create a temp WSOL account for the end user(we are cranking, no user sign),
+            // so have to use the authority as a "replay" to transfer the native mint to user
+            if ctx.accounts.market_mint.key() == token::spl_token::native_mint::id() {
+                let cpi_close = CloseAccount {
+                    account: ctx.accounts.user_mint_acc.to_account_info(),
+                    destination: ctx.accounts.authority.to_account_info(),
+                    authority: ctx.accounts.authority.to_account_info(),
+                };
+
+                let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_close);
+                token::close_account(cpi_ctx)?;
+
+                let cpi_sys_transfer = system_program::Transfer {
+                    from: ctx.accounts.authority.to_account_info(),
+                    to: ctx.accounts.user.to_account_info(),
+                };
+                let cpi_ctx =
+                    CpiContext::new(ctx.accounts.system_program.clone(), cpi_sys_transfer);
+
+                system_program::transfer(cpi_ctx, withdrawable)?;
+            }
         }
 
         // Save to event queue
