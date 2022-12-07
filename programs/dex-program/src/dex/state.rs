@@ -402,6 +402,18 @@ impl Dex {
         Ok(())
     }
 
+    pub fn increase_volume(&mut self, market: u8, price: u64, size: u64) -> DexResult {
+        require!(market < self.markets_number, DexError::InvalidMarketIndex);
+        let mi = &mut self.markets[market as usize];
+
+        let volume = size
+            .safe_mul(price)?
+            .safe_div(10u128.pow(mi.decimals.into()))? as u64;
+        mi.volume = mi.volume.safe_add(volume)? as u64;
+
+        Ok(())
+    }
+
     pub fn swap(
         &self,
         ain: u8,
@@ -598,6 +610,7 @@ pub struct MarketInfo {
     pub global_long: Position,
     pub global_short: Position,
 
+    pub volume: u64,
     pub minimum_collateral: u64,
     pub charge_borrow_fee_interval: u64,
     pub open_fee_rate: u16,
