@@ -28,7 +28,7 @@ use crate::utils::{
         TEST_USDC_TARGET_WEIGHT, TEST_VLP_DECIMALS,
     },
     convert_to_big_number, create_mint, create_token_account, get_context, get_dex_info,
-    get_keypair_from_file, get_program, set_mock_oracle,
+    get_keypair_from_file, get_program, set_mock_oracle, MAX_LEVERAGE,
 };
 
 use anchor_client::{
@@ -249,6 +249,7 @@ impl DexTestContext {
                 open_fee_rate,
                 close_fee_rate,
                 liquidate_fee_rate,
+                MAX_LEVERAGE,
                 decimals,
                 oracle_source,
                 asset_index,
@@ -283,6 +284,7 @@ impl DexTestContext {
                 open_fee_rate,
                 close_fee_rate,
                 liquidate_fee_rate,
+                MAX_LEVERAGE,
                 decimals,
                 oracle_source,
                 asset_index,
@@ -317,6 +319,7 @@ impl DexTestContext {
                 open_fee_rate,
                 close_fee_rate,
                 liquidate_fee_rate,
+                MAX_LEVERAGE,
                 decimals,
                 oracle_source,
                 asset_index,
@@ -363,6 +366,7 @@ pub async fn add_market(
     open_fee_rate: u16,
     close_fee_rate: u16,
     liquidate_fee_rate: u16,
+    max_leverage: u32,
     decimals: u8,
     oracle_source: u8,
     asset_index: u8,
@@ -386,6 +390,7 @@ pub async fn add_market(
         open_fee_rate,
         close_fee_rate,
         liquidate_fee_rate,
+        max_leverage,
         decimals,
         oracle_source,
         asset_index,

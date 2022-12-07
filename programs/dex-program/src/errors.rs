@@ -220,6 +220,9 @@ pub enum DexError {
 
     #[msg("Invalid user mint account")]
     InvalidUserMintAccount,
+
+    #[msg("Invalid leverage")]
+    InvalidLeverage,
 }
 
 pub type DexResult<T = ()> = Result<T>;

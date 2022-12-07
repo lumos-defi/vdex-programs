@@ -4,7 +4,7 @@ use crate::{
     errors::{DexError, DexResult},
     order::Order,
     user::state::*,
-    utils::{SafeMath, ORDER_POOL_MAGIC_BYTE},
+    utils::{SafeMath, LEVERAGE_POW_DECIMALS, ORDER_POOL_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -80,6 +80,11 @@ pub fn handler(
             && mi.order_book == ctx.accounts.order_book.key()
             && mi.order_pool_entry_page == ctx.accounts.order_pool_entry_page.key(),
         DexError::InvalidMarketIndex
+    );
+
+    require!(
+        leverage >= LEVERAGE_POW_DECIMALS && leverage <= mi.max_leverage,
+        DexError::InvalidLeverage
     );
 
     require_eq!(
