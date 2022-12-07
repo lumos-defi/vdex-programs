@@ -111,12 +111,12 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
     // Check if satisfies the minimum size
     if long {
         require!(
-            value(collateral, price, mi.decimals)? >= mi.minimum_position_value,
+            value(collateral, price, mi.decimals)? >= mi.minimum_collateral,
             DexError::PositionTooSmall
         );
     } else {
         require!(
-            collateral >= mi.minimum_position_value,
+            collateral >= mi.minimum_collateral,
             DexError::PositionTooSmall
         );
     }

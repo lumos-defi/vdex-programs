@@ -4,7 +4,7 @@ use crate::{
     errors::{DexError, DexResult},
     order::Order,
     user::state::*,
-    utils::{SafeMath, ORDER_POOL_MAGIC_BYTE},
+    utils::ORDER_POOL_MAGIC_BYTE,
 };
 use anchor_lang::prelude::*;
 
@@ -61,13 +61,13 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
         );
     }
 
-    let ai = &dex.assets[mi.asset_index as usize];
+    let ai = if long {
+        &dex.assets[mi.asset_index as usize]
+    } else {
+        &dex.assets[dex.usdc_asset_index as usize]
+    };
     require!(ai.valid, DexError::InvalidMarketIndex);
-
-    require!(
-        (size.safe_mul(price)? as u64) > mi.minimum_position_value,
-        DexError::InvalidAmount
-    );
+    let mfr = mi.get_fee_rates(ai.borrow_fee_rate);
 
     // Check price
     let market_price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
@@ -101,7 +101,7 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
     // Save order in user state
     let user_order_slot =
         us.borrow_mut()
-            .new_ask_order(order.index(), size, price, long, market)?;
+            .new_ask_order(order.index(), size, price, long, market, &mfr)?;
 
     // Link order to order book
     let side = if long { OrderSide::BID } else { OrderSide::ASK };
