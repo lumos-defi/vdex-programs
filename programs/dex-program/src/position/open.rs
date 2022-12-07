@@ -7,7 +7,7 @@ use crate::{
     errors::{DexError, DexResult},
     position::update_user_serial_number,
     user::state::*,
-    utils::{value, SafeMath, USER_LIST_MAGIC_BYTE},
+    utils::{value, SafeMath, LEVERAGE_POW_DECIMALS, USER_LIST_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -93,6 +93,11 @@ pub fn handler(
     require!(
         mi.valid && mi.oracle == ctx.accounts.market_oracle.key(),
         DexError::InvalidMarketIndex
+    );
+
+    require!(
+        leverage >= LEVERAGE_POW_DECIMALS && leverage <= mi.max_leverage,
+        DexError::InvalidLeverage
     );
 
     // Read market asset info

@@ -7,7 +7,7 @@ use bumpalo::{collections::Vec as BumpVec, vec as bump_vec, Bump};
 use rand::prelude::*;
 use safe_transmute::to_bytes::{transmute_to_bytes, transmute_to_bytes_mut};
 
-use super::LEVERAGE_DECIMALS;
+use super::LEVERAGE_POW_DECIMALS;
 
 pub const USDC_DECIMALS: u8 = 6;
 pub const SOL_DECIMALS: u8 = 9;
@@ -130,5 +130,5 @@ pub fn sol_i(size: f64) -> i64 {
 }
 
 pub fn leverage(l: u32) -> u32 {
-    l * 10u32.pow(LEVERAGE_DECIMALS as u32)
+    l * 10u32.pow(LEVERAGE_POW_DECIMALS as u32)
 }

@@ -9,6 +9,7 @@ const OPEN_FEE_RATE: u16 = 30; // 0.3% (30 / 10000)
 const CLOSE_FEE_RATE: u16 = 50; // 0.5%   (50 /  10000)
 const LIQUIDATE_FEE_RATE: u16 = 80; // 0.8%   (80 /  10000)
 
+pub const MAX_LEVERAGE: u32 = 30;
 //USDC ASSET
 pub const TEST_USDC_SYMBOL: &str = "USDC";
 pub const TEST_USDC_DECIMALS: u8 = 6;

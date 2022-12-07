@@ -4,7 +4,7 @@ use crate::{
     errors::{DexError, DexResult},
     utils::{
         swap, time::get_timestamp, value, ISafeAddSub, ISafeMath, SafeMath, FEE_RATE_BASE,
-        FEE_RATE_DECIMALS, LEVERAGE_DECIMALS, USD_POW_DECIMALS,
+        FEE_RATE_DECIMALS, LEVERAGE_POW_DECIMALS, USD_POW_DECIMALS,
     },
 };
 
@@ -604,13 +604,14 @@ pub struct MarketInfo {
     pub close_fee_rate: u16,
     pub liquidate_fee_rate: u16,
     pub liquidate_threshold: u16,
+    pub max_leverage: u32,
     pub valid: bool,
     pub decimals: u8,
     pub oracle_source: u8,
     pub asset_index: u8,
     pub significant_decimals: u8,
     pub order_pool_remaining_pages_number: u8,
-    pub padding: [u8; 250],
+    pub padding: [u8; 254],
 }
 
 pub struct MarketFeeRates {
@@ -703,13 +704,13 @@ impl Position {
         let size = if long {
             collateral
                 .safe_mul(leverage as u64)?
-                .safe_div(LEVERAGE_DECIMALS)
+                .safe_div(LEVERAGE_POW_DECIMALS.into())
         } else {
             collateral
                 .safe_mul(leverage as u64)?
                 .safe_mul(10u128.pow(mfr.base_decimals.into()))?
                 .safe_div(price as u128)?
-                .safe_div(LEVERAGE_DECIMALS)
+                .safe_div(LEVERAGE_POW_DECIMALS.into())
         }? as u64;
 
         let borrow = if long {
@@ -717,7 +718,7 @@ impl Position {
         } else {
             collateral
                 .safe_mul(leverage as u64)?
-                .safe_div(LEVERAGE_DECIMALS)
+                .safe_div(LEVERAGE_POW_DECIMALS.into())
         }? as u64;
 
         Ok((size, borrow))
@@ -736,13 +737,13 @@ impl Position {
         let size = if self.long {
             collateral
                 .safe_mul(leverage as u64)?
-                .safe_div(LEVERAGE_DECIMALS)
+                .safe_div(LEVERAGE_POW_DECIMALS.into())
         } else {
             collateral
                 .safe_mul(leverage as u64)?
                 .safe_mul(10u128.pow(mfr.base_decimals.into()))?
                 .safe_div(price as u128)?
-                .safe_div(LEVERAGE_DECIMALS)
+                .safe_div(LEVERAGE_POW_DECIMALS.into())
         }? as u64;
 
         // Update cumulative fund fee
@@ -766,7 +767,7 @@ impl Position {
         } else {
             collateral
                 .safe_mul(leverage as u64)?
-                .safe_div(LEVERAGE_DECIMALS)
+                .safe_div(LEVERAGE_POW_DECIMALS.into())
         }? as u64;
 
         let merged_size = self.size.safe_add(size)?;
@@ -909,7 +910,7 @@ impl Position {
     pub fn calc_collateral_and_fee(amount: u64, leverage: u32, rate: u16) -> DexResult<(u64, u64)> {
         let temp = (leverage as u64)
             .safe_mul(rate as u64)?
-            .safe_div(LEVERAGE_DECIMALS)? as u64;
+            .safe_div(LEVERAGE_POW_DECIMALS.into())? as u64;
 
         let dividend = amount.safe_mul(temp)?;
         let divisor = (FEE_RATE_BASE as u128).safe_add(temp as u128)?;

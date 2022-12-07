@@ -8,7 +8,7 @@ pub const USER_STATE_MAGIC_NUMBER: u32 = 0x6668;
 pub const ORDER_POOL_MAGIC_BYTE: u8 = 0x30;
 pub const USER_LIST_MAGIC_BYTE: u8 = 0x31;
 
-pub const LEVERAGE_DECIMALS: u128 = 1000;
+pub const LEVERAGE_POW_DECIMALS: u32 = 1000;
 pub const FEE_RATE_DECIMALS: u32 = 4;
 pub const FEE_RATE_BASE: u128 = 10000;
 

@@ -7,7 +7,7 @@ use crate::{
     dex::{MarketInfo, OracleSource, Position},
     errors::{DexError, DexResult},
     order::Order,
-    utils::ORDER_POOL_MAGIC_BYTE,
+    utils::{LEVERAGE_POW_DECIMALS, ORDER_POOL_MAGIC_BYTE},
 };
 
 use super::Dex;
@@ -43,6 +43,7 @@ pub fn handler(
     open_fee_rate: u16,
     close_fee_rate: u16,
     liquidate_fee_rate: u16,
+    max_leverage: u32,
     decimals: u8,
     oracle_source: u8,
     asset_index: u8,
@@ -97,13 +98,14 @@ pub fn handler(
         close_fee_rate,
         liquidate_fee_rate,
         liquidate_threshold: 10,
+        max_leverage: max_leverage * LEVERAGE_POW_DECIMALS,
         valid: true,
         decimals,
         oracle_source,
         asset_index,
         significant_decimals,
         order_pool_remaining_pages_number: 0,
-        padding: [0; 250],
+        padding: [0; 254],
     };
 
     dex.markets[market_index] = market;
