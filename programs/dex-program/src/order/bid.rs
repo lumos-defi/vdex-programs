@@ -4,7 +4,7 @@ use crate::{
     errors::{DexError, DexResult},
     order::Order,
     user::state::*,
-    utils::{SafeMath, LEVERAGE_POW_DECIMALS, ORDER_POOL_MAGIC_BYTE},
+    utils::{value, LEVERAGE_POW_DECIMALS, ORDER_POOL_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -92,7 +92,7 @@ pub fn handler(
         ctx.remaining_accounts.len(),
         DexError::InvalidRemainingAccounts
     );
-    let minimum_position_value = mi.minimum_position_value;
+    let minimum_collateral = mi.minimum_collateral;
 
     for i in 0..mi.order_pool_remaining_pages_number as usize {
         require_eq!(
@@ -143,11 +143,16 @@ pub fn handler(
         out
     };
 
-    let (size, borrow) = Position::size_and_borrow(long, price, actual_amount, leverage, &mfr)?;
-    require!(
-        size.safe_mul(price)? as u64 >= minimum_position_value,
-        DexError::PositionTooSmall
-    );
+    let (collateral, borrow) =
+        Position::collateral_and_borrow(long, price, actual_amount, leverage, &mfr)?;
+    if long {
+        require!(
+            value(collateral, price, mfr.base_decimals)? >= minimum_collateral,
+            DexError::PositionTooSmall
+        );
+    } else {
+        require!(collateral >= minimum_collateral, DexError::PositionTooSmall);
+    }
 
     dex.has_sufficient_liquidity(market, long, borrow)?;
 

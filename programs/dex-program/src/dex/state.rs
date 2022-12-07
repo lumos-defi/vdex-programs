@@ -598,7 +598,7 @@ pub struct MarketInfo {
     pub global_long: Position,
     pub global_short: Position,
 
-    pub minimum_position_value: u64,
+    pub minimum_collateral: u64,
     pub charge_borrow_fee_interval: u64,
     pub open_fee_rate: u16,
     pub close_fee_rate: u16,
@@ -616,7 +616,7 @@ pub struct MarketInfo {
 
 pub struct MarketFeeRates {
     pub charge_borrow_fee_interval: u64,
-    pub minimum_position_value: u64,
+    pub minimum_collateral: u64,
     pub borrow_fee_rate: u16,
     pub open_fee_rate: u16,
     pub close_fee_rate: u16,
@@ -629,7 +629,7 @@ impl MarketInfo {
     pub fn get_fee_rates(&self, borrow_fee_rate: u16) -> MarketFeeRates {
         MarketFeeRates {
             charge_borrow_fee_interval: self.charge_borrow_fee_interval,
-            minimum_position_value: self.minimum_position_value,
+            minimum_collateral: self.minimum_collateral,
             borrow_fee_rate,
             open_fee_rate: self.open_fee_rate,
             close_fee_rate: self.close_fee_rate,
@@ -691,7 +691,7 @@ impl Position {
         Ok(())
     }
 
-    pub fn size_and_borrow(
+    pub fn collateral_and_borrow(
         long: bool,
         price: u64,
         amount: u64,
@@ -721,7 +721,7 @@ impl Position {
                 .safe_div(LEVERAGE_POW_DECIMALS.into())
         }? as u64;
 
-        Ok((size, borrow))
+        Ok((collateral, borrow))
     }
 
     pub fn open(
@@ -745,6 +745,19 @@ impl Position {
                 .safe_div(price as u128)?
                 .safe_div(LEVERAGE_POW_DECIMALS.into())
         }? as u64;
+
+        // Check if satisfy the minimum collateral
+        if self.long {
+            require!(
+                value(collateral, price, mfr.base_decimals)? >= mfr.minimum_collateral,
+                DexError::PositionTooSmall
+            );
+        } else {
+            require!(
+                collateral >= mfr.minimum_collateral,
+                DexError::PositionTooSmall
+            );
+        }
 
         // Update cumulative fund fee
         let now = get_timestamp()?;
@@ -787,13 +800,15 @@ impl Position {
         Ok((size, collateral, borrow, open_fee))
     }
 
-    pub fn close(
+    pub fn check_close(
         &mut self,
         size: u64,
         price: u64,
         mfr: &MarketFeeRates,
         liquidate: bool,
-    ) -> DexResult<(u64, u64, i64, u64, u64)> {
+    ) -> DexResult<(Position, u64, u64, i64, u64, u64)> {
+        let mut position = *self;
+
         let unclosing_size = self.size.safe_sub(self.closing_size)?;
         let closing_size = if size > unclosing_size {
             unclosing_size
@@ -847,40 +862,81 @@ impl Position {
         let pnl_with_fee = pnl.i_safe_sub(total_fee as i64)?;
 
         // Update the position
-        self.size = unclosing_size
+        position.size = unclosing_size
             .safe_sub(closing_size)?
             .safe_add(self.closing_size)?;
 
-        self.borrowed_amount = self.borrowed_amount.safe_sub(fund_returned)?;
-        self.collateral = self.collateral.safe_sub(collateral_unlocked)?;
-        self.cumulative_fund_fee = 0;
-        self.last_fill_time = now;
+        position.borrowed_amount = self.borrowed_amount.safe_sub(fund_returned)?;
+        position.collateral = self.collateral.safe_sub(collateral_unlocked)?;
+        position.cumulative_fund_fee = 0;
+        position.last_fill_time = now;
 
         // If (pnl - fee) < 0, check if the unlocked collateral covers loss + fee
         let user_balance = (collateral_unlocked as i64).i_safe_add(pnl_with_fee)?;
         if user_balance < 0 {
             let abs_user_balance = i64::abs(user_balance) as u64;
 
-            if abs_user_balance < self.collateral {
-                self.collateral = self.collateral.safe_sub(abs_user_balance)?;
+            if abs_user_balance < position.collateral {
+                position.collateral = position.collateral.safe_sub(abs_user_balance)?;
                 collateral_unlocked = collateral_unlocked.safe_add(abs_user_balance)?;
             } else {
-                self.collateral = 0;
-                fund_returned = fund_returned.safe_add(self.borrowed_amount)?;
-                collateral_unlocked = collateral_unlocked.safe_add(self.collateral)?;
+                position.collateral = 0;
+                fund_returned = fund_returned.safe_add(position.borrowed_amount)?;
+                collateral_unlocked = collateral_unlocked.safe_add(position.collateral)?;
             }
         }
 
-        if self.size == 0 || self.collateral == 0 {
-            self.zero(self.long)?;
+        if position.size == 0 || position.collateral == 0 {
+            position.zero(position.long)?;
         }
 
-        if self.size > 0 {
+        if position.size > 0 {
+            if position.long {
+                require!(
+                    value(position.collateral, price, mfr.base_decimals)? >= mfr.minimum_collateral,
+                    DexError::PositionTooSmall
+                );
+            } else {
+                require!(
+                    position.collateral >= mfr.minimum_collateral,
+                    DexError::PositionTooSmall
+                );
+            }
+        }
+
+        if position.long {
             require!(
-                self.size.safe_mul(price)? as u64 >= mfr.minimum_position_value,
+                value(collateral_unlocked, price, mfr.base_decimals)? >= mfr.minimum_collateral,
+                DexError::PositionTooSmall
+            );
+        } else {
+            require!(
+                collateral_unlocked >= mfr.minimum_collateral,
                 DexError::PositionTooSmall
             );
         }
+
+        Ok((
+            position,
+            fund_returned,
+            collateral_unlocked,
+            pnl,
+            close_fee,
+            borrow_fee,
+        ))
+    }
+
+    pub fn close(
+        &mut self,
+        size: u64,
+        price: u64,
+        mfr: &MarketFeeRates,
+        liquidate: bool,
+    ) -> DexResult<(u64, u64, i64, u64, u64)> {
+        let (position, fund_returned, collateral_unlocked, pnl, close_fee, borrow_fee) =
+            self.check_close(size, price, mfr, liquidate)?;
+
+        *self = position;
 
         Ok((
             fund_returned,
