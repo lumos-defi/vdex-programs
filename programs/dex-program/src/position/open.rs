@@ -7,7 +7,7 @@ use crate::{
     errors::{DexError, DexResult},
     position::update_user_serial_number,
     user::state::*,
-    utils::{SafeMath, LEVERAGE_POW_DECIMALS, USER_LIST_MAGIC_BYTE},
+    utils::{value, SafeMath, LEVERAGE_POW_DECIMALS, USER_LIST_MAGIC_BYTE},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -120,6 +120,10 @@ pub fn handler(
 
     // Get market price
     let price = get_oracle_price(mi.oracle_source, &ctx.accounts.market_oracle)?;
+    let market_mint_price = get_oracle_price(mai.oracle_source, &ctx.accounts.market_mint_oracle)?;
+    let market_mint_decimals = mai.decimals;
+    let minimum_collateral = mi.minimum_collateral;
+
     let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
 
     // Read user input asset info
@@ -180,6 +184,11 @@ pub fn handler(
     let (size, collateral, borrow, open_fee) =
         us.borrow_mut()
             .open_position(market, price, actual_amount, long, leverage, &mfr)?;
+
+    require!(
+        value(collateral, market_mint_price, market_mint_decimals)? >= minimum_collateral,
+        DexError::CollateralTooSmall
+    );
 
     // Update asset info (collateral amount, borrow amount, fee)
     dex.borrow_fund(market, long, collateral, borrow, open_fee)?;

@@ -92,7 +92,6 @@ pub fn handler(
         ctx.remaining_accounts.len(),
         DexError::InvalidRemainingAccounts
     );
-    let minimum_collateral = mi.minimum_collateral;
 
     for i in 0..mi.order_pool_remaining_pages_number as usize {
         require_eq!(
@@ -145,14 +144,11 @@ pub fn handler(
 
     let (collateral, borrow) =
         Position::collateral_and_borrow(long, price, actual_amount, leverage, &mfr)?;
-    if long {
-        require!(
-            value(collateral, price, mfr.base_decimals)? >= minimum_collateral,
-            DexError::PositionTooSmall
-        );
-    } else {
-        require!(collateral >= minimum_collateral, DexError::PositionTooSmall);
-    }
+    let market_mint_price = get_oracle_price(mai.oracle_source, &ctx.accounts.market_mint_oracle)?;
+    require!(
+        value(collateral, market_mint_price, mai.decimals)? >= mi.minimum_collateral,
+        DexError::CollateralTooSmall
+    );
 
     dex.has_sufficient_liquidity(market, long, borrow)?;
 
