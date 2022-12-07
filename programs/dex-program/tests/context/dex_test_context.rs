@@ -6,20 +6,20 @@ use crate::utils::{
         INIT_ADD_SOL_AMOUNT, TEST_BTC_ADD_LIQUIDITY_FEE_RATE, TEST_BTC_ASSET_INDEX,
         TEST_BTC_BORROW_FEE_RATE, TEST_BTC_CHARGE_BORROW_FEE_INTERVAL, TEST_BTC_CLOSE_FEE_RATE,
         TEST_BTC_DECIMALS, TEST_BTC_LIQUIDATE_FEE_RATE, TEST_BTC_MARKET_DECIMALS,
-        TEST_BTC_MARKET_SYMBOL, TEST_BTC_MINIMUM_POSITION_VALUE, TEST_BTC_OPEN_FEE_RATE,
+        TEST_BTC_MARKET_SYMBOL, TEST_BTC_MINIMUM_COLLATERAL, TEST_BTC_OPEN_FEE_RATE,
         TEST_BTC_ORACLE_EXPO, TEST_BTC_ORACLE_PRICE, TEST_BTC_ORACLE_SOURCE,
         TEST_BTC_REMOVE_LIQUIDITY_FEE_RATE, TEST_BTC_SIGNIFICANT_DECIMALS, TEST_BTC_SWAP_FEE_RATE,
         TEST_BTC_SYMBOL, TEST_BTC_TARGET_WEIGHT, TEST_ETH_ADD_LIQUIDITY_FEE_RATE,
         TEST_ETH_ASSET_INDEX, TEST_ETH_BORROW_FEE_RATE, TEST_ETH_CHARGE_BORROW_FEE_INTERVAL,
         TEST_ETH_CLOSE_FEE_RATE, TEST_ETH_DECIMALS, TEST_ETH_LIQUIDATE_FEE_RATE,
-        TEST_ETH_MARKET_DECIMALS, TEST_ETH_MARKET_SYMBOL, TEST_ETH_MINIMUM_POSITION_VALUE,
+        TEST_ETH_MARKET_DECIMALS, TEST_ETH_MARKET_SYMBOL, TEST_ETH_MINIMUM_COLLATERAL,
         TEST_ETH_OPEN_FEE_RATE, TEST_ETH_ORACLE_EXPO, TEST_ETH_ORACLE_PRICE,
         TEST_ETH_ORACLE_SOURCE, TEST_ETH_REMOVE_LIQUIDITY_FEE_RATE, TEST_ETH_SIGNIFICANT_DECIMALS,
         TEST_ETH_SWAP_FEE_RATE, TEST_ETH_SYMBOL, TEST_ETH_TARGET_WEIGHT,
         TEST_SOL_ADD_LIQUIDITY_FEE_RATE, TEST_SOL_ASSET_INDEX, TEST_SOL_BORROW_FEE_RATE,
         TEST_SOL_CHARGE_BORROW_FEE_INTERVAL, TEST_SOL_CLOSE_FEE_RATE, TEST_SOL_DECIMALS,
         TEST_SOL_LIQUIDATE_FEE_RATE, TEST_SOL_MARKET_DECIMALS, TEST_SOL_MARKET_SYMBOL,
-        TEST_SOL_MINIMUM_POSITION_VALUE, TEST_SOL_OPEN_FEE_RATE, TEST_SOL_ORACLE_EXPO,
+        TEST_SOL_MINIMUM_COLLATERAL, TEST_SOL_OPEN_FEE_RATE, TEST_SOL_ORACLE_EXPO,
         TEST_SOL_ORACLE_PRICE, TEST_SOL_ORACLE_SOURCE, TEST_SOL_REMOVE_LIQUIDITY_FEE_RATE,
         TEST_SOL_SIGNIFICANT_DECIMALS, TEST_SOL_SWAP_FEE_RATE, TEST_SOL_SYMBOL,
         TEST_SOL_TARGET_WEIGHT, TEST_USDC_ADD_LIQUIDITY_FEE_RATE, TEST_USDC_BORROW_FEE_RATE,
@@ -226,8 +226,8 @@ impl DexTestContext {
         //6. add BTC market
         {
             let symbol: &str = TEST_BTC_MARKET_SYMBOL;
-            let minimum_position_value: u64 =
-                convert_to_big_number(TEST_BTC_MINIMUM_POSITION_VALUE as f64, 6);
+            let minimum_collateral: u64 =
+                convert_to_big_number(TEST_BTC_MINIMUM_COLLATERAL as f64, 6);
             let charge_borrow_fee_interval: u64 = TEST_BTC_CHARGE_BORROW_FEE_INTERVAL;
             let open_fee_rate: u16 = TEST_BTC_OPEN_FEE_RATE;
             let close_fee_rate: u16 = TEST_BTC_CLOSE_FEE_RATE;
@@ -244,7 +244,7 @@ impl DexTestContext {
                 &dex,
                 &btc_mock_oracle,
                 symbol.to_string(),
-                minimum_position_value,
+                minimum_collateral,
                 charge_borrow_fee_interval,
                 open_fee_rate,
                 close_fee_rate,
@@ -261,8 +261,8 @@ impl DexTestContext {
         //7. add ETH market
         {
             let symbol: &str = TEST_ETH_MARKET_SYMBOL;
-            let minimum_position_value: u64 =
-                convert_to_big_number(TEST_ETH_MINIMUM_POSITION_VALUE as f64, 6);
+            let minimum_collateral: u64 =
+                convert_to_big_number(TEST_ETH_MINIMUM_COLLATERAL as f64, 6);
             let charge_borrow_fee_interval: u64 = TEST_ETH_CHARGE_BORROW_FEE_INTERVAL;
             let open_fee_rate: u16 = TEST_ETH_OPEN_FEE_RATE;
             let close_fee_rate: u16 = TEST_ETH_CLOSE_FEE_RATE;
@@ -279,7 +279,7 @@ impl DexTestContext {
                 &dex,
                 &eth_mock_oracle,
                 symbol.to_string(),
-                minimum_position_value,
+                minimum_collateral,
                 charge_borrow_fee_interval,
                 open_fee_rate,
                 close_fee_rate,
@@ -296,8 +296,8 @@ impl DexTestContext {
         //8. add SOL market
         {
             let symbol: &str = TEST_SOL_MARKET_SYMBOL;
-            let minimum_position_value: u64 =
-                convert_to_big_number(TEST_SOL_MINIMUM_POSITION_VALUE as f64, 6);
+            let minimum_collateral: u64 =
+                convert_to_big_number(TEST_SOL_MINIMUM_COLLATERAL as f64, 6);
             let charge_borrow_fee_interval: u64 = TEST_SOL_CHARGE_BORROW_FEE_INTERVAL;
             let open_fee_rate: u16 = TEST_SOL_OPEN_FEE_RATE; // 0.3% (30 / 10000)
             let close_fee_rate: u16 = TEST_SOL_CLOSE_FEE_RATE; // 0.5%   (50 /  10000)
@@ -314,7 +314,7 @@ impl DexTestContext {
                 &dex,
                 &sol_mock_oracle,
                 symbol.to_string(),
-                minimum_position_value,
+                minimum_collateral,
                 charge_borrow_fee_interval,
                 open_fee_rate,
                 close_fee_rate,
@@ -361,7 +361,7 @@ pub async fn add_market(
     dex: &Keypair,
     mock_oracle: &Keypair,
     symbol: String,
-    minimum_position_value: u64,
+    minimum_collateral: u64,
     charge_borrow_fee_interval: u64,
     open_fee_rate: u16,
     close_fee_rate: u16,
@@ -385,7 +385,7 @@ pub async fn add_market(
         &order_pool_entry_page.pubkey(),
         &mock_oracle.pubkey(),
         symbol.to_string(),
-        minimum_position_value,
+        minimum_collateral,
         charge_borrow_fee_interval,
         open_fee_rate,
         close_fee_rate,

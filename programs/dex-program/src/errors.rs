@@ -132,7 +132,7 @@ pub enum DexError {
     InvalidVlpMintAuthority,
 
     #[msg("Position too small")]
-    PositionTooSmall,
+    CollateralTooSmall,
 
     #[msg("Invalid position time")]
     InvalidPositionTime,

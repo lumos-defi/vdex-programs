@@ -184,7 +184,7 @@ pub async fn compose_add_market_ixs(
     order_pool_entry_page: &Pubkey,
     oracle: &Pubkey,
     symbol: String,
-    minimum_position_value: u64,
+    minimum_collateral: u64,
     charge_borrow_fee_interval: u64,
     open_fee_rate: u16,
     close_fee_rate: u16,
@@ -224,7 +224,7 @@ pub async fn compose_add_market_ixs(
         })
         .args(dex_program::instruction::AddMarket {
             symbol,
-            minimum_position_value,
+            minimum_collateral,
             charge_borrow_fee_interval,
             open_fee_rate,
             close_fee_rate,

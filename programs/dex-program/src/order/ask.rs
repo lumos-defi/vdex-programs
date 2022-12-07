@@ -67,7 +67,6 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
         &dex.assets[dex.usdc_asset_index as usize]
     };
     require!(ai.valid, DexError::InvalidMarketIndex);
-    let mfr = mi.get_fee_rates(ai.borrow_fee_rate);
 
     // Check price
     let market_price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
@@ -101,7 +100,7 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
     // Save order in user state
     let user_order_slot =
         us.borrow_mut()
-            .new_ask_order(order.index(), size, price, long, market, &mfr)?;
+            .new_ask_order(order.index(), size, price, long, market)?;
 
     // Link order to order book
     let side = if long { OrderSide::BID } else { OrderSide::ASK };

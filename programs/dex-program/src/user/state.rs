@@ -157,22 +157,6 @@ impl UserPosition {
             self.short.unclosing_size()
         }
     }
-
-    pub fn check_close(
-        &mut self,
-        long: bool,
-        size: u64,
-        price: u64,
-        mfr: &MarketFeeRates,
-    ) -> DexResult {
-        if long {
-            self.long.check_close(size, price, mfr, false)?;
-        } else {
-            self.short.check_close(size, price, mfr, false)?;
-        };
-
-        Ok(())
-    }
 }
 
 pub struct UserState<'a> {
@@ -386,7 +370,6 @@ impl<'a> UserState<'a> {
         price: u64,
         long: bool,
         market: u8,
-        mfr: &MarketFeeRates,
     ) -> DexResult<u8> {
         let order = self.order_pool.new_slot()?;
         order
@@ -396,8 +379,6 @@ impl<'a> UserState<'a> {
         self.order_pool.add_to_tail(order)?;
 
         let position = self.find_or_new_position(market, false)?;
-        position.data.check_close(long, size, price, mfr)?;
-
         position.data.add_closing(long, size)?;
 
         let unclosing_size = position.data.unclosing_size(long)?;
@@ -732,29 +713,6 @@ mod test {
     }
 
     #[test]
-    fn test_open_fail_minimum_collateral() {
-        let bump = Bump::new();
-        let required_size = UserState::required_account_size(8u8, 8u8);
-        let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, 8u8, 8u8, Pubkey::default()).assert_ok();
-
-        let us = UserState::mount(&account, true).assert_unwrap();
-        let mfr = mock_mfr();
-        let leverage = 20u64;
-
-        us.borrow_mut()
-            .open_position(
-                0,
-                usdc(20000.),
-                btc(0.01),
-                true,
-                leverage as u32 * 1000,
-                &mfr,
-            )
-            .assert_err();
-    }
-
-    #[test]
     fn test_close_long_with_profit() {
         let bump = Bump::new();
         let required_size = UserState::required_account_size(8u8, 8u8);
@@ -802,38 +760,6 @@ mod test {
         assert_eq!(borrow_fee, expected_borrow_fee);
         assert_eq!(close_fee, expected_close_fee);
         assert_eq!(pnl, expected_pnl as i64);
-    }
-
-    #[test]
-    fn test_close_fail_minimum_collateral() {
-        let bump = Bump::new();
-        let required_size = UserState::required_account_size(8u8, 8u8);
-        let account = gen_account(required_size, &bump);
-        UserState::initialize(&account, 8u8, 8u8, Pubkey::default()).assert_ok();
-
-        let us = UserState::mount(&account, true).assert_unwrap();
-        let mfr = mock_mfr();
-        let leverage = 20u64;
-        us.borrow_mut()
-            .open_position(
-                0,
-                usdc(20000.),
-                btc(1.0),
-                true,
-                leverage as u32 * 1000,
-                &mfr,
-            )
-            .assert_unwrap();
-
-        // Unlocked collateral too small
-        us.borrow_mut()
-            .close_position(0, btc(0.1), usdc(20000.), true, &mfr, false)
-            .assert_err();
-
-        // Remained collateral too small
-        us.borrow_mut()
-            .close_position(0, btc(19.1), usdc(20000.), true, &mfr, false)
-            .assert_err();
     }
 
     #[test]
@@ -1063,11 +989,11 @@ mod test {
         // Create ask orders
         for _ in 0..max_order_count {
             us.borrow_mut()
-                .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0, &mfr)
+                .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0)
                 .assert_unwrap();
         }
         us.borrow_mut()
-            .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0, &mfr)
+            .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0)
             .assert_err();
     }
 
@@ -1090,7 +1016,7 @@ mod test {
 
         let user_order_slot = us
             .borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, &mfr)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_unwrap();
 
         let order = us.borrow().get_order(user_order_slot).assert_unwrap();
@@ -1124,16 +1050,16 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, &mfr)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, &mfr)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         // Can not place ask order with larger size
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, &mfr)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_err();
     }
 
@@ -1161,11 +1087,11 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, &mfr)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0, &mfr)
+            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0)
             .assert_ok();
 
         let orders = us.borrow().collect_market_orders(0);
@@ -1200,11 +1126,11 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, &mfr)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0, &mfr)
+            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0)
             .assert_ok();
 
         let orders = us.borrow().collect_market_orders(0);
@@ -1241,7 +1167,7 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0, &mfr)
+            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         // It should be ok to close the other half size.

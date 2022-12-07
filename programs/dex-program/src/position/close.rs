@@ -7,7 +7,7 @@ use crate::{
     errors::{DexError, DexResult},
     position::update_user_serial_number,
     user::state::*,
-    utils::{value, USER_LIST_MAGIC_BYTE},
+    utils::USER_LIST_MAGIC_BYTE,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -107,19 +107,6 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
     let (borrow, collateral, pnl, close_fee, borrow_fee) = us
         .borrow_mut()
         .close_position(market, size, price, long, &mfr, false)?;
-
-    // Check if satisfies the minimum size
-    if long {
-        require!(
-            value(collateral, price, mi.decimals)? >= mi.minimum_collateral,
-            DexError::PositionTooSmall
-        );
-    } else {
-        require!(
-            collateral >= mi.minimum_collateral,
-            DexError::PositionTooSmall
-        );
-    }
 
     // Update market global position
     dex.decrease_global_position(market, long, size, collateral)?;
