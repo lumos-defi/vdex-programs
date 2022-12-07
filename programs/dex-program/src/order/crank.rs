@@ -182,6 +182,7 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
 
         dex.borrow_fund(order.market, order.long, collateral, borrow, open_fee)?;
         dex.increase_global_position(order.market, order.long, order.price, size, collateral)?;
+        dex.increase_volume(order.market, order.price, size)?;
 
         // Save to event queue
         event_queue.fill_position(
