@@ -204,7 +204,7 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
             Err(_) => continue,
         };
 
-        let (_, open, long) = us
+        let (_, open, long, _, _) = us
             .borrow_mut()
             .unlink_order(user_order_slot)
             .map_err(|_| DexError::InvalidOrderSlot)?;

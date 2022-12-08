@@ -7,6 +7,7 @@ use crate::{
     utils::ORDER_POOL_MAGIC_BYTE,
 };
 use anchor_lang::prelude::*;
+use anchor_spl::token::{self, TokenAccount, Transfer};
 
 #[derive(Accounts)]
 pub struct CancelOrder<'info> {
@@ -22,11 +23,31 @@ pub struct CancelOrder<'info> {
     pub order_pool_entry_page: UncheckedAccount<'info>,
 
     /// CHECK
+    pub mint: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(mut)]
+    pub vault: AccountInfo<'info>,
+
+    /// CHECK
+    pub program_signer: AccountInfo<'info>,
+
+    #[account(
+            mut,
+            constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *mint.key)
+        )]
+    pub user_mint_acc: Box<Account<'info, TokenAccount>>,
+
+    /// CHECK
     #[account(mut, seeds = [dex.key().as_ref(), authority.key().as_ref()], bump)]
     pub user_state: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
+
+    /// CHECK
+    #[account(executable, constraint = (token_program.key == &token::ID))]
+    pub token_program: AccountInfo<'info>,
 }
 
 /// Layout of remaining counts:
@@ -39,13 +60,43 @@ pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
         .get_order_info(user_order_slot)
         .map_err(|_| DexError::InvalidOrderSlot)?;
 
-    let (market, open, long) = us
+    let (market, open, long, asset, size) = us
         .borrow_mut()
         .unlink_order(user_order_slot)
         .map_err(|_| DexError::InvalidOrderSlot)?;
 
     let dex = &ctx.accounts.dex.load()?;
     require!(market < dex.markets_number, DexError::InvalidMarketIndex);
+
+    // Refund if it's bid order
+    if open {
+        let ai = dex.asset_as_ref(asset)?;
+        require!(
+            ai.valid
+                && ai.mint == ctx.accounts.mint.key()
+                && ai.vault == ctx.accounts.vault.key()
+                && ai.program_signer == ctx.accounts.program_signer.key(),
+            DexError::InvalidAssetIndex
+        );
+
+        let seeds = &[
+            ctx.accounts.mint.key.as_ref(),
+            ctx.accounts.dex.to_account_info().key.as_ref(),
+            &[ai.nonce],
+        ];
+        let signer = &[&seeds[..]];
+
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.vault.to_account_info(),
+            to: ctx.accounts.user_mint_acc.to_account_info(),
+            authority: ctx.accounts.program_signer.to_account_info(),
+        };
+
+        // let cpi_program = ctx.accounts.token_program.clone();
+        let cpi_ctx =
+            CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_accounts, signer);
+        token::transfer(cpi_ctx, size)?;
+    }
 
     let mi = &dex.markets[market as usize];
     require!(

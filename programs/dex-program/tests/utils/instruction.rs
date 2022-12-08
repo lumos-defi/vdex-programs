@@ -599,6 +599,10 @@ pub async fn compose_cancel_ix(
     user_state: &Pubkey,
     order_book: &Pubkey,
     order_pool_entry_page: &Pubkey,
+    mint: &Pubkey,
+    vault: &Pubkey,
+    program_signer: &Pubkey,
+    user_mint_acc: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     user_order_slot: u8,
 ) -> Instruction {
@@ -608,8 +612,13 @@ pub async fn compose_cancel_ix(
             dex: *dex,
             order_book: *order_book,
             order_pool_entry_page: *order_pool_entry_page,
+            mint: *mint,
+            vault: *vault,
+            program_signer: *program_signer,
+            user_mint_acc: *user_mint_acc,
             user_state: *user_state,
             authority: payer.pubkey(),
+            token_program: spl_token::id(),
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::CancelOrder { user_order_slot })
