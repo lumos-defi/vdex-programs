@@ -406,7 +406,7 @@ impl<'a> UserState<'a> {
         Ok(order.data.order_slot)
     }
 
-    pub fn unlink_order(&mut self, user_order_slot: u8) -> DexResult<(u8, bool, bool)> {
+    pub fn unlink_order(&mut self, user_order_slot: u8) -> DexResult<(u8, bool, bool, u8, u64)> {
         let order = self.order_pool.from_index(user_order_slot)?;
         require!(order.in_use(), DexError::InvalidIndex);
 
@@ -418,11 +418,16 @@ impl<'a> UserState<'a> {
         }
 
         let UserOrder {
-            market, open, long, ..
+            market,
+            open,
+            long,
+            asset,
+            size,
+            ..
         } = order.data;
         self.order_pool.remove(user_order_slot)?;
 
-        Ok((market, open, long))
+        Ok((market, open, long, asset, size))
     }
 
     pub fn collect_market_orders(&self, market: u8) -> Vec<u8> {

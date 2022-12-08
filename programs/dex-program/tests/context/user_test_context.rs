@@ -20,7 +20,7 @@ use anchor_lang::prelude::{AccountInfo, AccountMeta, Pubkey};
 use crate::utils::constant::TEST_VLP_DECIMALS;
 use crate::utils::TestResult;
 use dex_program::{
-    collections::{SingleEvent, SingleEventQueue},
+    collections::{OrderBook, SingleEvent, SingleEventQueue},
     dex::{Dex, MockOracle},
     order::MatchEvent,
     user::UserState,
@@ -587,7 +587,10 @@ impl UserTestContext {
             convert_to_big_number(amount.into(), asset_info.decimals)
         );
 
-        assert!(asset_amount - convert_to_big_number(amount.into(), asset_info.decimals) <= 2);
+        let difference =
+            asset_amount as i64 - convert_to_big_number(amount.into(), asset_info.decimals) as i64;
+
+        assert!(difference.abs() <= 2);
     }
 
     pub async fn assert_vlp(&self, amount: f64) {
@@ -896,7 +899,7 @@ impl UserTestContext {
         price: f64,
         amount: f64,
         leverage: u32,
-    ) {
+    ) -> Result<(), TransportError> {
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
         let ai = self.dex_info.borrow().assets[in_asset as usize];
@@ -950,13 +953,37 @@ impl UserTestContext {
             leverage,
         )
         .await
-        .unwrap()
+    }
+
+    pub async fn assert_bid(
+        &self,
+        in_asset: DexAsset,
+        market: DexMarket,
+        long: bool,
+        price: f64,
+        amount: f64,
+        leverage: u32,
+    ) {
+        self.bid(in_asset, market, long, price, amount, leverage)
+            .await
+            .assert_ok();
+    }
+
+    pub async fn assert_bid_fail(
+        &self,
+        in_asset: DexAsset,
+        market: DexMarket,
+        long: bool,
+        price: f64,
+        amount: f64,
+        leverage: u32,
+    ) {
+        self.bid(in_asset, market, long, price, amount, leverage)
+            .await
+            .assert_err();
     }
 
     pub async fn cancel(&self, user_order_slot: u8) {
-        let di = self.dex_info.borrow();
-        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
-
         let mut user_state_account = self.get_account(self.user_state).await;
         let user_state_account_info: AccountInfo =
             (&self.user_state, true, &mut user_state_account).into();
@@ -965,6 +992,11 @@ impl UserTestContext {
         let ref_us = us.borrow();
 
         let order = ref_us.get_order(user_order_slot).assert_unwrap();
+
+        let di = self.dex_info.borrow();
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let ai = di.asset_as_ref(order.asset).assert_unwrap();
 
         let mi = di.markets[order.market as usize];
         let remaining_accounts = self
@@ -979,6 +1011,9 @@ impl UserTestContext {
             &self.user_state,
             &mi.order_book,
             &mi.order_pool_entry_page,
+            &ai.mint,
+            &ai.vault,
+            &ai.program_signer,
             remaining_accounts,
             user_order_slot,
         )
@@ -1025,6 +1060,7 @@ impl UserTestContext {
         long: bool,
         price: f64,
         amount: f64,
+        leverage: u32,
     ) {
         let mut user_state_account = self.get_account(self.user_state).await;
         let user_state_account_info: AccountInfo =
@@ -1047,6 +1083,8 @@ impl UserTestContext {
                 && order.long == long
                 && order.price == bid_price
                 && order.size == bid_amount
+                && order.leverage == leverage
+                && order.market == market as u8
             {
                 return;
             }
@@ -1054,6 +1092,44 @@ impl UserTestContext {
 
         // Not found
         assert!(false);
+    }
+
+    pub async fn assert_no_bid_order(
+        &self,
+        in_asset: DexAsset,
+        market: DexMarket,
+        long: bool,
+        price: f64,
+        amount: f64,
+        leverage: u32,
+    ) {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let ai = self.dex_info.borrow().assets[in_asset as usize];
+
+        let bid_amount = convert_to_big_number(amount, ai.decimals);
+        let bid_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
+
+        let slots = ref_us.collect_market_orders(market as u8);
+
+        for slot in slots {
+            let order = ref_us.get_order(slot).assert_unwrap();
+            if order.open
+                && order.asset == in_asset as u8
+                && order.long == long
+                && order.price == bid_price
+                && order.size == bid_amount
+                && order.leverage == leverage
+                && order.market == market as u8
+            {
+                assert!(false);
+            }
+        }
     }
 
     pub async fn assert_ask_order(&self, market: DexMarket, long: bool, price: f64, size: f64) {
@@ -1084,5 +1160,29 @@ impl UserTestContext {
 
         // Not found
         assert!(false);
+    }
+
+    pub async fn assert_order_book_bid_max_ask_min(
+        &self,
+        market: DexMarket,
+        bid_max: f64,
+        ask_min: f64,
+    ) {
+        let di = self.dex_info.borrow();
+        let mi = di.markets[market as usize];
+        let mut order_book_account = self.get_account(mi.order_book).await;
+        let order_book_account_info: AccountInfo =
+            (&mi.order_book, true, &mut order_book_account).into();
+
+        let order_book = OrderBook::mount(&order_book_account_info, true).assert_unwrap();
+        assert_eq!(
+            order_book.bid_max_price(),
+            convert_to_big_number(bid_max, TEST_USDC_DECIMALS)
+        );
+
+        assert_eq!(
+            order_book.ask_min_price(),
+            convert_to_big_number(ask_min, TEST_USDC_DECIMALS)
+        );
     }
 }
