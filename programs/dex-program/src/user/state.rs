@@ -437,6 +437,18 @@ impl<'a> UserState<'a> {
         orders
     }
 
+    pub fn collect_ask_orders(&self, market: u8, long: bool) -> Vec<u8> {
+        let mut orders: Vec<u8> = vec![];
+
+        for order in self.order_pool.into_iter() {
+            if !order.data.open && (order.data.market == market) && (order.data.long == long) {
+                orders.push(order.index);
+            }
+        }
+
+        orders
+    }
+
     pub fn find_or_new_position(
         &self,
         market: u8,
