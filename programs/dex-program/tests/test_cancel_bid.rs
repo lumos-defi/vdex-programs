@@ -9,7 +9,7 @@ use crate::utils::{DexAsset, DexMarket};
 use context::DexTestContext;
 
 #[tokio::test]
-async fn test_cancel_basic() {
+async fn test_cancel_bid() {
     let dtc = DexTestContext::new().await;
     let user = &dtc.user_context[0];
     let alice = &dtc.user_context[1];

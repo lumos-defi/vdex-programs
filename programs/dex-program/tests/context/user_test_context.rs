@@ -777,6 +777,26 @@ impl UserTestContext {
         }
     }
 
+    pub async fn get_position_size(&self, market: DexMarket, long: bool) -> u64 {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let position = ref_us
+            .find_or_new_position(market as u8, false)
+            .assert_unwrap();
+        let size = if long {
+            position.data.long.size
+        } else {
+            position.data.short.size
+        };
+
+        size
+    }
+
     pub async fn crank(&self) {
         let payer = self.generate_random_user().await;
         let di = self.dex_info.borrow();
@@ -863,7 +883,13 @@ impl UserTestContext {
         .unwrap()
     }
 
-    pub async fn ask(&self, market: DexMarket, long: bool, price: f64, size: f64) {
+    pub async fn ask(
+        &self,
+        market: DexMarket,
+        long: bool,
+        price: f64,
+        size: f64,
+    ) -> Result<(), TransportError> {
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
@@ -888,7 +914,6 @@ impl UserTestContext {
             convert_to_big_number(size, mi.decimals),
         )
         .await
-        .unwrap()
     }
 
     pub async fn bid(
@@ -953,6 +978,14 @@ impl UserTestContext {
             leverage,
         )
         .await
+    }
+
+    pub async fn assert_ask(&self, market: DexMarket, long: bool, price: f64, size: f64) {
+        self.ask(market, long, price, size).await.assert_ok();
+    }
+
+    pub async fn assert_ask_fail(&self, market: DexMarket, long: bool, price: f64, size: f64) {
+        self.ask(market, long, price, size).await.assert_err();
     }
 
     pub async fn assert_bid(
@@ -1132,7 +1165,7 @@ impl UserTestContext {
         }
     }
 
-    pub async fn assert_ask_order(&self, market: DexMarket, long: bool, price: f64, size: f64) {
+    pub async fn assert_ask_order(&self, market: DexMarket, long: bool, price: f64, size: u64) {
         let mut user_state_account = self.get_account(self.user_state).await;
         let user_state_account_info: AccountInfo =
             (&self.user_state, true, &mut user_state_account).into();
@@ -1140,20 +1173,14 @@ impl UserTestContext {
         let us = UserState::mount(&user_state_account_info, true).unwrap();
         let ref_us = us.borrow();
 
-        let mi = self.dex_info.borrow().markets[market as usize];
-
-        let ask_size = convert_to_big_number(size, mi.decimals);
         let ask_price = convert_to_big_number(price, TEST_USDC_DECIMALS);
 
         let slots = ref_us.collect_market_orders(market as u8);
 
         for slot in slots {
             let order = ref_us.get_order(slot).assert_unwrap();
-            if !order.open
-                && order.long == long
-                && order.price == ask_price
-                && order.size == ask_size
-            {
+
+            if !order.open && order.long == long && order.price == ask_price && order.size == size {
                 return;
             }
         }

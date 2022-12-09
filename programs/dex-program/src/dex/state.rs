@@ -902,11 +902,12 @@ impl Position {
         Ok(())
     }
 
-    pub fn add_closing(&mut self, closing_size: u64) -> DexResult {
-        self.closing_size = self.closing_size.safe_add(closing_size)?;
-        require!(self.closing_size <= self.size, DexError::AskSizeTooLarge);
+    pub fn add_closing(&mut self, size: u64) -> DexResult<u64> {
+        let unclosing_size = self.size.safe_sub(self.closing_size)?;
+        let temp = unclosing_size.min(size);
+        self.closing_size = self.closing_size.safe_add(temp)?;
 
-        Ok(())
+        Ok(temp)
     }
 
     pub fn unclosing_size(&self) -> DexResult<u64> {

@@ -136,3 +136,31 @@ pub const INIT_ADD_SOL_AMOUNT: f64 = 1000.0;
 // VLP
 pub const TEST_VLP_DECIMALS: u8 = 8;
 pub const INIT_VLP_AMOUNT: f64 = 199_800.0; //1000 * 200 -（1000 * 200）*0.1%
+
+pub fn btc(size: f64) -> u64 {
+    (size * (10u64.pow(TEST_BTC_DECIMALS as u32) as f64)) as u64
+}
+
+pub fn sol(size: f64) -> u64 {
+    (size * (10u64.pow(TEST_SOL_DECIMALS as u32) as f64)) as u64
+}
+
+pub fn eth(size: f64) -> u64 {
+    (size * (10u64.pow(TEST_ETH_DECIMALS as u32) as f64)) as u64
+}
+
+pub fn usdc_i(size: f64) -> i64 {
+    (size * (10u64.pow(TEST_USDC_DECIMALS as u32) as f64)) as i64
+}
+
+pub fn btc_i(size: f64) -> i64 {
+    (size * (10u64.pow(TEST_BTC_DECIMALS as u32) as f64)) as i64
+}
+
+pub fn eth_i(size: f64) -> i64 {
+    (size * (10u64.pow(TEST_ETH_DECIMALS as u32) as f64)) as i64
+}
+
+pub fn sol_i(size: f64) -> i64 {
+    (size * (10u64.pow(TEST_SOL_DECIMALS as u32) as f64)) as i64
+}

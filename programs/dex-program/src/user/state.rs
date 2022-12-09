@@ -2,11 +2,14 @@ use std::cell::{RefCell, RefMut};
 
 use crate::collections::small_list::*;
 use crate::dex::{state::*, StakingPool, UserStake};
-use crate::utils::{time::get_timestamp, SafeMath, NIL32, USER_STATE_MAGIC_NUMBER};
-use anchor_lang::prelude::*;
-
 use crate::errors::{DexError, DexResult};
+
+use crate::utils::{time::get_timestamp, NIL32, USER_STATE_MAGIC_NUMBER};
+use anchor_lang::prelude::*;
 use std::mem;
+
+#[cfg(feature = "client-support")]
+use crate::utils::SafeMath;
 #[cfg(feature = "client-support")]
 use std::mem::ManuallyDrop;
 
@@ -65,15 +68,7 @@ impl UserOrder {
         Ok(())
     }
 
-    pub fn init_as_ask(
-        &mut self,
-        order_slot: u32,
-        size: u64,
-        price: u64,
-        long: bool,
-        market: u8,
-    ) -> DexResult {
-        self.order_slot = order_slot;
+    pub fn init_as_ask(&mut self, size: u64, price: u64, long: bool, market: u8) -> DexResult {
         self.size = size;
         self.price = price;
         self.long = long;
@@ -142,11 +137,11 @@ impl UserPosition {
         }
     }
 
-    pub fn add_closing(&mut self, long: bool, closing_size: u64) -> DexResult {
+    pub fn add_closing(&mut self, long: bool, size: u64) -> DexResult<u64> {
         if long {
-            self.long.add_closing(closing_size)
+            self.long.add_closing(size)
         } else {
-            self.short.add_closing(closing_size)
+            self.short.add_closing(size)
         }
     }
 
@@ -365,31 +360,31 @@ impl<'a> UserState<'a> {
 
     pub fn new_ask_order(
         &mut self,
-        order_slot: u32,
         size: u64,
         price: u64,
         long: bool,
         market: u8,
-    ) -> DexResult<u8> {
+    ) -> DexResult<(u8, u64)> {
+        let position = self.find_or_new_position(market, false)?;
+        let added_closing_size = position.data.add_closing(long, size)?;
+        require!(added_closing_size > 0, DexError::NoSizeForAskOrder);
+
         let order = self.order_pool.new_slot()?;
         order
             .data
-            .init_as_ask(order_slot, size, price, long, market)?;
+            .init_as_ask(added_closing_size, price, long, market)?;
 
         self.order_pool.add_to_tail(order)?;
 
-        let position = self.find_or_new_position(market, false)?;
-        position.data.add_closing(long, size)?;
+        Ok((order.index, added_closing_size))
+    }
 
-        let unclosing_size = position.data.unclosing_size(long)?;
-        if unclosing_size > 0 {
-            require!(
-                unclosing_size.safe_mul(price)? as u64 > 1,
-                DexError::UnclosingSizeTooSmall
-            );
-        }
+    pub fn set_ask_order_slot(&mut self, user_order_slot: u8, order_slot: u32) -> DexResult {
+        let order = self.order_pool.from_index(user_order_slot)?;
+        require!(order.in_use(), DexError::InvalidIndex);
+        order.data.order_slot = order_slot;
 
-        Ok(order.index)
+        Ok(())
     }
 
     pub fn get_order(&self, user_order_slot: u8) -> DexResult<UserOrder> {
@@ -1006,11 +1001,11 @@ mod test {
         // Create ask orders
         for _ in 0..max_order_count {
             us.borrow_mut()
-                .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0)
+                .new_ask_order(btc(0.1), usdc(19000.), false, 0)
                 .assert_unwrap();
         }
         us.borrow_mut()
-            .new_ask_order(0xff, btc(0.1), usdc(19000.), false, 0)
+            .new_ask_order(btc(0.1), usdc(19000.), false, 0)
             .assert_err();
     }
 
@@ -1031,13 +1026,12 @@ mod test {
             .open_position(0, usdc(20000.), usdc(2000.), false, 10 * 1000, &mfr)
             .assert_unwrap();
 
-        let user_order_slot = us
+        let (user_order_slot, _) = us
             .borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
+            .new_ask_order(size / 2, usdc(19000.), false, 0)
             .assert_unwrap();
 
         let order = us.borrow().get_order(user_order_slot).assert_unwrap();
-        assert_eq!(order.order_slot, 0xff);
         assert_eq!(order.size, size / 2);
         assert_eq!(order.price, usdc(19000.));
         assert_eq!(order.leverage, 0);
@@ -1067,16 +1061,16 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
+            .new_ask_order(size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
+            .new_ask_order(size, usdc(19000.), false, 0)
             .assert_ok();
 
         // Can not place ask order with larger size
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
+            .new_ask_order(size / 2, usdc(19000.), false, 0)
             .assert_err();
     }
 
@@ -1104,11 +1098,11 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
+            .new_ask_order(size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0)
+            .new_ask_order(size / 2, usdc(18000.), false, 0)
             .assert_ok();
 
         let orders = us.borrow().collect_market_orders(0);
@@ -1143,11 +1137,11 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
+            .new_ask_order(size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(18000.), false, 0)
+            .new_ask_order(size / 2, usdc(18000.), false, 0)
             .assert_ok();
 
         let orders = us.borrow().collect_market_orders(0);
@@ -1184,7 +1178,7 @@ mod test {
             .assert_unwrap();
 
         us.borrow_mut()
-            .new_ask_order(0xff, size / 2, usdc(19000.), false, 0)
+            .new_ask_order(size / 2, usdc(19000.), false, 0)
             .assert_ok();
 
         // It should be ok to close the other half size.

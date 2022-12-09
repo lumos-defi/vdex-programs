@@ -10,7 +10,7 @@ use anchor_lang::prelude::{AccountMeta, Pubkey};
 use solana_program_test::ProgramTestContext;
 use spl_associated_token_account::get_associated_token_address;
 
-use super::{compose_cancel_ix, create_token_account};
+use super::{compose_cancel_ix, create_associated_token_account, create_token_account};
 
 #[allow(clippy::too_many_arguments)]
 pub async fn setup(
@@ -37,6 +37,10 @@ pub async fn setup(
     } else {
         get_associated_token_address(&user.pubkey(), mint)
     };
+
+    if let Ok(None) = context.banks_client.get_account(user_mint_acc).await {
+        create_associated_token_account(context, &user, &user.pubkey(), mint).await
+    }
 
     let cancel_ix = compose_cancel_ix(
         program,

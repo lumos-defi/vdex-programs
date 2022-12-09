@@ -223,6 +223,9 @@ pub enum DexError {
 
     #[msg("Invalid leverage")]
     InvalidLeverage,
+
+    #[msg("No position size for ask order")]
+    NoSizeForAskOrder,
 }
 
 pub type DexResult<T = ()> = Result<T>;
