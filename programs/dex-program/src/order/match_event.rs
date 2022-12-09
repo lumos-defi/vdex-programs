@@ -4,7 +4,7 @@ pub struct MatchEvent {
     pub user: [u8; 32],
     pub order_slot: u32,
     pub user_order_slot: u8,
-    _padding: [u8; 3],
+    pub _padding: [u8; 3],
 }
 
 pub trait AppendSingleEvent {

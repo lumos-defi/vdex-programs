@@ -93,7 +93,6 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
     let (user_order_slot, closing_size) =
         us.borrow_mut().new_ask_order(size, price, long, market)?;
 
-    msg!("============> closing size {}", closing_size);
     // Try to allocate from center order pool
     let order = order_pool
         .new_slot()
@@ -106,7 +105,7 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
         .set_ask_order_slot(user_order_slot, order.index())?;
 
     // Link order to order book
-    let side = if long { OrderSide::BID } else { OrderSide::ASK };
+    let side = if long { OrderSide::ASK } else { OrderSide::BID };
     let price_node = order_book.link_order(side, order, &order_pool)?;
     order.data.set_extra_slot(price_node, user_order_slot);
 

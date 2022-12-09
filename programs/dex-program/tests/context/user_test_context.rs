@@ -859,6 +859,8 @@ impl UserTestContext {
     }
 
     pub async fn fill(&self, market: DexMarket) {
+        let payer = self.generate_random_user().await;
+
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
@@ -870,7 +872,7 @@ impl UserTestContext {
         set_fill::setup(
             context,
             &self.program,
-            &self.user,
+            &payer,
             &self.dex,
             &mi.oracle,
             &di.match_queue,
@@ -1211,5 +1213,33 @@ impl UserTestContext {
             order_book.ask_min_price(),
             convert_to_big_number(ask_min, TEST_USDC_DECIMALS)
         );
+    }
+
+    pub async fn assert_no_match_event(&self) {
+        let di = self.dex_info.borrow();
+
+        let mut match_event_account = self.get_account(di.match_queue).await;
+        let match_event_account_info: AccountInfo =
+            (&di.match_queue, true, &mut match_event_account).into();
+
+        let match_queue =
+            SingleEventQueue::<MatchEvent>::mount(&match_event_account_info, true).assert_unwrap();
+
+        match_queue.read_head().assert_err();
+    }
+
+    pub async fn read_match_event(&self) -> MatchEvent {
+        let di = self.dex_info.borrow();
+
+        let mut match_event_account = self.get_account(di.match_queue).await;
+        let match_event_account_info: AccountInfo =
+            (&di.match_queue, true, &mut match_event_account).into();
+
+        let match_queue =
+            SingleEventQueue::<MatchEvent>::mount(&match_event_account_info, true).assert_unwrap();
+
+        let SingleEvent { data } = match_queue.read_head().assert_unwrap();
+
+        MatchEvent { ..*data }
     }
 }

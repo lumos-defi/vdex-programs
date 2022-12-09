@@ -84,7 +84,7 @@ pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
     loop {
         let (user_order_slot, order_slot, user) = match order_book.get_next_match_order(
             market_price,
-            OrderSide::BID,
+            OrderSide::ASK,
             OrderType::LIMIT,
             &order_pool,
         ) {
@@ -93,7 +93,7 @@ pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
                 let order_slot = order.index();
                 let user = order.data.user;
 
-                order_book.fill_order(u64::MAX, OrderSide::BID, order, &order_pool)?;
+                order_book.fill_order(u64::MAX, OrderSide::ASK, order, &order_pool)?;
 
                 (user_order_slot, order_slot, user)
             }
@@ -114,7 +114,7 @@ pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
     loop {
         let (user_order_slot, order_slot, user) = match order_book.get_next_match_order(
             market_price,
-            OrderSide::ASK,
+            OrderSide::BID,
             OrderType::LIMIT,
             &order_pool,
         ) {
