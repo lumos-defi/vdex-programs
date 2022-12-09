@@ -89,18 +89,21 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
     )
     .map_err(|_| DexError::FailedMountOrderPool)?;
 
+    // Save order in user state
+    let (user_order_slot, closing_size) =
+        us.borrow_mut().new_ask_order(size, price, long, market)?;
+
+    msg!("============> closing size {}", closing_size);
     // Try to allocate from center order pool
     let order = order_pool
         .new_slot()
         .map_err(|_| DexError::NoFreeSlotInOrderPool)?;
     order
         .data
-        .init(price, size, ctx.accounts.authority.key().to_bytes());
+        .init(price, closing_size, ctx.accounts.authority.key().to_bytes());
 
-    // Save order in user state
-    let user_order_slot =
-        us.borrow_mut()
-            .new_ask_order(order.index(), size, price, long, market)?;
+    us.borrow_mut()
+        .set_ask_order_slot(user_order_slot, order.index())?;
 
     // Link order to order book
     let side = if long { OrderSide::BID } else { OrderSide::ASK };
