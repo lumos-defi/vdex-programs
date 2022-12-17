@@ -806,8 +806,14 @@ impl Position {
         price: u64,
         mfr: &MarketFeeRates,
         liquidate: bool,
+        limit_order: bool,
     ) -> DexResult<(u64, u64, i64, u64, u64)> {
-        let unclosing_size = self.size.safe_sub(self.closing_size)?;
+        let unclosing_size = if limit_order {
+            self.closing_size
+        } else {
+            self.size.safe_sub(self.closing_size)?
+        };
+
         let closing_size = if size > unclosing_size {
             unclosing_size
         } else {
@@ -860,9 +866,10 @@ impl Position {
         let pnl_with_fee = pnl.i_safe_sub(total_fee as i64)?;
 
         // Update the position
-        self.size = unclosing_size
-            .safe_sub(closing_size)?
-            .safe_add(self.closing_size)?;
+        self.size = self.size.safe_sub(closing_size)?;
+        if limit_order {
+            self.closing_size = self.closing_size.safe_sub(closing_size)?;
+        }
 
         self.borrowed_amount = self.borrowed_amount.safe_sub(fund_returned)?;
         self.collateral = self.collateral.safe_sub(collateral_unlocked)?;
@@ -1463,8 +1470,9 @@ mod test {
         const HOURS_2: u64 = 2;
         long.mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) =
-            long.close(size, usdc(25000.), &mfr, false).assert_unwrap();
+        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = long
+            .close(size, usdc(25000.), &mfr, false, false)
+            .assert_unwrap();
 
         let expected_borrow_fee =
             collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
@@ -1496,8 +1504,9 @@ mod test {
         const HOURS_2: u64 = 2;
         long.mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) =
-            long.close(size, usdc(18000.), &mfr, false).assert_unwrap();
+        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = long
+            .close(size, usdc(18000.), &mfr, false, false)
+            .assert_unwrap();
 
         let expected_borrow_fee =
             collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
@@ -1583,8 +1592,9 @@ mod test {
         const HOURS_2: u64 = 2;
         short.mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) =
-            short.close(size, usdc(18000.), &mfr, false).assert_unwrap();
+        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = short
+            .close(size, usdc(18000.), &mfr, false, false)
+            .assert_unwrap();
 
         let expected_borrow_fee =
             collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
@@ -1619,8 +1629,9 @@ mod test {
         const HOURS_2: u64 = 2;
         short.mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) =
-            short.close(size, usdc(22000.), &mfr, false).assert_unwrap();
+        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = short
+            .close(size, usdc(22000.), &mfr, false, false)
+            .assert_unwrap();
 
         let expected_borrow_fee =
             collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;

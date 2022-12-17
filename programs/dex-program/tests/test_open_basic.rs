@@ -72,7 +72,7 @@ async fn test_open_btc_short_with_usdc() {
     user.assert_borrow(DexAsset::USDC, 0.).await;
     user.assert_collateral(DexAsset::USDC, 0.).await;
 
-    // Alice open long
+    // Alice open short
     alice.mint_usdc(2000.).await;
 
     alice

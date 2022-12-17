@@ -76,7 +76,7 @@ fn cancel_market_orders(
 
         let (_, open, long, _, _) = us
             .borrow_mut()
-            .unlink_order(user_order_slot)
+            .unlink_order(user_order_slot, true)
             .map_err(|_| DexError::InvalidOrderSlot)?;
 
         order_book.unlink_order(select_side(open, long), order, &order_pool)?;
