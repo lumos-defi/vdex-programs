@@ -268,7 +268,6 @@ impl<'a> UserState<'a> {
                 .data
                 .close(u64::MAX, market_price, long, mfr, true, false)?;
 
-        println!("pnl...{} {}", pnl, collateral);
         if pnl < 0 {
             let loss = (pnl.abs() as u64) + close_fee + borrow_fee;
             if loss
