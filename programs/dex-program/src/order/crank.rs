@@ -2,7 +2,7 @@ use crate::{
     collections::{EventQueue, MountMode, PagedList, SingleEvent, SingleEventQueue},
     dex::{
         event::{AppendEvent, PositionAct},
-        Dex, UserListItem,
+        Dex, Position, UserListItem,
     },
     errors::{DexError, DexResult},
     order::MatchEvent,
@@ -26,15 +26,23 @@ pub struct Crank<'info> {
     #[account(mut, seeds = [dex.key().as_ref(), user.key().as_ref()], bump)]
     pub user_state: UncheckedAccount<'info>,
 
-    #[account(
-        mut,
-        constraint = (user_mint_acc.mint == *market_mint.key)
-    )]
+    /// CHECK
+    #[account(mut)]
     pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
     /// Possibly used for bid order that needs swap assets
     /// CHECK
+    pub in_mint: AccountInfo<'info>,
+
+    /// CHECK
     pub in_mint_oracle: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(mut)]
+    pub in_mint_vault: AccountInfo<'info>,
+
+    /// CHECK
+    pub in_mint_program_signer: AccountInfo<'info>,
 
     /// CHECK
     pub market_mint: AccountInfo<'info>,
@@ -95,8 +103,6 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     let order = us.borrow().get_order(data.user_order_slot)?;
-    us.borrow_mut().unlink_order(data.user_order_slot)?;
-
     require_eq!(
         order.order_slot,
         data.order_slot,
@@ -148,8 +154,8 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         );
 
         // Check if need to swap asset before opening position
-        let actual_amount = if ai.mint == mai.mint {
-            order.size
+        let (need_swap, actual_amount, swap_fee) = if ai.mint == mai.mint {
+            (false, order.size, 0)
         } else {
             // Swap input asset to market desired mint
             require!(
@@ -164,13 +170,66 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             let (out, fee) =
                 dex.swap(order.asset, market_asset_index, order.size, true, &oracles)?;
 
-            dex.swap_in(order.asset, order.size.safe_sub(fee)?, fee)?;
-            dex.swap_out(market_asset_index, out)?;
-
-            out
+            (true, out, fee)
         };
 
-        // Ready to open
+        let (_, borrow) = Position::collateral_and_borrow(
+            order.long,
+            order.price,
+            actual_amount,
+            order.leverage,
+            &mfr,
+        )?;
+
+        let required_liquidity = if ai.mint == mai.mint {
+            borrow
+        } else {
+            borrow + actual_amount
+        };
+        if let Err(_) = dex.has_sufficient_liquidity(order.market, order.long, required_liquidity) {
+            // refund
+            require!(
+                ctx.accounts.user_mint_acc.owner == ctx.accounts.user.key()
+                    && ctx.accounts.user_mint_acc.mint == ctx.accounts.in_mint.key(),
+                DexError::InvalidUserMintAccount
+            );
+
+            require!(
+                ai.mint == ctx.accounts.in_mint.key()
+                    && ai.vault == ctx.accounts.in_mint_vault.key()
+                    && ai.program_signer == ctx.accounts.in_mint_program_signer.key(),
+                DexError::InvalidMint
+            );
+
+            let seeds = &[
+                ctx.accounts.in_mint.key.as_ref(),
+                ctx.accounts.dex.to_account_info().key.as_ref(),
+                &[ai.nonce],
+            ];
+            let signer = &[&seeds[..]];
+
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.in_mint_vault.to_account_info(),
+                to: ctx.accounts.user_mint_acc.to_account_info(),
+                authority: ctx.accounts.in_mint_program_signer.to_account_info(),
+            };
+
+            let cpi_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.clone(),
+                cpi_accounts,
+                signer,
+            );
+            token::transfer(cpi_ctx, order.size)?;
+
+            return Ok(());
+        }
+
+        if need_swap {
+            dex.swap_in(order.asset, order.size.safe_sub(swap_fee)?, swap_fee)?;
+            dex.swap_out(market_asset_index, actual_amount)?;
+        }
+
+        // Ready to swap & open position
         let (size, collateral, borrow, open_fee) = us.borrow_mut().open_position(
             order.market,
             order.price,
@@ -200,15 +259,15 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         )?;
     } else {
         if ctx.accounts.market_mint.key() == token::spl_token::native_mint::id() {
-            require_eq!(
-                ctx.accounts.user_mint_acc.owner,
-                ctx.accounts.authority.key(),
+            require!(
+                ctx.accounts.user_mint_acc.owner == ctx.accounts.authority.key()
+                    && ctx.accounts.user_mint_acc.mint == ctx.accounts.market_mint.key(),
                 DexError::InvalidUserMintAccount
             );
         } else {
-            require_eq!(
-                ctx.accounts.user_mint_acc.owner,
-                ctx.accounts.user.key(),
+            require!(
+                ctx.accounts.user_mint_acc.owner == ctx.accounts.user.key()
+                    && ctx.accounts.user_mint_acc.mint == ctx.accounts.market_mint.key(),
                 DexError::InvalidUserMintAccount
             );
         }
@@ -226,6 +285,7 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             order.long,
             &mfr,
             false,
+            true,
         )?;
 
         // Update market global position
@@ -295,7 +355,7 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         )?;
     }
 
-    us.borrow_mut().unlink_order(data.user_order_slot)?;
+    us.borrow_mut().unlink_order(data.user_order_slot, false)?;
 
     match_queue.remove_head()?;
     let user_list = PagedList::<UserListItem>::mount(

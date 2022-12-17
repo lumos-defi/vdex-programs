@@ -150,7 +150,13 @@ pub fn handler(
         DexError::CollateralTooSmall
     );
 
-    dex.has_sufficient_liquidity(market, long, borrow)?;
+    let required_liquidity = if ai.mint == mai.mint {
+        borrow
+    } else {
+        borrow + actual_amount
+    };
+
+    dex.has_sufficient_liquidity(market, long, required_liquidity)?;
 
     // Transfer token in
     let cpi_accounts = Transfer {

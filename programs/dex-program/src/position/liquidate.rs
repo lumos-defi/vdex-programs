@@ -145,7 +145,7 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
     let size = us.borrow().get_position_size(market, long)?;
     let (borrow, collateral, pnl, close_fee, borrow_fee) = us
         .borrow_mut()
-        .close_position(market, size, price, long, &mfr, true)?;
+        .close_position(market, size, price, long, &mfr, true, false)?;
 
     // Update market global position
     dex.decrease_global_position(market, long, size, collateral)?;
@@ -206,7 +206,7 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
 
         let (_, open, long, _, _) = us
             .borrow_mut()
-            .unlink_order(user_order_slot)
+            .unlink_order(user_order_slot, true)
             .map_err(|_| DexError::InvalidOrderSlot)?;
 
         order_book.unlink_order(select_side(open, long), order, &order_pool)?;

@@ -149,6 +149,9 @@ pub enum DexError {
     #[msg("Pice less than market price")]
     PriceLTMarketPrice,
 
+    #[msg("Pice equal to market price")]
+    PriceEQMarketPrice,
+
     #[msg("Invalid RBTree header")]
     InvalidRBTHeader,
 

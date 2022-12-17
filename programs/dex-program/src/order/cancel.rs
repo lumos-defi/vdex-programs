@@ -62,7 +62,7 @@ pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
 
     let (market, open, long, asset, size) = us
         .borrow_mut()
-        .unlink_order(user_order_slot)
+        .unlink_order(user_order_slot, true)
         .map_err(|_| DexError::InvalidOrderSlot)?;
 
     let dex = &ctx.accounts.dex.load()?;
@@ -92,7 +92,6 @@ pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
             authority: ctx.accounts.program_signer.to_account_info(),
         };
 
-        // let cpi_program = ctx.accounts.token_program.clone();
         let cpi_ctx =
             CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_accounts, signer);
         token::transfer(cpi_ctx, size)?;

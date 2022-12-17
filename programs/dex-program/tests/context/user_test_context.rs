@@ -590,6 +590,7 @@ impl UserTestContext {
         let difference =
             asset_amount as i64 - convert_to_big_number(amount.into(), asset_info.decimals) as i64;
 
+        println!("diff {}", difference);
         assert!(difference.abs() <= 2);
     }
 
@@ -801,12 +802,6 @@ impl UserTestContext {
         let payer = self.generate_random_user().await;
         let di = self.dex_info.borrow();
 
-        let mut user_state_account = self.get_account(self.user_state).await;
-        let user_state_account_info: AccountInfo =
-            (&self.user_state, true, &mut user_state_account).into();
-        let us = UserState::mount(&user_state_account_info, true).unwrap();
-        let ref_us = us.borrow();
-
         let mut match_queue_account = self.get_account(di.match_queue).await;
         let match_queue_account_info: AccountInfo =
             (&di.match_queue, true, &mut match_queue_account).into();
@@ -819,6 +814,18 @@ impl UserTestContext {
         let SingleEvent { data } = match_queue.read_head().assert_unwrap();
 
         let user = Pubkey::new_from_array(data.user);
+
+        let (user_state, _) = Pubkey::find_program_address(
+            &[&self.dex.to_bytes(), &user.to_bytes()],
+            &self.program.id(),
+        );
+
+        let mut user_state_account = self.get_account(user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&user_state, true, &mut user_state_account).into();
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
         let order = ref_us.get_order(data.user_order_slot).assert_unwrap();
 
         let in_asset = di.asset_as_ref(order.asset).assert_unwrap();
@@ -841,9 +848,13 @@ impl UserTestContext {
             &self.program,
             &payer,
             &self.dex,
+            order.open,
             &user,
-            &self.user_state,
+            &user_state,
+            &in_asset.mint,
+            &in_asset.vault,
             &in_asset.oracle,
+            &in_asset.program_signer,
             &mai.mint,
             &mai.oracle,
             &mai.vault,

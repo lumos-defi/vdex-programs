@@ -121,11 +121,12 @@ impl UserPosition {
         long: bool,
         mfr: &MarketFeeRates,
         liquidate: bool,
+        limit_order: bool,
     ) -> DexResult<(u64, u64, i64, u64, u64)> {
         if long {
-            self.long.close(size, price, mfr, liquidate)
+            self.long.close(size, price, mfr, liquidate, limit_order)
         } else {
-            self.short.close(size, price, mfr, liquidate)
+            self.short.close(size, price, mfr, liquidate, limit_order)
         }
     }
 
@@ -265,9 +266,8 @@ impl<'a> UserState<'a> {
         let (_, collateral, pnl, close_fee, borrow_fee) =
             position
                 .data
-                .close(u64::MAX, market_price, long, mfr, true)?;
+                .close(u64::MAX, market_price, long, mfr, true, false)?;
 
-        println!("pnl...{} {}", pnl, collateral);
         if pnl < 0 {
             let loss = (pnl.abs() as u64) + close_fee + borrow_fee;
             if loss
@@ -333,9 +333,12 @@ impl<'a> UserState<'a> {
         long: bool,
         mfr: &MarketFeeRates,
         liquidate: bool,
+        limit_order: bool,
     ) -> DexResult<(u64, u64, i64, u64, u64)> {
         let position = self.find_or_new_position(market, false)?;
-        position.data.close(size, price, long, mfr, liquidate)
+        position
+            .data
+            .close(size, price, long, mfr, liquidate, limit_order)
     }
 
     pub fn new_bid_order(
@@ -401,11 +404,15 @@ impl<'a> UserState<'a> {
         Ok(order.data.order_slot)
     }
 
-    pub fn unlink_order(&mut self, user_order_slot: u8) -> DexResult<(u8, bool, bool, u8, u64)> {
+    pub fn unlink_order(
+        &mut self,
+        user_order_slot: u8,
+        cancel: bool,
+    ) -> DexResult<(u8, bool, bool, u8, u64)> {
         let order = self.order_pool.from_index(user_order_slot)?;
         require!(order.in_use(), DexError::InvalidIndex);
 
-        if !order.data.open {
+        if !order.data.open && cancel {
             let position = self.find_or_new_position(order.data.market, false)?;
             position
                 .data
@@ -756,7 +763,7 @@ mod test {
 
         let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
             .borrow_mut()
-            .close_position(0, size, usdc(25000.), true, &mfr, false)
+            .close_position(0, size, usdc(25000.), true, &mfr, false, false)
             .assert_unwrap();
 
         let expected_borrow_fee =
@@ -806,7 +813,7 @@ mod test {
 
         let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
             .borrow_mut()
-            .close_position(0, size, usdc(18000.), true, &mfr, false)
+            .close_position(0, size, usdc(18000.), true, &mfr, false, false)
             .assert_unwrap();
 
         let expected_borrow_fee =
@@ -856,7 +863,7 @@ mod test {
 
         let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
             .borrow_mut()
-            .close_position(0, size, usdc(18000.), false, &mfr, false)
+            .close_position(0, size, usdc(18000.), false, &mfr, false, false)
             .assert_unwrap();
 
         let expected_borrow_fee =
@@ -909,7 +916,7 @@ mod test {
 
         let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
             .borrow_mut()
-            .close_position(0, size, usdc(22000.), false, &mfr, false)
+            .close_position(0, size, usdc(22000.), false, &mfr, false, false)
             .assert_unwrap();
 
         let expected_borrow_fee =
@@ -989,7 +996,7 @@ mod test {
 
         // Release all bid orders
         for i in 0..max_order_count {
-            us.borrow_mut().unlink_order(i).assert_unwrap();
+            us.borrow_mut().unlink_order(i, true).assert_unwrap();
         }
 
         // Mock position
@@ -1147,17 +1154,17 @@ mod test {
         let orders = us.borrow().collect_market_orders(0);
         assert_eq!(orders.len(), 4);
 
-        us.borrow_mut().unlink_order(0).assert_ok();
-        us.borrow_mut().unlink_order(1).assert_ok();
-        us.borrow_mut().unlink_order(2).assert_ok();
-        us.borrow_mut().unlink_order(3).assert_ok();
+        us.borrow_mut().unlink_order(0, true).assert_ok();
+        us.borrow_mut().unlink_order(1, true).assert_ok();
+        us.borrow_mut().unlink_order(2, true).assert_ok();
+        us.borrow_mut().unlink_order(3, true).assert_ok();
         let orders = us.borrow().collect_market_orders(0);
         assert_eq!(orders.len(), 0);
 
-        us.borrow_mut().unlink_order(0).assert_err();
-        us.borrow_mut().unlink_order(1).assert_err();
-        us.borrow_mut().unlink_order(2).assert_err();
-        us.borrow_mut().unlink_order(3).assert_err();
+        us.borrow_mut().unlink_order(0, true).assert_err();
+        us.borrow_mut().unlink_order(1, true).assert_err();
+        us.borrow_mut().unlink_order(2, true).assert_err();
+        us.borrow_mut().unlink_order(3, true).assert_err();
     }
 
     #[test]
@@ -1183,7 +1190,7 @@ mod test {
 
         // It should be ok to close the other half size.
         us.borrow_mut()
-            .close_position(0, size / 2, usdc(19500.), false, &mfr, false)
+            .close_position(0, size / 2, usdc(19500.), false, &mfr, false, false)
             .assert_ok();
 
         let position = us.borrow().get_position(0, false).assert_unwrap();
@@ -1192,15 +1199,15 @@ mod test {
 
         // Fail to close the remained size.
         us.borrow_mut()
-            .close_position(0, size / 2, usdc(19500.), false, &mfr, false)
+            .close_position(0, size / 2, usdc(19500.), false, &mfr, false, false)
             .assert_err();
 
         // Unlink the ask order
-        us.borrow_mut().unlink_order(0).assert_ok();
+        us.borrow_mut().unlink_order(0, true).assert_ok();
 
         // Success to close
         us.borrow_mut()
-            .close_position(0, size / 2, usdc(19500.), false, &mfr, false)
+            .close_position(0, size / 2, usdc(19500.), false, &mfr, false, false)
             .assert_ok();
     }
 

@@ -70,11 +70,13 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
 
     // Check price
     let market_price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
-    if long {
-        require!(market_price < price, DexError::PriceLTMarketPrice)
+    require!(market_price != price, DexError::PriceEQMarketPrice);
+
+    let side = if market_price > price {
+        OrderSide::BID
     } else {
-        require!(market_price > price, DexError::PriceGTMarketPrice)
-    }
+        OrderSide::ASK
+    };
 
     // Mount user state
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
@@ -105,7 +107,7 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
         .set_ask_order_slot(user_order_slot, order.index())?;
 
     // Link order to order book
-    let side = if long { OrderSide::ASK } else { OrderSide::BID };
+    // let side = if long { OrderSide::ASK } else { OrderSide::BID };
     let price_node = order_book.link_order(side, order, &order_pool)?;
     order.data.set_extra_slot(price_node, user_order_slot);
 
