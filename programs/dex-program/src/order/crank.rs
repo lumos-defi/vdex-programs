@@ -278,18 +278,19 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             &[mai.nonce],
         ];
 
-        let (borrow, collateral, pnl, close_fee, borrow_fee) = us.borrow_mut().close_position(
-            order.market,
-            order.size,
-            order.price,
-            order.long,
-            &mfr,
-            false,
-            true,
-        )?;
+        let (borrow, collateral, pnl, closed_size, close_fee, borrow_fee) =
+            us.borrow_mut().close_position(
+                order.market,
+                order.size,
+                order.price,
+                order.long,
+                &mfr,
+                false,
+                true,
+            )?;
 
         // Update market global position
-        dex.decrease_global_position(order.market, order.long, order.size, collateral)?;
+        dex.decrease_global_position(order.market, order.long, closed_size, collateral)?;
 
         let withdrawable = dex.settle_pnl(
             order.market,

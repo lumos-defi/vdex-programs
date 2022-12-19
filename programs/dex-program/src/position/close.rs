@@ -104,12 +104,12 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
 
     // User close position
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let (borrow, collateral, pnl, close_fee, borrow_fee) = us
+    let (borrow, collateral, pnl, closed_size, close_fee, borrow_fee) = us
         .borrow_mut()
         .close_position(market, size, price, long, &mfr, false, false)?;
 
     // Update market global position
-    dex.decrease_global_position(market, long, size, collateral)?;
+    dex.decrease_global_position(market, long, closed_size, collateral)?;
 
     let withdrawable =
         dex.settle_pnl(market, long, collateral, borrow, pnl, close_fee, borrow_fee)?;
@@ -138,7 +138,7 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
         PositionAct::Close,
         long,
         price,
-        size,
+        closed_size,
         collateral,
         0,
         close_fee,
