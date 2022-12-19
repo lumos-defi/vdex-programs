@@ -143,7 +143,7 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
     // User close position
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     let size = us.borrow().get_position_size(market, long)?;
-    let (borrow, collateral, pnl, close_fee, borrow_fee) = us
+    let (borrow, collateral, pnl, _closed_size, close_fee, borrow_fee) = us
         .borrow_mut()
         .close_position(market, size, price, long, &mfr, true, false)?;
 

@@ -807,7 +807,7 @@ impl Position {
         mfr: &MarketFeeRates,
         liquidate: bool,
         limit_order: bool,
-    ) -> DexResult<(u64, u64, i64, u64, u64)> {
+    ) -> DexResult<(u64, u64, i64, u64, u64, u64)> {
         let unclosing_size = if limit_order {
             self.closing_size
         } else {
@@ -894,11 +894,11 @@ impl Position {
         if self.size == 0 || self.collateral == 0 {
             self.zero(self.long)?;
         }
-
         Ok((
             fund_returned,
             collateral_unlocked,
             pnl,
+            closing_size,
             close_fee,
             borrow_fee,
         ))
@@ -1470,7 +1470,7 @@ mod test {
         const HOURS_2: u64 = 2;
         long.mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = long
+        let (returned, collateral_unlocked, pnl, _closed_size, close_fee, borrow_fee) = long
             .close(size, usdc(25000.), &mfr, false, false)
             .assert_unwrap();
 
@@ -1504,7 +1504,7 @@ mod test {
         const HOURS_2: u64 = 2;
         long.mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = long
+        let (returned, collateral_unlocked, pnl, _closed_size, close_fee, borrow_fee) = long
             .close(size, usdc(18000.), &mfr, false, false)
             .assert_unwrap();
 
@@ -1592,7 +1592,7 @@ mod test {
         const HOURS_2: u64 = 2;
         short.mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = short
+        let (returned, collateral_unlocked, pnl, _closed_size, close_fee, borrow_fee) = short
             .close(size, usdc(18000.), &mfr, false, false)
             .assert_unwrap();
 
@@ -1629,7 +1629,7 @@ mod test {
         const HOURS_2: u64 = 2;
         short.mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = short
+        let (returned, collateral_unlocked, pnl, _closed_size, close_fee, borrow_fee) = short
             .close(size, usdc(22000.), &mfr, false, false)
             .assert_unwrap();
 

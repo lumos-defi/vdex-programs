@@ -122,7 +122,7 @@ impl UserPosition {
         mfr: &MarketFeeRates,
         liquidate: bool,
         limit_order: bool,
-    ) -> DexResult<(u64, u64, i64, u64, u64)> {
+    ) -> DexResult<(u64, u64, i64, u64, u64, u64)> {
         if long {
             self.long.close(size, price, mfr, liquidate, limit_order)
         } else {
@@ -263,7 +263,7 @@ impl<'a> UserState<'a> {
         mfr: &MarketFeeRates,
     ) -> DexResult {
         let position = self.find_or_new_position(market, false)?;
-        let (_, collateral, pnl, close_fee, borrow_fee) =
+        let (_, collateral, pnl, _, close_fee, borrow_fee) =
             position
                 .data
                 .close(u64::MAX, market_price, long, mfr, true, false)?;
@@ -334,7 +334,7 @@ impl<'a> UserState<'a> {
         mfr: &MarketFeeRates,
         liquidate: bool,
         limit_order: bool,
-    ) -> DexResult<(u64, u64, i64, u64, u64)> {
+    ) -> DexResult<(u64, u64, i64, u64, u64, u64)> {
         let position = self.find_or_new_position(market, false)?;
         position
             .data
@@ -761,7 +761,7 @@ mod test {
             .long
             .mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
+        let (returned, collateral_unlocked, pnl, _closed_size, close_fee, borrow_fee) = us
             .borrow_mut()
             .close_position(0, size, usdc(25000.), true, &mfr, false, false)
             .assert_unwrap();
@@ -811,7 +811,7 @@ mod test {
             .long
             .mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
+        let (returned, collateral_unlocked, pnl, _closed_size, close_fee, borrow_fee) = us
             .borrow_mut()
             .close_position(0, size, usdc(18000.), true, &mfr, false, false)
             .assert_unwrap();
@@ -861,7 +861,7 @@ mod test {
             .short
             .mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
+        let (returned, collateral_unlocked, pnl, _closed_size, close_fee, borrow_fee) = us
             .borrow_mut()
             .close_position(0, size, usdc(18000.), false, &mfr, false, false)
             .assert_unwrap();
@@ -914,7 +914,7 @@ mod test {
             .short
             .mock_after_hours(HOURS_2);
 
-        let (returned, collateral_unlocked, pnl, close_fee, borrow_fee) = us
+        let (returned, collateral_unlocked, pnl, _closed_size, close_fee, borrow_fee) = us
             .borrow_mut()
             .close_position(0, size, usdc(22000.), false, &mfr, false, false)
             .assert_unwrap();
