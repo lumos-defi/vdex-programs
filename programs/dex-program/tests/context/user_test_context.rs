@@ -1067,6 +1067,44 @@ impl UserTestContext {
         .unwrap()
     }
 
+    pub async fn fail_to_cancel(&self, user_order_slot: u8) {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let order = ref_us.get_order(user_order_slot).assert_unwrap();
+
+        let di = self.dex_info.borrow();
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let ai = di.asset_as_ref(order.asset).assert_unwrap();
+
+        let mi = di.markets[order.market as usize];
+        let remaining_accounts = self
+            .get_market_order_pool_remaining_accounts(order.market)
+            .await;
+
+        set_cancel::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.user_state,
+            &mi.order_book,
+            &mi.order_pool_entry_page,
+            &ai.mint,
+            &ai.vault,
+            &ai.program_signer,
+            remaining_accounts,
+            user_order_slot,
+        )
+        .await
+        .assert_err()
+    }
+
     pub async fn cancel_call(&self) {
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
