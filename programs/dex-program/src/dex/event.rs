@@ -44,7 +44,7 @@ pub struct PositionFilled {
 }
 
 impl PackedEvent for PositionFilled {
-    const DISCRIMINATOR: u8 = 1;
+    const DISCRIMINATOR: u8 = 100;
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -60,7 +60,7 @@ pub struct LiquidityMoved {
 }
 
 impl PackedEvent for LiquidityMoved {
-    const DISCRIMINATOR: u8 = 2;
+    const DISCRIMINATOR: u8 = 101;
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -75,7 +75,7 @@ pub struct AssetSwapped {
 }
 
 impl PackedEvent for AssetSwapped {
-    const DISCRIMINATOR: u8 = 3;
+    const DISCRIMINATOR: u8 = 102;
 }
 
 pub trait AppendEvent {
