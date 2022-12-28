@@ -4,7 +4,7 @@ use crate::{
     errors::{DexError, DexResult},
     order::Order,
     user::state::*,
-    utils::{value, LEVERAGE_POW_DECIMALS, ORDER_POOL_MAGIC_BYTE},
+    utils::{value, LEVERAGE_POW_DECIMALS, ORDER_POOL_MAGIC_BYTE, USDC_DECIMALS},
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -91,6 +91,11 @@ pub fn handler(
         mi.order_pool_remaining_pages_number as usize,
         ctx.remaining_accounts.len(),
         DexError::InvalidRemainingAccounts
+    );
+
+    require!(
+        price % 10u64.pow((USDC_DECIMALS - mi.significant_decimals) as u32) == 0,
+        DexError::InvalidSignificantDecimals
     );
 
     for i in 0..mi.order_pool_remaining_pages_number as usize {
