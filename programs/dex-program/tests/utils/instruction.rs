@@ -11,7 +11,7 @@ use dex_program::{
     accounts::{
         AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClosePosition, Crank,
         CreateUserState, FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, LimitAsk,
-        LimitBid, OpenPosition, RemoveLiquidity,
+        LimitBid, OpenPosition, RemoveLiquidity, Swap,
     },
     dex::Dex,
 };
@@ -650,6 +650,48 @@ pub async fn compose_cancel_all_ix(
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::CancelAllOrders {})
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_market_swap_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    user_state: &Pubkey,
+    in_mint: &Pubkey,
+    in_mint_oracle: &Pubkey,
+    in_vault: &Pubkey,
+    user_in_mint_acc: &Pubkey,
+    out_mint: &Pubkey,
+    out_mint_oracle: &Pubkey,
+    out_vault: &Pubkey,
+    out_vault_program_signer: &Pubkey,
+    user_out_mint_acc: &Pubkey,
+    event_queue: &Pubkey,
+    amount: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(Swap {
+            dex: *dex,
+            in_mint: *in_mint,
+            in_mint_oracle: *in_mint_oracle,
+            in_vault: *in_vault,
+            user_in_mint_acc: *user_in_mint_acc,
+            out_mint: *out_mint,
+            out_mint_oracle: *out_mint_oracle,
+            out_vault: *out_vault,
+            out_vault_program_signer: *out_vault_program_signer,
+            user_out_mint_acc: *user_out_mint_acc,
+            event_queue: *event_queue,
+            user_state: *user_state,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .args(dex_program::instruction::Swap { amount })
         .instructions()
         .unwrap()
         .pop()
