@@ -83,6 +83,8 @@ pub fn handler(ctx: Context<Swap>, amount: u64) -> DexResult {
         DexError::InvalidMint
     );
 
+    require!(aii.mint != aoi.mint, DexError::InvalidMint);
+
     let seeds = &[
         ctx.accounts.out_mint.key.as_ref(),
         ctx.accounts.dex.to_account_info().key.as_ref(),

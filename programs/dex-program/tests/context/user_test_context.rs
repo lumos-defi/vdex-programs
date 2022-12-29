@@ -7,9 +7,9 @@ use std::{
 use crate::utils::{
     assert_eq_with_dust, convert_to_big_number, create_associated_token_account, get_dex_info,
     get_keypair, get_program, get_token_balance, mint_tokens, set_add_liquidity, set_ask, set_bid,
-    set_cancel, set_cancel_all, set_close, set_crank, set_feed_mock_oracle, set_fill, set_open,
-    set_remove_liquidity, set_user_state, transfer, DexAsset, DexMarket, TEST_SOL_DECIMALS,
-    TEST_USDC_DECIMALS,
+    set_cancel, set_cancel_all, set_close, set_crank, set_feed_mock_oracle, set_fill,
+    set_market_swap, set_open, set_remove_liquidity, set_user_state, transfer, DexAsset, DexMarket,
+    TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{account::Account, signature::Keypair, signer::Signer, transport::TransportError},
@@ -1290,5 +1290,55 @@ impl UserTestContext {
         let SingleEvent { data } = match_queue.read_head().assert_unwrap();
 
         MatchEvent { ..*data }
+    }
+
+    pub async fn market_swap(&self, in_asset: DexAsset, out_asset: DexAsset, amount: f64) {
+        let aii = self.dex_info.borrow().assets[in_asset as usize];
+        let aio = self.dex_info.borrow().assets[out_asset as usize];
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        set_market_swap::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.user_state,
+            &aii.mint,
+            &aii.oracle,
+            &aii.vault,
+            &aio.mint,
+            &aio.oracle,
+            &aio.vault,
+            &aio.program_signer,
+            &self.dex_info.borrow().event_queue,
+            convert_to_big_number(amount, aii.decimals),
+        )
+        .await
+        .unwrap()
+    }
+
+    pub async fn market_swap_error(&self, in_asset: DexAsset, out_asset: DexAsset, amount: f64) {
+        let aii = self.dex_info.borrow().assets[in_asset as usize];
+        let aio = self.dex_info.borrow().assets[out_asset as usize];
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        set_market_swap::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.user_state,
+            &aii.mint,
+            &aii.oracle,
+            &aii.vault,
+            &aio.mint,
+            &aio.oracle,
+            &aio.vault,
+            &aio.program_signer,
+            &self.dex_info.borrow().event_queue,
+            convert_to_big_number(amount, aii.decimals),
+        )
+        .await
+        .assert_err()
     }
 }
