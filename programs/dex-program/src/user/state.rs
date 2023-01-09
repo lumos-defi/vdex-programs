@@ -86,7 +86,7 @@ pub struct UserPosition {
     pub long: Position,
     pub short: Position,
     pub market: u8,
-    padding: [u8; 3],
+    padding: [u8; 7],
 }
 
 impl UserPosition {
@@ -729,6 +729,51 @@ mod test {
             expected_collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2
                 / FEE_RATE_BASE as u64;
         assert_eq!(short.cumulative_fund_fee, expected_fund_fee);
+    }
+
+    #[test]
+    fn test_open_two_positions() {
+        let bump = Bump::new();
+        let required_size = UserState::required_account_size(8u8, 8u8);
+        let account = gen_account(required_size, &bump);
+        UserState::initialize(&account, 8u8, 8u8, Pubkey::default()).assert_ok();
+
+        let us = UserState::mount(&account, true).assert_unwrap();
+        let mfr = mock_mfr();
+        let leverage = 10u64;
+
+        us.borrow_mut()
+            .open_position(
+                0,
+                usdc(20000.),
+                usdc(2000.0),
+                false,
+                leverage as u32 * 1000,
+                &mfr,
+            )
+            .assert_ok();
+
+        us.borrow_mut()
+            .open_position(
+                1,
+                usdc(2000.),
+                usdc(2000.0),
+                false,
+                leverage as u32 * 1000,
+                &mfr,
+            )
+            .assert_ok();
+
+        let binding = us.borrow();
+        let btc = binding.position_pool.from_index(0).assert_unwrap();
+        assert_eq!(btc.index, 0);
+        assert_eq!(btc.next, 1);
+        assert_eq!(btc.prev, 255);
+
+        let eth = binding.position_pool.from_index(1).assert_unwrap();
+        assert_eq!(eth.index, 1);
+        assert_eq!(eth.next, 255);
+        assert_eq!(eth.prev, 0);
     }
 
     #[test]
