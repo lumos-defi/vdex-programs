@@ -647,6 +647,7 @@ pub async fn compose_cancel_all_ix(
             dex: *dex,
             user_state: *user_state,
             authority: payer.pubkey(),
+            token_program: spl_token::id(),
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::CancelAllOrders {})

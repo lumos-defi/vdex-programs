@@ -444,6 +444,18 @@ impl<'a> UserState<'a> {
         orders
     }
 
+    pub fn collect_orders(&self, market: usize, open: bool) -> Vec<u8> {
+        let mut orders: Vec<u8> = vec![];
+
+        for order in self.order_pool.into_iter() {
+            if order.data.open == open && order.data.market == market as u8 {
+                orders.push(order.index);
+            }
+        }
+
+        orders
+    }
+
     pub fn collect_ask_orders(&self, market: u8, long: bool) -> Vec<u8> {
         let mut orders: Vec<u8> = vec![];
 

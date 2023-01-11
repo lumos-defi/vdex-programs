@@ -19,11 +19,25 @@ pub async fn setup(
     dex: &Pubkey,
     user_state: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
+    close_wsol_account: bool,
+    user_wsol_account: &Pubkey,
 ) -> Result<(), TransportError> {
     let cancel_all_ix =
         compose_cancel_all_ix(program, user, dex, user_state, remaining_accounts).await;
 
-    let instructions: Vec<Instruction> = vec![cancel_all_ix];
+    let mut instructions: Vec<Instruction> = vec![cancel_all_ix];
+    if close_wsol_account {
+        let close_wsol_account_ix = spl_token::instruction::close_account(
+            &spl_token::id(),
+            user_wsol_account,
+            &user.pubkey(),
+            &user.pubkey(),
+            &[&user.pubkey()],
+        )
+        .unwrap();
+
+        instructions.push(close_wsol_account_ix);
+    }
 
     let transaction = Transaction::new_signed_with_payer(
         &instructions,

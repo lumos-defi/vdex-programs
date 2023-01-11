@@ -26,76 +26,43 @@ pub struct CancelAllOrders<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-/// Orders.map( {
-///   mint
-///   vault
-///   program signer
-///   user mint acc
+/// Markets_that_has_limit_orders.map({
 ///   order book account
 ///   order pool entry page
 ///   order pool remaining pages
-/// } )
+///   BID_orders.map({
+///     mint
+///     vault
+///     program signer
+///     user mint acc
+///   })
+/// })
 pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, CancelAllOrders<'info>>) -> DexResult {
     let dex = &ctx.accounts.dex.load()?;
 
     // Mount user state
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let orders = us.borrow().collect_orders();
     let mut offset = 0usize;
 
     let token_program = ctx.accounts.token_program.clone();
-    for user_order_slot in orders {
-        let order_slot = us
-            .borrow()
-            .get_order_info(user_order_slot)
-            .map_err(|_| DexError::InvalidOrderSlot)?;
 
-        let (market, open, long, asset, size) = us
-            .borrow_mut()
-            .unlink_order(user_order_slot, true)
-            .map_err(|_| DexError::InvalidOrderSlot)?;
-        require!(market < dex.markets_number, DexError::InvalidMarketIndex);
+    for market in 0..dex.markets_number as usize {
+        let bid_orders = us.borrow().collect_orders(market, true);
+        let ask_orders = us.borrow().collect_orders(market, false);
 
-        let mint = &ctx.remaining_accounts[offset];
-        let vault = &ctx.remaining_accounts[offset + 1];
-        let program_signer = &ctx.remaining_accounts[offset + 2];
-        let user_mint_acc = &ctx.remaining_accounts[offset + 3];
-        let order_book = &ctx.remaining_accounts[offset + 4];
-        let order_pool_entry_page = &ctx.remaining_accounts[offset + 5];
-
-        let order_pool_pages = &ctx.remaining_accounts[offset + 6..];
-
-        // Refund if it's bid order
-        if open {
-            let ai = dex.asset_as_ref(asset)?;
-            require!(
-                ai.valid
-                    && ai.mint == mint.key()
-                    && ai.vault == vault.key()
-                    && ai.program_signer == program_signer.key(),
-                DexError::InvalidAssetIndex
-            );
-
-            let seeds = &[
-                ctx.remaining_accounts[offset].key.as_ref(),
-                ctx.accounts.dex.to_account_info().key.as_ref(),
-                &[ai.nonce],
-            ];
-            let signer_seeds = &[&seeds[..]];
-
-            let cpi_accounts = Transfer {
-                from: ctx.remaining_accounts[offset + 1].to_account_info().clone(),
-                to: ctx.remaining_accounts[offset + 3].to_account_info().clone(),
-                authority: ctx.remaining_accounts[offset + 2].to_account_info().clone(),
-            };
-
-            let cpi_ctx =
-                CpiContext::new_with_signer(token_program.clone(), cpi_accounts, signer_seeds);
-            // let cpi_ctx = CpiContext::new(token_program.clone(), cpi_accounts);
-            token::transfer(cpi_ctx, size)?;
+        if bid_orders.is_empty() && ask_orders.is_empty() {
+            continue;
         }
 
-        let mi = &dex.markets[market as usize];
+        let mi = &dex.markets[market];
+
+        let order_book = &ctx.remaining_accounts[offset];
+        let order_pool_entry_page = &ctx.remaining_accounts[offset + 1];
+
+        offset += 2;
+        let order_pool_pages =
+            &ctx.remaining_accounts[offset..offset + mi.order_pool_remaining_pages_number as usize];
+
         require!(
             mi.valid
                 && mi.order_book == order_book.key()
@@ -111,10 +78,7 @@ pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, CancelAllOrders<'info>>) -
             );
         }
 
-        offset += 6 + mi.order_pool_remaining_pages_number as usize;
-
-        let ai = &dex.assets[mi.asset_index as usize];
-        require!(ai.valid, DexError::InvalidMarketIndex);
+        offset += mi.order_pool_remaining_pages_number as usize;
 
         // Mount order book & order pool
         let order_book = OrderBook::mount(order_book, true)?;
@@ -126,19 +90,92 @@ pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, CancelAllOrders<'info>>) -
         )
         .map_err(|_| DexError::FailedMountOrderPool)?;
 
-        let order = order_pool
-            .from_index(order_slot)
-            .map_err(|_| DexError::InvalidOrderSlot)?;
+        // Cancel bid orders
+        for user_order_slot in bid_orders {
+            let order_slot = us
+                .borrow()
+                .get_order_info(user_order_slot)
+                .map_err(|_| DexError::InvalidOrderSlot)?;
 
-        require!(order.in_use(), DexError::InvalidOrderSlot);
+            let (_, open, long, asset, size) = us
+                .borrow_mut()
+                .unlink_order(user_order_slot, true)
+                .map_err(|_| DexError::InvalidOrderSlot)?;
 
-        require_eq!(
-            order.data.user_order_slot,
-            user_order_slot,
-            DexError::InvalidOrderSlot
-        );
+            let mint = &ctx.remaining_accounts[offset];
+            let vault = &ctx.remaining_accounts[offset + 1];
+            let program_signer = &ctx.remaining_accounts[offset + 2];
+            let user_mint_acc = &ctx.remaining_accounts[offset + 3];
 
-        order_book.unlink_order(select_side(open, long), order, &order_pool)?;
+            let ai = dex.asset_as_ref(asset)?;
+            require!(
+                ai.valid
+                    && ai.mint == mint.key()
+                    && ai.vault == vault.key()
+                    && ai.program_signer == program_signer.key(),
+                DexError::InvalidAssetIndex
+            );
+
+            let seeds = &[
+                mint.key.as_ref(),
+                ctx.accounts.dex.to_account_info().key.as_ref(),
+                &[ai.nonce],
+            ];
+            let signer_seeds = &[&seeds[..]];
+
+            let cpi_accounts = Transfer {
+                from: vault.to_account_info().clone(),
+                to: user_mint_acc.to_account_info().clone(),
+                authority: program_signer.to_account_info().clone(),
+            };
+
+            let cpi_ctx =
+                CpiContext::new_with_signer(token_program.clone(), cpi_accounts, signer_seeds);
+            token::transfer(cpi_ctx, size)?;
+
+            let order = order_pool
+                .from_index(order_slot)
+                .map_err(|_| DexError::InvalidOrderSlot)?;
+
+            require!(order.in_use(), DexError::InvalidOrderSlot);
+
+            require_eq!(
+                order.data.user_order_slot,
+                user_order_slot,
+                DexError::InvalidOrderSlot
+            );
+
+            order_book.unlink_order(select_side(open, long), order, &order_pool)?;
+
+            offset += 4;
+        }
+
+        // Cancel ask orders
+        for user_order_slot in ask_orders {
+            let order_slot = us
+                .borrow()
+                .get_order_info(user_order_slot)
+                .map_err(|_| DexError::InvalidOrderSlot)?;
+
+            let (_, open, long, _, _) = us
+                .borrow_mut()
+                .unlink_order(user_order_slot, true)
+                .map_err(|_| DexError::InvalidOrderSlot)?;
+
+            let order = order_pool
+                .from_index(order_slot)
+                .map_err(|_| DexError::InvalidOrderSlot)?;
+
+            require!(order.in_use(), DexError::InvalidOrderSlot);
+
+            require_eq!(
+                order.data.user_order_slot,
+                user_order_slot,
+                DexError::InvalidOrderSlot
+            );
+
+            order_book.unlink_order(select_side(open, long), order, &order_pool)?;
+        }
     }
 
     Ok(())
