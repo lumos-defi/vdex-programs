@@ -166,7 +166,9 @@ pub mod dex_program {
         order::cancel::handler(ctx, user_order_slot)
     }
 
-    pub fn cancel_all_orders(ctx: Context<CancelAllOrders>) -> DexResult {
+    pub fn cancel_all_orders<'info>(
+        ctx: Context<'_, '_, '_, 'info, CancelAllOrders<'info>>,
+    ) -> DexResult {
         order::cancel_all::handler(ctx)
     }
 

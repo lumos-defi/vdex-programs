@@ -5,11 +5,11 @@ use std::{
 };
 
 use crate::utils::{
-    assert_eq_with_dust, convert_to_big_number, create_associated_token_account, get_dex_info,
-    get_keypair, get_program, get_token_balance, mint_tokens, set_add_liquidity, set_ask, set_bid,
-    set_cancel, set_cancel_all, set_close, set_crank, set_feed_mock_oracle, set_fill,
-    set_market_swap, set_open, set_remove_liquidity, set_user_state, transfer, DexAsset, DexMarket,
-    TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
+    assert_eq_with_dust, convert_to_big_number, create_associated_token_account,
+    create_token_account, get_dex_info, get_keypair, get_program, get_token_balance, mint_tokens,
+    set_add_liquidity, set_ask, set_bid, set_cancel, set_cancel_all, set_close, set_crank,
+    set_feed_mock_oracle, set_fill, set_market_swap, set_open, set_remove_liquidity,
+    set_user_state, transfer, DexAsset, DexMarket, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{account::Account, signature::Keypair, signer::Signer, transport::TransportError},
@@ -1106,13 +1106,29 @@ impl UserTestContext {
     }
 
     pub async fn cancel_call(&self) {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
         let mut remaining_accounts: Vec<AccountMeta> = Vec::new();
 
-        for i in 0..di.markets_number as usize {
-            let mi = di.markets[i];
+        let mut close_wsol_account = false;
+        let user_wsol_acc = Keypair::new();
+
+        for market in 0..di.markets_number as usize {
+            let bid_orders = ref_us.collect_orders(market, true);
+            let ask_orders = ref_us.collect_orders(market, false);
+            if bid_orders.is_empty() && ask_orders.is_empty() {
+                continue;
+            }
+
+            let mi = di.markets[market];
 
             remaining_accounts.append(&mut vec![AccountMeta::new(mi.order_book, false)]);
             remaining_accounts.append(&mut vec![AccountMeta::new(mi.order_pool_entry_page, false)]);
@@ -1123,6 +1139,46 @@ impl UserTestContext {
                     false,
                 )]);
             }
+
+            // Bid orders
+            for user_order_slot in bid_orders {
+                let order = ref_us.get_order(user_order_slot).unwrap();
+
+                let ai = di.assets[order.asset as usize];
+                remaining_accounts.append(&mut vec![AccountMeta::new(ai.mint, false)]);
+                remaining_accounts.append(&mut vec![AccountMeta::new(ai.vault, false)]);
+                remaining_accounts.append(&mut vec![AccountMeta::new(ai.program_signer, false)]);
+
+                let user_mint_acc = if ai.mint == spl_token::native_mint::id() {
+                    close_wsol_account = true;
+
+                    create_token_account(
+                        context,
+                        &self.user,
+                        &user_wsol_acc,
+                        &ai.mint,
+                        &self.user.pubkey(),
+                        0,
+                    )
+                    .await
+                    .unwrap();
+                    user_wsol_acc.pubkey()
+                } else {
+                    get_associated_token_address(&self.user.pubkey(), &ai.mint)
+                };
+
+                if let Ok(None) = context.banks_client.get_account(user_mint_acc).await {
+                    create_associated_token_account(
+                        context,
+                        &self.user,
+                        &self.user.pubkey(),
+                        &ai.mint,
+                    )
+                    .await
+                }
+
+                remaining_accounts.append(&mut vec![AccountMeta::new(user_mint_acc, false)]);
+            }
         }
 
         set_cancel_all::setup(
@@ -1132,6 +1188,8 @@ impl UserTestContext {
             &self.dex,
             &self.user_state,
             remaining_accounts,
+            close_wsol_account,
+            &user_wsol_acc.pubkey(),
         )
         .await
         .unwrap()
@@ -1238,6 +1296,23 @@ impl UserTestContext {
 
         // Not found
         assert!(false);
+    }
+
+    pub async fn assert_no_order(&self) {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let mut orders: Vec<u8> = vec![];
+
+        for order in ref_us.order_pool.into_iter() {
+            orders.push(order.index);
+        }
+
+        assert!(orders.is_empty());
     }
 
     pub async fn assert_order_book_bid_max_ask_min(

@@ -129,7 +129,7 @@ async fn test_cancel_ask_short() {
     user.add_liquidity_with_usdc(100000.).await;
     user.feed_btc_price(20000.).await;
 
-    // Alice open long
+    // Alice open short
     alice.mint_usdc(2000.).await;
 
     alice
