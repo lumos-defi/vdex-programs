@@ -510,7 +510,7 @@ impl<'a> UserState<'a> {
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use crate::utils::{test::*, FEE_RATE_BASE};
+    use crate::utils::{test::*, BORROW_FEE_RATE_BASE, FEE_RATE_BASE};
     use bumpalo::Bump;
 
     impl<'a> UserState<'a> {
@@ -648,7 +648,7 @@ mod test {
         assert_eq!(long.closing_size, 0);
 
         let expected_fund_fee = expected_collateral * 20 * (mfr.borrow_fee_rate as u64) * HOURS_2
-            / FEE_RATE_BASE as u64;
+            / BORROW_FEE_RATE_BASE as u64;
         assert_eq!(long.cumulative_fund_fee, expected_fund_fee);
     }
 
@@ -739,7 +739,7 @@ mod test {
 
         let expected_fund_fee =
             expected_collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2
-                / FEE_RATE_BASE as u64;
+                / BORROW_FEE_RATE_BASE as u64;
         assert_eq!(short.cumulative_fund_fee, expected_fund_fee);
     }
 
@@ -823,8 +823,8 @@ mod test {
             .close_position(0, size, usdc(25000.), true, &mfr, false, false)
             .assert_unwrap();
 
-        let expected_borrow_fee =
-            collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
+        let expected_borrow_fee = collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2
+            / BORROW_FEE_RATE_BASE as u64;
 
         let expected_close_fee = size * (mfr.close_fee_rate as u64) / FEE_RATE_BASE as u64;
 
@@ -873,8 +873,8 @@ mod test {
             .close_position(0, size, usdc(18000.), true, &mfr, false, false)
             .assert_unwrap();
 
-        let expected_borrow_fee =
-            collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
+        let expected_borrow_fee = collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2
+            / BORROW_FEE_RATE_BASE as u64;
 
         let expected_close_fee = size * (mfr.close_fee_rate as u64) / FEE_RATE_BASE as u64;
 
@@ -923,8 +923,8 @@ mod test {
             .close_position(0, size, usdc(18000.), false, &mfr, false, false)
             .assert_unwrap();
 
-        let expected_borrow_fee =
-            collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
+        let expected_borrow_fee = collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2
+            / BORROW_FEE_RATE_BASE as u64;
 
         let expected_close_fee =
             (size as u128) * (mfr.close_fee_rate as u128) * (usdc(18000.) as u128)
@@ -976,8 +976,8 @@ mod test {
             .close_position(0, size, usdc(22000.), false, &mfr, false, false)
             .assert_unwrap();
 
-        let expected_borrow_fee =
-            collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2 / FEE_RATE_BASE as u64;
+        let expected_borrow_fee = collateral * leverage * (mfr.borrow_fee_rate as u64) * HOURS_2
+            / BORROW_FEE_RATE_BASE as u64;
 
         let expected_close_fee =
             (size as u128) * (mfr.close_fee_rate as u128) * (usdc(22000.) as u128)
