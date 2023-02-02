@@ -3,10 +3,10 @@ name: Tests
 on:
   push:
     branches:
-      - main-workflow
+      - main
   pull_request:
     branches:
-      - main-workflow
+      - main
 env:
   SOLANA_TOOL_SUITE_VERSION: 1.13.5
   NODE_VERSION: 17.0.1
