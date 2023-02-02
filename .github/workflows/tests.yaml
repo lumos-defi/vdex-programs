@@ -71,7 +71,7 @@ jobs:
       - name: expose solana cli
         run: echo "/home/runner/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_PATH
       - name: Run bpf tests
-        run: cargo test-bpf --features client-support -- --test-threads=1
+        run: cargo test-bpf --features client-support
 
   # cargo-audit:
   #   name: Cargo audit
