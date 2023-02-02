@@ -1,0 +1,123 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main-workflow
+  pull_request:
+    branches:
+      - main-workflow
+env:
+  SOLANA_TOOL_SUITE_VERSION: 1.13.5
+  NODE_VERSION: 17.0.1
+  RUST_TOOLCHAIN: 1.64.0
+
+jobs:
+  # fmt-clippy:
+  #   name: fmt & clippy
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - uses: ./.github/actions/setup/
+  #     - name: Install Rust nightly
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         toolchain: ${{ env.RUST_TOOLCHAIN }}
+  #         profile: minimal
+  #         override: true
+  #         components: rustfmt, clippy
+  #     - name: Cache build files
+  #       uses: Swatinem/rust-cache@v1
+  #     - name: Cargo fmt
+  #       run: cargo fmt -- --check
+  #     - name: Cargo clippy
+  #       run: cargo clippy --all-targets
+
+  # unit:
+  #   name: Unit tests
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - uses: ./.github/actions/setup/
+  #     - name: Install Rust toolchain
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         toolchain: ${{ env.RUST_TOOLCHAIN }}
+  #         profile: minimal
+  #         override: true
+  #     - name: Cache build artefacts
+  #       uses: Swatinem/rust-cache@v1
+  #     - name: Run package checks
+  #       run: cargo check # run package checks
+  #     - name: Run unit tests
+  #       run: cargo test --lib # run unit tests
+
+  test-bpf:
+    name: Solana test-bpf
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/setup/
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          profile: minimal
+          override: true
+      - name: Cache build artefacts
+        uses: Swatinem/rust-cache@v1
+      - name: Install solana tool suite
+        run: sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_TOOL_SUITE_VERSION }}/install)"
+      - name: expose solana cli
+        run: echo "/home/runner/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_PATH
+      - name: Run bpf tests
+        run: cargo test-bpf --features client-support -- --test-threads=1
+
+  # cargo-audit:
+  #   name: Cargo audit
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - uses: ./.github/actions/setup/
+  #     - name: Cache cargo-audit version
+  #       uses: Swatinem/rust-cache@v1
+  #     - name: Download cargo-audit
+  #       uses: actions-rs/install@v0.1
+  #       with:
+  #         crate: cargo-audit
+  #         version: latest
+  #     - name: Run cargo-audit # Using args from .cargo/audit.toml
+  #       run: cargo audit --ignore RUSTSEC-2020-0016 --ignore RUSTSEC-2020-0036 --ignore RUSTSEC-2020-0159 --ignore RUSTSEC-2020-0071
+  #       # solana-sdk: https://github.com/lumos-defi/dex-programs/runs/5809536330?check_suite_focus=true#step:6:209
+  #       # solana-client https://github.com/lumos-defi/dex-programs/runs/5809398864?check_suite_focus=true#step:6:303
+  #       # solana-sdk: https://github.com/lumos-defi/dex-programs/runs/5809583522?check_suite_focus=true#step:6:16
+  #       # solana-program-test: https://github.com/lumos-defi/dex-programs/runs/5809583522?check_suite_focus=true#step:6:111
+
+  # yarn-prettier:
+  #   name: yarn prettier
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: Setup node
+  #       uses: actions/setup-node@v2
+  #       with:
+  #         node-version: '14.x'
+  #         registry-url: 'https://registry.npmjs.org'
+  #     - name: Install yarn
+  #       run: yarn
+  #     - name: Run prettier
+  #       run: yarn prettier
+
+  # yarn-lint:
+  #   name: yarn lint
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: Setup node
+  #       uses: actions/setup-node@v2
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #     - name: Install yarn
+  #       run: yarn
+  #     - name: Run lint
+  #       run: yarn lint
