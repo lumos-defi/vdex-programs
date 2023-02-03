@@ -42,6 +42,8 @@ export async function createDexFull(authority: Keypair) {
   const LIQUIDATE_FEE_RATE = 80
   const ASSET_INDEX = 0
   const USDC_MINT_DECIMALS = 6
+  const MINIMUM_COLLATERAL = 100
+  const MAX_LEVERAGE = 30_000 //10 (30_000 / 1_000)
 
   const dex = Keypair.generate()
   const eventQueue = Keypair.generate()
@@ -159,11 +161,12 @@ export async function createDexFull(authority: Keypair) {
   await program.methods
     .addMarket(
       MARKET_SYMBOL,
-      new BN(100),
+      new BN(MINIMUM_COLLATERAL),
       new BN(CHARGE_BORROW_FEE_INTERVAL),
       OPEN_FEE_RATE,
       CLOSE_FEE_RATE,
       LIQUIDATE_FEE_RATE,
+      MAX_LEVERAGE,
       DECIMALS,
       BTC_ORACLE_SOURCE,
       ASSET_INDEX,
