@@ -168,22 +168,22 @@ impl UserTestContext {
     pub async fn feed_btc_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::BTC as u8, price)
             .await;
-        self.feed_asset_mock_oracle_price(self.asset_index("BTC"), price)
-            .await
+        // self.feed_asset_mock_oracle_price(self.asset_index("BTC"), price)
+        //     .await
     }
 
     pub async fn feed_eth_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::ETH as u8, price)
             .await;
-        self.feed_asset_mock_oracle_price(self.asset_index("ETH"), price)
-            .await
+        // self.feed_asset_mock_oracle_price(self.asset_index("ETH"), price)
+        //     .await
     }
 
     pub async fn feed_sol_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::SOL as u8, price)
             .await;
-        self.feed_asset_mock_oracle_price(self.asset_index("SOL"), price)
-            .await
+        // self.feed_asset_mock_oracle_price(self.asset_index("SOL"), price)
+        //     .await
     }
 
     pub async fn generate_random_user(&self) -> Keypair {
