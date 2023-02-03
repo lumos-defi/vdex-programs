@@ -17,8 +17,8 @@ default = []
 client-support = []
 
 [dependencies]
-anchor-lang = "0.25.0"
-anchor-spl = "0.25.0"
+anchor-lang = "0.26.0"
+anchor-spl = "0.26.0"
 num_enum = "0.5.5"
 pyth-client = {version = "0.4.0", features = ["no-entrypoint"]}
 packed_struct = "0.10.0"
@@ -32,7 +32,7 @@ rand = "0.7.3"
 safe-transmute = "0.11.2"
 getrandom = { version = "0.2.2", features = ["custom"] }
 bumpalo = { version = "3.9.1", features = ["collections"] }
-anchor-client = { version = "^0.25.0", features = ["debug"] }
+anchor-client = { version = "^0.26.0", features = ["debug"] }
 solana-program-test = "1.10.32"
 spl-token = { version = "3.1.1", features = ["no-entrypoint"] }
 spl-associated-token-account = "1.0.3"

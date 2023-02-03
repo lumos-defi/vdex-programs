@@ -407,8 +407,9 @@ mod paged_linked_list_test_suite {
         assert_eq!(
             list.into_iter()
                 .map(|x| x.data.user_id)
-                .collect::<Vec<u64>>(),
-            vec![]
+                .collect::<Vec<u64>>()
+                .len(),
+            0
         )
     }
 

@@ -269,6 +269,7 @@ pub async fn create_associated_token_account(
                 &payer.pubkey(),
                 wallet_address,
                 token_mint_address,
+                &spl_token::id(),
             ),
         ],
         Some(&payer.pubkey()),
