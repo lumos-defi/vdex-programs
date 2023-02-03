@@ -264,7 +264,6 @@ impl UserTestContext {
         let usdc_asset = self.dex_info.borrow().assets[DexAsset::USDC as usize];
         let mint_amount = convert_to_big_number(amount, usdc_asset.decimals);
 
-        println!("===========>mint_amount:{}", mint_amount);
         self.mint_asset(&usdc_asset.mint, &self.admin, mint_amount)
             .await;
     }
@@ -324,7 +323,6 @@ impl UserTestContext {
             .await
             .unwrap();
         }
-        println!("=====>4");
     }
 
     pub async fn add_liquidity_with_usdc(&self, amount: f64) {
