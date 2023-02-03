@@ -45,7 +45,7 @@ impl UserTestContext {
         let program = get_program().await;
         let user = Keypair::new();
 
-        let transfer_sol_amount = 10_000_000_000;
+        let transfer_sol_amount = 10_000_000_000_000;
         transfer(
             &mut context.borrow_mut(),
             &user.pubkey(),
@@ -103,25 +103,24 @@ impl UserTestContext {
     }
 
     pub async fn get_mock_oracle_price(&self, oracle: Pubkey) -> u64 {
-        let mock_oracle = self.get_mock_oracle_account_info(oracle).await;
-        mock_oracle
-            .price
-            .div(10u64.pow(mock_oracle.expo as u32))
-            .mul(USDC_POW_DECIMALS)
+        let (price, expo) = self.get_mock_oracle_account_info(oracle).await;
+
+        price.div(10u64.pow(expo as u32)).mul(USDC_POW_DECIMALS)
     }
 
-    pub async fn get_mock_oracle_account_info(&self, oracle: Pubkey) -> &MockOracle {
+    pub async fn get_mock_oracle_account_info(&self, oracle: Pubkey) -> (u64, u8) {
         let oracle_account = self.get_account(oracle).await;
         let data_ptr = oracle_account.data.as_ptr();
+
         let mock_oracle = unsafe { data_ptr.add(8).cast::<MockOracle>().as_ref() }.unwrap();
 
-        mock_oracle
+        (mock_oracle.price, mock_oracle.expo)
     }
 
     pub async fn feed_asset_mock_oracle_price(&self, asset: usize, price: f64) {
         let asset_info = self.dex_info.borrow().assets[asset];
-        let oracle_info = self.get_mock_oracle_account_info(asset_info.oracle).await;
-        let new_market_oracle_price = convert_to_big_number(price, oracle_info.expo);
+        let (_, oracle_price_expo) = self.get_mock_oracle_account_info(asset_info.oracle).await;
+        let new_market_oracle_price = convert_to_big_number(price, oracle_price_expo);
         set_feed_mock_oracle::setup(
             &mut self.context.borrow_mut(),
             &self.program,
@@ -135,8 +134,9 @@ impl UserTestContext {
 
     pub async fn feed_market_mock_oracle_price(&self, market: u8, price: f64) {
         let market_info = self.dex_info.borrow().markets[market as usize];
-        let oracle_info = self.get_mock_oracle_account_info(market_info.oracle).await;
-        let new_market_oracle_price = convert_to_big_number(price.into(), oracle_info.expo);
+        let (_, oracle_price_expo) = self.get_mock_oracle_account_info(market_info.oracle).await;
+
+        let new_market_oracle_price = convert_to_big_number(price.into(), oracle_price_expo);
 
         set_feed_mock_oracle::setup(
             &mut self.context.borrow_mut(),
@@ -264,6 +264,7 @@ impl UserTestContext {
         let usdc_asset = self.dex_info.borrow().assets[DexAsset::USDC as usize];
         let mint_amount = convert_to_big_number(amount, usdc_asset.decimals);
 
+        println!("===========>mint_amount:{}", mint_amount);
         self.mint_asset(&usdc_asset.mint, &self.admin, mint_amount)
             .await;
     }
@@ -323,6 +324,7 @@ impl UserTestContext {
             .await
             .unwrap();
         }
+        println!("=====>4");
     }
 
     pub async fn add_liquidity_with_usdc(&self, amount: f64) {
