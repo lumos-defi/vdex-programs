@@ -437,7 +437,7 @@ impl<'a, T> SmallList<'a, T> {
 #[cfg(test)]
 #[allow(dead_code)]
 mod test {
-    use std::cell::{RefCell, RefMut};
+    use std::cell::RefMut;
 
     use super::*;
     use crate::utils::test::*;
