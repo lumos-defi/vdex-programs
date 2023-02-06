@@ -181,7 +181,7 @@ pub async fn mint_tokens(
     amount: u64,
 ) -> Result<(), TransportError> {
     let transaction = Transaction::new_signed_with_payer(
-        &[spl_token_2022::instruction::mint_to(
+        &[spl_token::instruction::mint_to(
             &spl_token::id(),
             mint,
             account,
