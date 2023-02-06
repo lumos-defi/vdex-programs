@@ -153,7 +153,7 @@ pub async fn create_token_account(
                 spl_token::state::Account::LEN as u64,
                 &spl_token::id(),
             ),
-            spl_token::instruction::initialize_account(
+            spl_token_2022::instruction::initialize_account(
                 &spl_token::id(),
                 &account.pubkey(),
                 mint,
@@ -167,7 +167,7 @@ pub async fn create_token_account(
 
     context
         .banks_client
-        .process_transaction(transaction)
+        .process_transaction_with_preflight(transaction)
         .await
         .map_err(|e| e.into())
 }
@@ -181,7 +181,7 @@ pub async fn mint_tokens(
     amount: u64,
 ) -> Result<(), TransportError> {
     let transaction = Transaction::new_signed_with_payer(
-        &[spl_token::instruction::mint_to(
+        &[spl_token_2022::instruction::mint_to(
             &spl_token::id(),
             mint,
             account,
