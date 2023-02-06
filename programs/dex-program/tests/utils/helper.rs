@@ -39,7 +39,7 @@ pub async fn get_banks_client(program_id: &Pubkey) -> (BanksClient, Keypair, Has
     let client = Client::new_with_options(
         Cluster::Debug,
         Rc::new(Keypair::new()),
-        CommitmentConfig::finalized(),
+        CommitmentConfig::processed(),
     );
     let program = client.program(*program_id);
     (banks_client, payer, recent_blockhash, program)
@@ -53,7 +53,7 @@ pub async fn get_context_and_program() -> (ProgramTestContext, Program) {
     let client = Client::new_with_options(
         Cluster::Debug,
         Rc::new(Keypair::new()),
-        CommitmentConfig::finalized(),
+        CommitmentConfig::processed(),
     );
     let program = client.program(dex_program_id);
 
@@ -66,7 +66,7 @@ pub async fn get_program() -> Program {
     let client = Client::new_with_options(
         Cluster::Debug,
         Rc::new(Keypair::new()),
-        CommitmentConfig::finalized(),
+        CommitmentConfig::processed(),
     );
     let program = client.program(dex_program_id);
     program
