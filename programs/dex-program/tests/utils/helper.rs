@@ -102,7 +102,7 @@ pub async fn create_mint(
     owner: &Pubkey,
 ) -> Result<(), TransportError> {
     let rent = context.banks_client.get_rent().await.unwrap();
-    let mint_rent = rent.minimum_balance(spl_token::state::Mint::LEN);
+    let mint_rent = rent.minimum_balance(spl_token_2022::state::Mint::LEN);
 
     let mut transaction = Transaction::new_with_payer(
         &[
@@ -113,7 +113,7 @@ pub async fn create_mint(
                 spl_token::state::Mint::LEN as u64,
                 &spl_token::id(),
             ),
-            spl_token::instruction::initialize_mint(
+            spl_token_2022::instruction::initialize_mint(
                 &spl_token::id(),
                 &mint.pubkey(),
                 owner,
@@ -153,7 +153,7 @@ pub async fn create_token_account(
                 spl_token::state::Account::LEN as u64,
                 &spl_token::id(),
             ),
-            spl_token::instruction::initialize_account(
+            spl_token_2022::instruction::initialize_account(
                 &spl_token::id(),
                 &account.pubkey(),
                 mint,
@@ -167,7 +167,7 @@ pub async fn create_token_account(
 
     context
         .banks_client
-        .process_transaction_with_preflight(transaction)
+        .process_transaction(transaction)
         .await
         .map_err(|e| e.into())
 }
@@ -252,8 +252,8 @@ pub async fn transfer_spl_tokens(
 
 pub async fn get_token_balance(banks_client: &mut BanksClient, token: &Pubkey) -> u64 {
     let token_account = banks_client.get_account(*token).await.unwrap().unwrap();
-    let account_info: spl_token::state::Account =
-        spl_token::state::Account::unpack_from_slice(token_account.data.as_slice()).unwrap();
+    let account_info: spl_token_2022::state::Account =
+        spl_token_2022::state::Account::unpack_from_slice(token_account.data.as_slice()).unwrap();
     account_info.amount
 }
 
