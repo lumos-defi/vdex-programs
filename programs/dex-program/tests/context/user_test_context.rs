@@ -311,18 +311,16 @@ impl UserTestContext {
             Err(_) => {}
         }
 
-        {
-            mint_tokens(
-                context,
-                &self.admin,
-                mint,
-                &user_mint_acc,
-                mint_authority,
-                amount,
-            )
-            .await
-            .unwrap();
-        }
+        mint_tokens(
+            context,
+            &self.admin,
+            mint,
+            &user_mint_acc,
+            mint_authority,
+            amount,
+        )
+        .await
+        .unwrap();
     }
 
     pub async fn add_liquidity_with_usdc(&self, amount: f64) {

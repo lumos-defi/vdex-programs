@@ -14,10 +14,12 @@ describe('Test Create Market', () => {
   const MOCK_ORACLE_PRICE_EXPO = 88
   const ORACLE_SOURCE = 0 // 0: mock,1: pyth
   const SIGNIFICANT_DECIMALS = 2 // 0.00
+  const MINIMUM_COLLATERAL = 100
   const CHARGE_BORROW_FEE_INTERVAL = 3600
   const OPEN_FEE_RATE = 30 // 0.3% (30 / 10000)
   const CLOSE_FEE_RATE = 50 // 0.5%   (50 /  10000)
   const LIQUIDATE_FEE_RATE = 80 // 0.8%   (80 /  10000)
+  const MAX_LEVERAGE = 30_000 //10 (30_000 / 1_000)
 
   const ASSET_INDEX = 0
 
@@ -39,11 +41,12 @@ describe('Test Create Market', () => {
     await program.methods
       .addMarket(
         MARKET_SYMBOL,
-        new BN(100),
+        new BN(MINIMUM_COLLATERAL),
         new BN(CHARGE_BORROW_FEE_INTERVAL),
         OPEN_FEE_RATE,
         CLOSE_FEE_RATE,
         LIQUIDATE_FEE_RATE,
+        MAX_LEVERAGE,
         DECIMALS,
         ORACLE_SOURCE,
         ASSET_INDEX,
@@ -67,11 +70,12 @@ describe('Test Create Market', () => {
       await program.methods
         .addMarket(
           MARKET_SYMBOL,
-          new BN(100),
+          new BN(MINIMUM_COLLATERAL),
           new BN(CHARGE_BORROW_FEE_INTERVAL),
           OPEN_FEE_RATE,
           CLOSE_FEE_RATE,
           LIQUIDATE_FEE_RATE,
+          MAX_LEVERAGE,
           DECIMALS,
           ORACLE_SOURCE,
           ASSET_INDEX,
@@ -93,11 +97,12 @@ describe('Test Create Market', () => {
     await program.methods
       .addMarket(
         MARKET_SYMBOL,
-        new BN(100),
+        new BN(MINIMUM_COLLATERAL),
         new BN(CHARGE_BORROW_FEE_INTERVAL),
         OPEN_FEE_RATE,
         CLOSE_FEE_RATE,
         LIQUIDATE_FEE_RATE,
+        MAX_LEVERAGE,
         DECIMALS,
         ORACLE_SOURCE,
         ASSET_INDEX,
@@ -132,7 +137,7 @@ describe('Test Create Market', () => {
       orderBook: orderBook.publicKey,
       orderPoolEntryPage: orderPoolEntryPage.publicKey,
       oracle: mockOracle.publicKey,
-      minimumPositionValue: expect.toBNEqual(100),
+      minimumCollateral: expect.toBNEqual(MINIMUM_COLLATERAL),
       chargeBorrowFeeInterval: expect.toBNEqual(CHARGE_BORROW_FEE_INTERVAL),
       openFeeRate: OPEN_FEE_RATE,
       closeFeeRate: CLOSE_FEE_RATE,

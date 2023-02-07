@@ -39,7 +39,7 @@ pub async fn get_banks_client(program_id: &Pubkey) -> (BanksClient, Keypair, Has
     let client = Client::new_with_options(
         Cluster::Debug,
         Rc::new(Keypair::new()),
-        CommitmentConfig::finalized(),
+        CommitmentConfig::processed(),
     );
     let program = client.program(*program_id);
     (banks_client, payer, recent_blockhash, program)
@@ -53,7 +53,7 @@ pub async fn get_context_and_program() -> (ProgramTestContext, Program) {
     let client = Client::new_with_options(
         Cluster::Debug,
         Rc::new(Keypair::new()),
-        CommitmentConfig::finalized(),
+        CommitmentConfig::processed(),
     );
     let program = client.program(dex_program_id);
 
@@ -66,7 +66,7 @@ pub async fn get_program() -> Program {
     let client = Client::new_with_options(
         Cluster::Debug,
         Rc::new(Keypair::new()),
-        CommitmentConfig::finalized(),
+        CommitmentConfig::processed(),
     );
     let program = client.program(dex_program_id);
     program
@@ -102,7 +102,7 @@ pub async fn create_mint(
     owner: &Pubkey,
 ) -> Result<(), TransportError> {
     let rent = context.banks_client.get_rent().await.unwrap();
-    let mint_rent = rent.minimum_balance(spl_token::state::Mint::LEN);
+    let mint_rent = rent.minimum_balance(spl_token_2022::state::Mint::LEN);
 
     let mut transaction = Transaction::new_with_payer(
         &[
@@ -113,7 +113,7 @@ pub async fn create_mint(
                 spl_token::state::Mint::LEN as u64,
                 &spl_token::id(),
             ),
-            spl_token::instruction::initialize_mint(
+            spl_token_2022::instruction::initialize_mint(
                 &spl_token::id(),
                 &mint.pubkey(),
                 owner,
@@ -153,7 +153,7 @@ pub async fn create_token_account(
                 spl_token::state::Account::LEN as u64,
                 &spl_token::id(),
             ),
-            spl_token::instruction::initialize_account(
+            spl_token_2022::instruction::initialize_account(
                 &spl_token::id(),
                 &account.pubkey(),
                 mint,
@@ -181,7 +181,7 @@ pub async fn mint_tokens(
     amount: u64,
 ) -> Result<(), TransportError> {
     let transaction = Transaction::new_signed_with_payer(
-        &[spl_token::instruction::mint_to(
+        &[spl_token_2022::instruction::mint_to(
             &spl_token::id(),
             mint,
             account,
@@ -252,8 +252,8 @@ pub async fn transfer_spl_tokens(
 
 pub async fn get_token_balance(banks_client: &mut BanksClient, token: &Pubkey) -> u64 {
     let token_account = banks_client.get_account(*token).await.unwrap().unwrap();
-    let account_info: spl_token::state::Account =
-        spl_token::state::Account::unpack_from_slice(token_account.data.as_slice()).unwrap();
+    let account_info: spl_token_2022::state::Account =
+        spl_token_2022::state::Account::unpack_from_slice(token_account.data.as_slice()).unwrap();
     account_info.amount
 }
 
@@ -269,6 +269,7 @@ pub async fn create_associated_token_account(
                 &payer.pubkey(),
                 wallet_address,
                 token_mint_address,
+                &spl_token::id(),
             ),
         ],
         Some(&payer.pubkey()),
