@@ -32,7 +32,7 @@ pub struct LimitAsk<'info> {
     pub authority: Signer<'info>,
 }
 
-/// Layout of remaining counts:
+/// Layout of remaining accounts:
 /// 1. Order pool remaining pages
 pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size: u64) -> DexResult {
     let dex = &ctx.accounts.dex.load()?;

@@ -14,6 +14,7 @@ use dex_program::{
         LimitBid, OpenPosition, RemoveLiquidity, Swap,
     },
     dex::Dex,
+    dual_invest::DI,
 };
 use solana_program_test::ProgramTestContext;
 
@@ -28,6 +29,7 @@ pub async fn compose_init_dex_ixs(
     event_queue: &Keypair,
     match_queue: &Keypair,
     user_list_entry_page: &Keypair,
+    di_option: &Keypair,
     reward_mint: &Pubkey,
     vlp_decimals: u8,
 ) -> Vec<Instruction> {
@@ -36,6 +38,7 @@ pub async fn compose_init_dex_ixs(
     let event_queue_account_size = 16 * 1024;
     let match_queue_account_size = 16 * 1024;
     let user_list_entry_page_account_size = 4 * 1024;
+    let di_option_account_size = DI::required_account_size(64u8);
 
     let init_dex_ixs = program
         .request()
@@ -67,6 +70,13 @@ pub async fn compose_init_dex_ixs(
             user_list_entry_page_account_size as u64,
             &program.id(),
         ))
+        .instruction(system_instruction::create_account(
+            &payer.pubkey(),
+            &di_option.pubkey(),
+            rent.minimum_balance(di_option_account_size),
+            di_option_account_size as u64,
+            &program.id(),
+        ))
         .accounts(InitDex {
             dex: dex.pubkey(),
             usdc_mint: usdc_mint.pubkey(),
@@ -75,6 +85,7 @@ pub async fn compose_init_dex_ixs(
             match_queue: match_queue.pubkey(),
             user_list_entry_page: user_list_entry_page.pubkey(),
             reward_mint: *reward_mint,
+            di_option: di_option.pubkey(),
         })
         .args(dex_program::instruction::InitDex { vlp_decimals })
         .instructions()
@@ -249,6 +260,7 @@ pub async fn compose_init_user_state_ixs(
 ) -> Vec<Instruction> {
     let order_slot_count: u8 = 32;
     let position_slot_count: u8 = 32;
+    let di_option_slot_count: u8 = 32;
 
     let init_user_state_ixs = program
         .request()
@@ -261,6 +273,7 @@ pub async fn compose_init_user_state_ixs(
         .args(dex_program::instruction::CreateUserState {
             order_slot_count,
             position_slot_count,
+            di_option_slot_count,
         })
         .instructions()
         .unwrap();

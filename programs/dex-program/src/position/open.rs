@@ -66,7 +66,7 @@ pub struct OpenPosition<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-// Layout of remaining counts:
+// Layout of remaining accounts:
 //  offset 0 ~ n: user_list remaining pages
 pub fn handler(
     ctx: Context<OpenPosition>,

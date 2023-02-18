@@ -522,6 +522,7 @@ pub async fn init_dex(
     let event_queue = Keypair::new();
     let match_queue = Keypair::new();
     let user_list_entry_page = Keypair::new();
+    let di_option = Keypair::new();
     let reward_mint = spl_token::native_mint::id();
 
     let vlp_decimals = TEST_VLP_DECIMALS;
@@ -535,6 +536,7 @@ pub async fn init_dex(
         &event_queue,
         &match_queue,
         &user_list_entry_page,
+        &di_option,
         &reward_mint,
         vlp_decimals,
     )

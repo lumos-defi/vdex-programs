@@ -31,7 +31,7 @@ pub struct FillOrder<'info> {
     pub authority: Signer<'info>,
 }
 
-/// Layout of remaining counts:
+/// Layout of remaining accounts:
 /// 1. Order pool remaining pages
 pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
     let dex = &ctx.accounts.dex.load()?;

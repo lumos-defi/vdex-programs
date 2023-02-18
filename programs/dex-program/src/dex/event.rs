@@ -78,6 +78,41 @@ impl PackedEvent for AssetSwapped {
     const DISCRIMINATOR: u8 = 102;
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
+#[cfg_attr(feature = "client-support", derive(Serialize))]
+pub struct DIOptionSettled {
+    pub user_state: [u8; 32],
+    pub base_mint: [u8; 32],
+    pub quote_mint: [u8; 32],
+    pub expiry_date: i64,
+    pub strike_price: u64,
+    pub settle_price: u64,
+    pub size: u64,
+    pub premium_rate: u16,
+    pub fee: u64,
+    pub is_call: bool,
+}
+
+impl PackedEvent for DIOptionSettled {
+    const DISCRIMINATOR: u8 = 103;
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+#[cfg_attr(feature = "client-support", derive(Serialize))]
+pub struct DIOptionRemoved {
+    pub base_mint: [u8; 32],
+    pub quote_mint: [u8; 32],
+    pub expiry_date: i64,
+    pub strike_price: u64,
+    pub settle_price: u64,
+    pub volume: u64,
+    pub is_call: bool,
+}
+
+impl PackedEvent for DIOptionRemoved {
+    const DISCRIMINATOR: u8 = 104;
+}
+
 pub trait AppendEvent {
     #[allow(clippy::too_many_arguments)]
     fn fill_position(
@@ -114,6 +149,33 @@ pub trait AppendEvent {
         in_amount: u64,
         out_amount: u64,
         fee: u64,
+    ) -> DexResult;
+
+    #[allow(clippy::too_many_arguments)]
+    fn settle_di_option(
+        &mut self,
+        user_state: [u8; 32],
+        base_mint: [u8; 32],
+        quote_mint: [u8; 32],
+        expiry_date: i64,
+        strike_price: u64,
+        settle_price: u64,
+        size: u64,
+        premium_rate: u16,
+        fee: u64,
+        is_call: bool,
+    ) -> DexResult;
+
+    #[allow(clippy::too_many_arguments)]
+    fn remove_di_option(
+        &mut self,
+        base_mint: [u8; 32],
+        quote_mint: [u8; 32],
+        expiry_date: i64,
+        strike_price: u64,
+        settle_price: u64,
+        volume: u64,
+        is_call: bool,
     ) -> DexResult;
 }
 
@@ -233,6 +295,89 @@ impl AppendEvent for EventQueue<'_> {
             fee,
             event_seq
         );
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn settle_di_option(
+        &mut self,
+        user_state: [u8; 32],
+        base_mint: [u8; 32],
+        quote_mint: [u8; 32],
+        expiry_date: i64,
+        strike_price: u64,
+        settle_price: u64,
+        size: u64,
+        premium_rate: u16,
+        fee: u64,
+        is_call: bool,
+    ) -> DexResult {
+        let event = DIOptionSettled {
+            user_state,
+            base_mint,
+            quote_mint,
+            expiry_date,
+            strike_price,
+            settle_price,
+            size,
+            premium_rate,
+            fee,
+            is_call,
+        };
+
+        let event_seq = self.append(event)?;
+        msg!(
+            "DI option settled: {:?} {:?} {:?} {} {} {} {} {} {} {} {}",
+            user_state,
+            base_mint,
+            quote_mint,
+            expiry_date,
+            strike_price,
+            settle_price,
+            size,
+            premium_rate,
+            fee,
+            is_call,
+            event_seq
+        );
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn remove_di_option(
+        &mut self,
+        base_mint: [u8; 32],
+        quote_mint: [u8; 32],
+        expiry_date: i64,
+        strike_price: u64,
+        settle_price: u64,
+        volume: u64,
+        is_call: bool,
+    ) -> DexResult {
+        let event = DIOptionRemoved {
+            base_mint,
+            quote_mint,
+            expiry_date,
+            strike_price,
+            settle_price,
+            volume,
+            is_call,
+        };
+
+        let event_seq = self.append(event)?;
+        msg!(
+            "DI option removed: {:?} {:?} {:?} {} {} {} {} {}",
+            base_mint,
+            quote_mint,
+            expiry_date,
+            strike_price,
+            settle_price,
+            volume,
+            is_call,
+            event_seq
+        );
+
         Ok(())
     }
 }
