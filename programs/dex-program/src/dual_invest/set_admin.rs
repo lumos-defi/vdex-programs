@@ -28,8 +28,6 @@ pub fn handler(ctx: Context<DISetAdmin>) -> DexResult {
         DexError::InvalidDIOptionAccount
     );
 
-    // TODO: Check dex authority
-
     let di = DI::mount(&ctx.accounts.di_option, true)?;
     di.borrow_mut().set_admin(ctx.accounts.admin.key());
 

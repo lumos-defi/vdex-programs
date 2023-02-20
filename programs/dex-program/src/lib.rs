@@ -24,8 +24,8 @@ declare_id!("AzGjndwsJTbc1XRzPkmuFk11V88dNLMiQwGqkqkS1vBD");
 pub mod dex_program {
     use super::*;
 
-    pub fn init_dex(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
-        dex::init_dex::handler(ctx, vlp_decimals)
+    pub fn init_dex(ctx: Context<InitDex>, vlp_decimals: u8, di_fee_rate: u16) -> DexResult {
+        dex::init_dex::handler(ctx, vlp_decimals, di_fee_rate)
     }
 
     pub fn init_mock_oracle(ctx: Context<InitMockOracle>, price: u64, expo: u8) -> DexResult {
@@ -189,11 +189,15 @@ pub mod dex_program {
     }
 
     // Dual investment
-    pub fn set_admin(ctx: Context<DISetAdmin>) -> DexResult {
+    pub fn di_set_admin(ctx: Context<DISetAdmin>) -> DexResult {
         dual_invest::set_admin::handler(ctx)
     }
 
-    pub fn create(
+    pub fn di_set_fee_rate(ctx: Context<DISetFeeRate>, fee_rate: u16) -> DexResult {
+        dual_invest::set_fee_rate::handler(ctx, fee_rate)
+    }
+
+    pub fn di_create_option(
         ctx: Context<DICreateOption>,
         is_call: bool,
         base_asset_index: u8,
@@ -215,11 +219,11 @@ pub mod dex_program {
         )
     }
 
-    pub fn set_settle_price(ctx: Context<DISetSettlePrice>, id: u64, price: u64) -> DexResult {
+    pub fn di_set_settle_price(ctx: Context<DISetSettlePrice>, id: u64, price: u64) -> DexResult {
         dual_invest::set_settle_price::handler(ctx, id, price)
     }
 
-    pub fn update(
+    pub fn di_update_option(
         ctx: Context<DIUpdateOption>,
         id: u64,
         premium_rate: u16,
@@ -228,15 +232,15 @@ pub mod dex_program {
         dual_invest::update::handler(ctx, id, premium_rate, stop)
     }
 
-    pub fn remove(ctx: Context<DIRemoveOption>, id: u64, force: bool) -> DexResult {
+    pub fn di_remove_option(ctx: Context<DIRemoveOption>, id: u64, force: bool) -> DexResult {
         dual_invest::remove::handler(ctx, id, force)
     }
 
-    pub fn buy(ctx: Context<DIBuy>, id: u64, premium_rate: u16, size: u64) -> DexResult {
+    pub fn di_buy(ctx: Context<DIBuy>, id: u64, premium_rate: u16, size: u64) -> DexResult {
         dual_invest::buy::handler(ctx, id, premium_rate, size)
     }
 
-    pub fn handler(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) -> DexResult {
+    pub fn di_settle(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) -> DexResult {
         dual_invest::settle::handler(ctx, id, force, settle_price)
     }
 }

@@ -70,8 +70,7 @@ pub fn handler(
     let now = get_timestamp()?;
     require!(now < expiry_date, DexError::InvalidExpiryDate);
 
-    let mut di_mut = di.borrow_mut();
-    di_mut.create(
+    di.borrow_mut().create(
         is_call,
         base_asset_index,
         quote_asset_index,
@@ -79,5 +78,7 @@ pub fn handler(
         expiry_date,
         strike_price,
         minimum_open_size,
-    )
+    )?;
+
+    Ok(())
 }

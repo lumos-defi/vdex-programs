@@ -28,7 +28,7 @@ use crate::utils::{
         TEST_USDC_TARGET_WEIGHT, TEST_VLP_DECIMALS,
     },
     convert_to_big_number, create_mint, create_token_account, get_context, get_dex_info,
-    get_keypair_from_file, get_program, set_mock_oracle, MAX_LEVERAGE,
+    get_keypair_from_file, get_program, set_mock_oracle, MAX_LEVERAGE, TEST_DI_FEE_RATE,
 };
 
 use anchor_client::{
@@ -539,6 +539,7 @@ pub async fn init_dex(
         &di_option,
         &reward_mint,
         vlp_decimals,
+        TEST_DI_FEE_RATE,
     )
     .await;
 

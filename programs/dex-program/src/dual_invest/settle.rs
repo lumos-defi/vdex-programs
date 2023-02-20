@@ -153,6 +153,8 @@ pub fn handler(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) 
     let base_mint = base_ai.mint.to_bytes();
     let quote_mint = quote_ai.mint.to_bytes();
 
+    let fee_rate = di.borrow().meta.fee_rate as u64;
+
     let fee = if option.is_call {
         if actual_settle_price >= option.strike_price {
             // Call option, exercised, swap base asset to quote asset, return quote asset + premium to user
@@ -172,7 +174,6 @@ pub fn handler(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) 
                     .safe_mul(option.premium_rate as u64)?
                     .safe_div(FEE_RATE_BASE as u128)? as u64;
 
-            let fee_rate = quote_ai.swap_fee_rate;
             let total = if quote_asset_with_premium <= option.borrowed_quote_funds {
                 dex.di_option_refund(
                     option.quote_asset_index,
@@ -193,7 +194,7 @@ pub fn handler(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) 
             dex.di_option_refund(option.base_asset_index, option.borrowed_base_funds)?;
             dex.di_option_add_fund(option.base_asset_index, option.size)?;
 
-            let fee = total.safe_mul(fee_rate.into())?.safe_div(FEE_RATE_BASE)? as u64;
+            let fee = total.safe_mul(fee_rate)?.safe_div(FEE_RATE_BASE)? as u64;
             let withdrawable = total.safe_sub(fee)?;
 
             let signer_seeds = &[&quote_asset_seeds[..]];
@@ -215,9 +216,7 @@ pub fn handler(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) 
         } else {
             // Call option, not exercised, return base asset + premium to user
             let total = option.size + option.borrowed_base_funds;
-            let fee = total
-                .safe_mul(base_ai.swap_fee_rate.into())?
-                .safe_div(FEE_RATE_BASE)? as u64;
+            let fee = total.safe_mul(fee_rate)?.safe_div(FEE_RATE_BASE)? as u64;
 
             let withdrawable = total.safe_sub(fee)?;
 
@@ -261,7 +260,6 @@ pub fn handler(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) 
                     .safe_mul(option.premium_rate as u64)?
                     .safe_div(FEE_RATE_BASE as u128)? as u64;
 
-            let fee_rate = base_ai.swap_fee_rate;
             let total = if base_asset_with_premium <= option.borrowed_base_funds {
                 dex.di_option_refund(
                     option.base_asset_index,
@@ -282,7 +280,7 @@ pub fn handler(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) 
             dex.di_option_refund(option.quote_asset_index, option.borrowed_quote_funds)?;
             dex.di_option_add_fund(option.quote_asset_index, option.size)?;
 
-            let fee = total.safe_mul(fee_rate.into())?.safe_div(FEE_RATE_BASE)? as u64;
+            let fee = total.safe_mul(fee_rate)?.safe_div(FEE_RATE_BASE)? as u64;
             let withdrawable = total.safe_sub(fee)?;
 
             let signer_seeds = &[&base_asset_seeds[..]];
@@ -304,9 +302,7 @@ pub fn handler(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) 
         } else {
             // Put option, not exercised
             let total = option.size + option.borrowed_quote_funds;
-            let fee = total
-                .safe_mul(quote_ai.swap_fee_rate.into())?
-                .safe_div(FEE_RATE_BASE)? as u64;
+            let fee = total.safe_mul(fee_rate)?.safe_div(FEE_RATE_BASE)? as u64;
 
             let withdrawable = total.safe_sub(fee)?;
 

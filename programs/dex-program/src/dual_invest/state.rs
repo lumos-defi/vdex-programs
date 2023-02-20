@@ -15,9 +15,10 @@ use crate::{
 pub struct DIMeta {
     pub magic: u32,
     pub admin: Pubkey,
+    pub fee_rate: u16,
     pub stopped: bool,
     pub option_slot_count: u8,
-    reserved: [u8; 62],
+    reserved: [u8; 60],
 }
 
 #[repr(C)]
@@ -78,7 +79,12 @@ impl<'a> DI<'a> {
         size
     }
 
-    pub fn initialize(account: &'a AccountInfo, max_options: u8, admin: Pubkey) -> DexResult {
+    pub fn initialize(
+        account: &'a AccountInfo,
+        max_options: u8,
+        admin: Pubkey,
+        fee_rate: u16,
+    ) -> DexResult {
         let data_ptr = match account.try_borrow_mut_data() {
             Ok(p) => RefMut::map(p, |data| *data).as_mut_ptr(),
             Err(_) => return Err(error!(DexError::FailedMountAccount)),
@@ -87,6 +93,7 @@ impl<'a> DI<'a> {
         let meta = unsafe { &mut *(data_ptr as *mut DIMeta) };
         meta.magic = DI_ACCOUNT_MAGIC_NUMBER;
         meta.admin = admin;
+        meta.fee_rate = fee_rate;
         meta.stopped = false;
         meta.option_slot_count = max_options;
 
@@ -142,6 +149,10 @@ impl<'a> DI<'a> {
 
     pub fn set_admin(&mut self, admin: Pubkey) {
         self.meta.admin = admin;
+    }
+
+    pub fn set_fee_rate(&mut self, fee_rate: u16) {
+        self.meta.fee_rate = fee_rate;
     }
 
     pub fn create(

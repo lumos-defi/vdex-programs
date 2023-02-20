@@ -7,11 +7,8 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct DIUpdateOption<'info> {
-    #[account(
-        mut,
-        has_one = authority,
-    )]
+pub struct DISetFeeRate<'info> {
+    #[account(owner = *program_id, has_one = authority)]
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
@@ -21,20 +18,15 @@ pub struct DIUpdateOption<'info> {
     pub authority: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<DIUpdateOption>, id: u64, premium_rate: u16, stop: bool) -> DexResult {
-    let dex = &mut ctx.accounts.dex.load()?;
+pub fn handler(ctx: Context<DISetFeeRate>, fee_rate: u16) -> DexResult {
+    let dex = &ctx.accounts.dex.load()?;
     require!(
         dex.di_option == ctx.accounts.di_option.key(),
         DexError::InvalidDIOptionAccount
     );
 
     let di = DI::mount(&ctx.accounts.di_option, true)?;
-    require!(
-        di.borrow().meta.admin == ctx.accounts.authority.key(),
-        DexError::InvalidDIAdmin
-    );
-
-    di.borrow_mut().update(id, premium_rate, stop)?;
+    di.borrow_mut().set_fee_rate(fee_rate);
 
     Ok(())
 }

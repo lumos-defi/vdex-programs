@@ -40,7 +40,7 @@ pub struct InitDex<'info> {
     pub di_option: UncheckedAccount<'info>,
 }
 
-pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
+pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8, di_fee_rate: u16) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_init()?;
 
     dex.magic = DEX_MAGIC_NUMBER;
@@ -82,5 +82,6 @@ pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
         &mut ctx.accounts.di_option,
         64u8,
         ctx.accounts.authority.key(),
+        di_fee_rate,
     )
 }

@@ -32,6 +32,7 @@ pub fn handler(ctx: Context<DISetSettlePrice>, id: u64, price: u64) -> DexResult
         DexError::InvalidDIAdmin
     );
 
-    let mut di_mut = di.borrow_mut();
-    di_mut.set_settle_price(id, price)
+    di.borrow_mut().set_settle_price(id, price)?;
+
+    Ok(())
 }

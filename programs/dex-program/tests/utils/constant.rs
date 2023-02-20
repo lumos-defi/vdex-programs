@@ -94,6 +94,8 @@ pub const TEST_SOL_ORACLE_SOURCE: u8 = 0; // 0: mock,1: pyth
 pub const TEST_SOL_ASSET_INDEX: u8 = 3; // 0:usdc, 1:btc, 2:eth, 3:sol
 pub const TEST_SOL_SIGNIFICANT_DECIMALS: u8 = 2;
 
+pub const TEST_DI_FEE_RATE: u16 = 30;
+
 pub fn add_fee(a: f64) -> f64 {
     a * ADD_LIQUIDITY_FEE_RATE as f64 / 10000.0
 }
