@@ -1014,6 +1014,7 @@ dependencies = [
  "anchor-client",
  "anchor-lang",
  "anchor-spl",
+ "bincode",
  "bumpalo",
  "colored",
  "getrandom 0.2.7",

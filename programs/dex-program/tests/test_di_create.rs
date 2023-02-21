@@ -204,7 +204,7 @@ async fn test_di_create_read_back() {
 }
 
 #[tokio::test]
-async fn test_di_create_multiple() {
+async fn test_di_create_max() {
     let dtc = DexTestContext::new().await;
     let admin = &dtc.user_context[0];
     dtc.di_set_admin(&admin.user.pubkey()).await;
@@ -239,4 +239,43 @@ async fn test_di_create_multiple() {
         )
         .await
         .assert_err();
+}
+
+#[tokio::test]
+async fn test_di_create_multiple() {
+    let dtc = DexTestContext::new().await;
+    let admin = &dtc.user_context[0];
+    dtc.di_set_admin(&admin.user.pubkey()).await;
+
+    let mut now = now();
+    admin
+        .di_create_option(
+            100,
+            true,
+            DexAsset::BTC,
+            DexAsset::USDC,
+            500,
+            now + 1,
+            usdc(25000.),
+            btc(0.1),
+        )
+        .await
+        .assert_ok();
+
+    now += 10;
+    admin.advance_clock(now).await;
+
+    admin
+        .di_create_option(
+            101,
+            true,
+            DexAsset::BTC,
+            DexAsset::USDC,
+            500,
+            now + 10,
+            usdc(25000.),
+            btc(0.1),
+        )
+        .await
+        .assert_ok();
 }

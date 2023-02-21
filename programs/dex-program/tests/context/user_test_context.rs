@@ -1,4 +1,5 @@
 use std::{
+    borrow::Borrow,
     cell::RefCell,
     ops::{Div, Mul},
     rc::Rc,
@@ -14,13 +15,17 @@ use crate::utils::{
     TEST_USDC_DECIMALS,
 };
 use anchor_client::{
-    solana_sdk::{account::Account, signature::Keypair, signer::Signer, transport::TransportError},
+    solana_sdk::{
+        account::Account, clock::UnixTimestamp, signature::Keypair, signer::Signer, sysvar,
+        transport::TransportError,
+    },
     Program,
 };
 use anchor_lang::{
     error,
-    prelude::{AccountInfo, AccountMeta, Pubkey},
+    prelude::{AccountInfo, AccountMeta, Clock, Pubkey},
 };
+use bincode::deserialize;
 
 use crate::utils::constant::TEST_VLP_DECIMALS;
 use crate::utils::TestResult;
@@ -1578,5 +1583,33 @@ impl UserTestContext {
         assert_eq!(strike_price, option.strike_price);
         assert_eq!(minimum_open_size, option.minimum_open_size);
         assert_eq!(stopped, option.stopped);
+    }
+
+    pub async fn decode_account<T: serde::de::DeserializeOwned>(&self, address: &Pubkey) -> T {
+        self.context
+            .borrow_mut()
+            .banks_client
+            .get_account(*address)
+            .await
+            .unwrap()
+            .map(|a| deserialize::<T>(&a.data.borrow()).unwrap())
+            .expect(format!("Get Account Error {}", address).as_str())
+    }
+
+    pub async fn get_clock(&self) -> Clock {
+        self.decode_account::<Clock>(&sysvar::clock::id()).await
+    }
+
+    pub async fn advance_clock(&self, unix_timestamp: UnixTimestamp) {
+        let mut clock: Clock = self.get_clock().await;
+
+        while clock.unix_timestamp <= unix_timestamp {
+            self.context
+                .borrow_mut()
+                .warp_to_slot(clock.slot + 400)
+                .unwrap();
+
+            clock = self.get_clock().await;
+        }
     }
 }
