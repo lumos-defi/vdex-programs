@@ -1585,6 +1585,12 @@ impl UserTestContext {
         assert_eq!(stopped, option.stopped);
     }
 
+    pub async fn assert_di_settle_price(&self, id: u64, price: u64) {
+        let option = self.di_read_option(id).await;
+
+        assert_eq!(price, option.settle_price);
+    }
+
     pub async fn decode_account<T: serde::de::DeserializeOwned>(&self, address: &Pubkey) -> T {
         self.context
             .borrow_mut()

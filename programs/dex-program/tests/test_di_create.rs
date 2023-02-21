@@ -51,7 +51,6 @@ async fn test_di_create_err_invalid_expiry() {
 
     let now = now();
 
-    // Expiry must be later than now
     user.di_create_option(
         100,
         true,
