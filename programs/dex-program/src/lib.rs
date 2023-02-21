@@ -189,16 +189,17 @@ pub mod dex_program {
     }
 
     // Dual investment
-    pub fn di_set_admin(ctx: Context<DISetAdmin>) -> DexResult {
+    pub fn di_set_admin(ctx: Context<DiSetAdmin>) -> DexResult {
         dual_invest::set_admin::handler(ctx)
     }
 
-    pub fn di_set_fee_rate(ctx: Context<DISetFeeRate>, fee_rate: u16) -> DexResult {
+    pub fn di_set_fee_rate(ctx: Context<DiSetFeeRate>, fee_rate: u16) -> DexResult {
         dual_invest::set_fee_rate::handler(ctx, fee_rate)
     }
 
     pub fn di_create_option(
-        ctx: Context<DICreateOption>,
+        ctx: Context<DiCreateOption>,
+        id: u64,
         is_call: bool,
         base_asset_index: u8,
         quote_asset_index: u8,
@@ -209,6 +210,7 @@ pub mod dex_program {
     ) -> DexResult {
         dual_invest::create::handler(
             ctx,
+            id,
             is_call,
             base_asset_index,
             quote_asset_index,
@@ -219,12 +221,12 @@ pub mod dex_program {
         )
     }
 
-    pub fn di_set_settle_price(ctx: Context<DISetSettlePrice>, id: u64, price: u64) -> DexResult {
+    pub fn di_set_settle_price(ctx: Context<DiSetSettlePrice>, id: u64, price: u64) -> DexResult {
         dual_invest::set_settle_price::handler(ctx, id, price)
     }
 
     pub fn di_update_option(
-        ctx: Context<DIUpdateOption>,
+        ctx: Context<DiUpdateOption>,
         id: u64,
         premium_rate: u16,
         stop: bool,
@@ -232,7 +234,7 @@ pub mod dex_program {
         dual_invest::update::handler(ctx, id, premium_rate, stop)
     }
 
-    pub fn di_remove_option(ctx: Context<DIRemoveOption>, id: u64, force: bool) -> DexResult {
+    pub fn di_remove_option(ctx: Context<DiRemoveOption>, id: u64, force: bool) -> DexResult {
         dual_invest::remove::handler(ctx, id, force)
     }
 

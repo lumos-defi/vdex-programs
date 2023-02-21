@@ -151,6 +151,10 @@ pub fn eth(size: f64) -> u64 {
     (size * (10u64.pow(TEST_ETH_DECIMALS as u32) as f64)) as u64
 }
 
+pub fn usdc(size: f64) -> u64 {
+    (size * (10u64.pow(TEST_USDC_DECIMALS as u32) as f64)) as u64
+}
+
 pub fn usdc_i(size: f64) -> i64 {
     (size * (10u64.pow(TEST_USDC_DECIMALS as u32) as f64)) as i64
 }

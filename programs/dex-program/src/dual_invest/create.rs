@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct DICreateOption<'info> {
+pub struct DiCreateOption<'info> {
     #[account(owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
@@ -23,7 +23,8 @@ pub struct DICreateOption<'info> {
 }
 
 pub fn handler(
-    ctx: Context<DICreateOption>,
+    ctx: Context<DiCreateOption>,
+    id: u64,
     is_call: bool,
     base_asset_index: u8,
     quote_asset_index: u8,
@@ -71,6 +72,7 @@ pub fn handler(
     require!(now < expiry_date, DexError::InvalidExpiryDate);
 
     di.borrow_mut().create(
+        id,
         is_call,
         base_asset_index,
         quote_asset_index,

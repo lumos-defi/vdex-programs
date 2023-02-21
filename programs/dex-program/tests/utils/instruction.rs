@@ -10,7 +10,8 @@ use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
     accounts::{
         AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClosePosition, Crank,
-        CreateUserState, FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, LimitAsk,
+        CreateUserState, DiCreateOption, DiSetAdmin, DiSetFeeRate, DiSetSettlePrice,
+        DiUpdateOption, FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, LimitAsk,
         LimitBid, OpenPosition, RemoveLiquidity, Swap,
     },
     dex::Dex,
@@ -710,6 +711,137 @@ pub async fn compose_market_swap_ix(
             token_program: spl_token::id(),
         })
         .args(dex_program::instruction::Swap { amount })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_set_fee_rate_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    fee_rate: u16,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiSetFeeRate {
+            dex: *dex,
+            di_option: *di_option,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiSetFeeRate { fee_rate })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_set_admin_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    admin: &Pubkey,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiSetAdmin {
+            dex: *dex,
+            di_option: *di_option,
+            admin: *admin,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiSetAdmin {})
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_create_option_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    base_asset_oracle: &Pubkey,
+    id: u64,
+    is_call: bool,
+    base_asset_index: u8,
+    quote_asset_index: u8,
+    premium_rate: u16,
+    expiry_date: i64,
+    strike_price: u64,
+    minimum_open_size: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiCreateOption {
+            dex: *dex,
+            di_option: *di_option,
+            base_asset_oracle: *base_asset_oracle,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiCreateOption {
+            id,
+            is_call,
+            base_asset_index,
+            quote_asset_index,
+            premium_rate,
+            expiry_date,
+            strike_price,
+            minimum_open_size,
+        })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_set_settle_price_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    id: u64,
+    price: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiSetSettlePrice {
+            dex: *dex,
+            di_option: *di_option,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiSetSettlePrice { id, price })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_update_option_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    id: u64,
+    premium_rate: u16,
+    stop: bool,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiUpdateOption {
+            dex: *dex,
+            di_option: *di_option,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiUpdateOption {
+            id,
+            premium_rate,
+            stop,
+        })
         .instructions()
         .unwrap()
         .pop()

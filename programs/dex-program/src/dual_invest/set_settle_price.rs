@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct DISetSettlePrice<'info> {
+pub struct DiSetSettlePrice<'info> {
     #[account(owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
@@ -19,7 +19,7 @@ pub struct DISetSettlePrice<'info> {
 }
 
 // TODO: calculate the average price in 30 minutes before the expiry date
-pub fn handler(ctx: Context<DISetSettlePrice>, id: u64, price: u64) -> DexResult {
+pub fn handler(ctx: Context<DiSetSettlePrice>, id: u64, price: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load()?;
     require!(
         dex.di_option == ctx.accounts.di_option.key(),

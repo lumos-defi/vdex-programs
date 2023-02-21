@@ -244,6 +244,7 @@ impl<'a> UserState<'a> {
 
         user_state.borrow().order_pool.initialize()?;
         user_state.borrow().position_pool.initialize()?;
+        user_state.borrow().di_option_pool.initialize()?;
 
         Ok(())
     }

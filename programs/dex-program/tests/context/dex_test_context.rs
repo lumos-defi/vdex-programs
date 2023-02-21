@@ -1,7 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::utils::{
-    compose_add_asset_ix, compose_add_market_ixs, compose_init_dex_ixs,
+    compose_add_asset_ix, compose_add_market_ixs, compose_di_set_admin_ix,
+    compose_di_set_fee_rate_ix, compose_init_dex_ixs,
     constant::{
         INIT_ADD_SOL_AMOUNT, TEST_BTC_ADD_LIQUIDITY_FEE_RATE, TEST_BTC_ASSET_INDEX,
         TEST_BTC_BORROW_FEE_RATE, TEST_BTC_CHARGE_BORROW_FEE_INTERVAL, TEST_BTC_CLOSE_FEE_RATE,
@@ -32,11 +33,16 @@ use crate::utils::{
 };
 
 use anchor_client::{
-    solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction},
+    solana_sdk::{
+        signature::Keypair, signer::Signer, transaction::Transaction, transport::TransportError,
+    },
     Program,
 };
-use anchor_lang::prelude::Pubkey;
-use dex_program::dex::Dex;
+use anchor_lang::{error, prelude::Pubkey};
+use dex_program::{
+    dex::Dex,
+    errors::{DexError, DexResult},
+};
 use solana_program_test::ProgramTestContext;
 
 use crate::context::UserTestContext;
@@ -352,6 +358,66 @@ impl DexTestContext {
             user_context: users,
         }
     }
+
+    pub async fn di_set_fee_rate(&self, admin: &Keypair, fee_rate: u16) -> DexResult {
+        let context = &mut self.context.borrow_mut();
+        let binding = self.dex_info.borrow();
+
+        let ix = compose_di_set_fee_rate_ix(
+            &self.program,
+            admin,
+            &self.dex,
+            &binding.di_option,
+            fee_rate,
+        )
+        .await;
+
+        let transaction = Transaction::new_signed_with_payer(
+            &vec![ix],
+            Some(&admin.pubkey()),
+            &[admin],
+            context.last_blockhash,
+        );
+
+        let res: Result<(), TransportError> = context
+            .banks_client
+            .process_transaction(transaction)
+            .await
+            .map_err(|e| e.into());
+
+        if res.is_ok() {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::DIOptionNotFound));
+        }
+    }
+
+    pub async fn di_set_admin(&self, admin: &Pubkey) {
+        let context = &mut self.context.borrow_mut();
+        let binding = self.dex_info.borrow();
+
+        let ix = compose_di_set_admin_ix(
+            &self.program,
+            &self.admin,
+            &self.dex,
+            &binding.di_option,
+            admin,
+        )
+        .await;
+
+        let transaction = Transaction::new_signed_with_payer(
+            &vec![ix],
+            Some(&self.admin.pubkey()),
+            &[&self.admin],
+            context.last_blockhash,
+        );
+
+        context
+            .banks_client
+            .process_transaction(transaction)
+            .await
+            .unwrap();
+    }
 }
 
 pub async fn add_market(
@@ -549,6 +615,7 @@ pub async fn init_dex(
     signers.push(&event_queue);
     signers.push(&match_queue);
     signers.push(&user_list_entry_page);
+    signers.push(&di_option);
 
     let transaction = Transaction::new_signed_with_payer(
         &init_dex_ixs,

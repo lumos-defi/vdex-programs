@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct DIRemoveOption<'info> {
+pub struct DiRemoveOption<'info> {
     #[account(owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
@@ -23,7 +23,7 @@ pub struct DIRemoveOption<'info> {
     pub authority: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<DIRemoveOption>, id: u64, force: bool) -> DexResult {
+pub fn handler(ctx: Context<DiRemoveOption>, id: u64, force: bool) -> DexResult {
     let dex = &mut ctx.accounts.dex.load()?;
     require!(
         dex.di_option == ctx.accounts.di_option.key(),

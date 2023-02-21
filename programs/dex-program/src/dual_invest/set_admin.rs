@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct DISetAdmin<'info> {
+pub struct DiSetAdmin<'info> {
     #[account(owner = *program_id, has_one = authority)]
     pub dex: AccountLoader<'info, Dex>,
 
@@ -21,7 +21,7 @@ pub struct DISetAdmin<'info> {
     pub authority: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<DISetAdmin>) -> DexResult {
+pub fn handler(ctx: Context<DiSetAdmin>) -> DexResult {
     let dex = &mut ctx.accounts.dex.load()?;
     require!(
         dex.di_option == ctx.accounts.di_option.key(),

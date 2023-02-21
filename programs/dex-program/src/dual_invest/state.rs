@@ -42,6 +42,7 @@ pub struct DIOption {
 impl DIOption {
     pub fn init(
         &mut self,
+        id: u64,
         is_call: bool,
         base_asset_index: u8,
         quote_asset_index: u8,
@@ -50,6 +51,7 @@ impl DIOption {
         strike_price: u64,
         minimum_open_size: u64,
     ) {
+        self.id = id;
         self.is_call = is_call;
         self.base_asset_index = base_asset_index;
         self.quote_asset_index = quote_asset_index;
@@ -98,7 +100,7 @@ impl<'a> DI<'a> {
         meta.option_slot_count = max_options;
 
         let di = Self::mount(account, false)?;
-        di.borrow().options.initialize()?;
+        di.borrow_mut().options.initialize()?;
 
         Ok(())
     }
@@ -157,6 +159,7 @@ impl<'a> DI<'a> {
 
     pub fn create(
         &mut self,
+        id: u64,
         is_call: bool,
         base_asset_index: u8,
         quote_asset_index: u8,
@@ -165,8 +168,6 @@ impl<'a> DI<'a> {
         strike_price: u64,
         minimum_open_size: u64,
     ) -> DexResult {
-        let id = get_timestamp()? as u64;
-
         // Check no dup id
         if let Ok(_) = self.find_option(id) {
             return Err(error!(DexError::DIOptionDupID));
@@ -185,8 +186,8 @@ impl<'a> DI<'a> {
         }
 
         let option = self.options.new_slot()?;
-        self.options.add_to_tail(option)?;
         option.data.init(
+            id,
             is_call,
             base_asset_index,
             quote_asset_index,
@@ -195,10 +196,7 @@ impl<'a> DI<'a> {
             strike_price,
             minimum_open_size,
         );
-
-        option.data.id = id;
-
-        Ok(())
+        self.options.add_to_tail(option)
     }
 
     pub fn update(&mut self, id: u64, premium_rate: u16, stop: bool) -> DexResult {
