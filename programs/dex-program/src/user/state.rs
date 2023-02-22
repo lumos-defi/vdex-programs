@@ -588,6 +588,19 @@ impl<'a> UserState<'a> {
 
         return Err(error!(DexError::DIOptionNotFound));
     }
+
+    #[cfg(feature = "client-support")]
+    pub fn collect_di_option(&self, id: u64) -> Vec<UserDIOption> {
+        let mut options: Vec<UserDIOption> = vec![];
+
+        for o in self.di_option_pool.into_iter() {
+            if o.data.id == id {
+                options.push(o.data);
+            }
+        }
+
+        options
+    }
 }
 
 #[cfg(test)]

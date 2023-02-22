@@ -10,9 +10,9 @@ use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
     accounts::{
         AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClosePosition, Crank,
-        CreateUserState, DiCreateOption, DiSetAdmin, DiSetFeeRate, DiSetSettlePrice,
-        DiUpdateOption, FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, LimitAsk,
-        LimitBid, OpenPosition, RemoveLiquidity, Swap,
+        CreateUserState, DiBuy, DiCreateOption, DiRemoveOption, DiSetAdmin, DiSetFeeRate,
+        DiSetSettlePrice, DiSettle, DiUpdateOption, FeedMockOraclePrice, FillOrder, InitDex,
+        InitMockOracle, LimitAsk, LimitBid, OpenPosition, RemoveLiquidity, Swap,
     },
     dex::Dex,
     dual_invest::DI,
@@ -841,6 +841,128 @@ pub async fn compose_di_update_option_ix(
             id,
             premium_rate,
             stop,
+        })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_remove_option_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    event_queue: &Pubkey,
+    id: u64,
+    force: bool,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiRemoveOption {
+            dex: *dex,
+            di_option: *di_option,
+            event_queue: *event_queue,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiRemoveOption { id, force })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_buy_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    base_asset_oracle: &Pubkey,
+    in_mint: &Pubkey,
+    in_mint_vault: &Pubkey,
+    user_mint_acc: &Pubkey,
+    user_state: &Pubkey,
+    user_list_entry_page: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    id: u64,
+    premium_rate: u16,
+    size: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiBuy {
+            dex: *dex,
+            di_option: *di_option,
+            base_asset_oracle: *base_asset_oracle,
+            in_mint: *in_mint,
+            in_mint_vault: *in_mint_vault,
+            user_mint_acc: *user_mint_acc,
+            user_state: *user_state,
+            user_list_entry_page: *user_list_entry_page,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::DiBuy {
+            id,
+            premium_rate,
+            size,
+        })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_settle_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    user: &Pubkey,
+    user_state: &Pubkey,
+    user_base_mint_acc: &Pubkey,
+    user_quote_mint_acc: &Pubkey,
+    base_mint: &Pubkey,
+    quote_mint: &Pubkey,
+    quote_asset_oracle: &Pubkey,
+    base_mint_vault: &Pubkey,
+    quote_mint_vault: &Pubkey,
+    base_asset_program_signer: &Pubkey,
+    quote_asset_program_signer: &Pubkey,
+    event_queue: &Pubkey,
+    user_list_entry_page: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    id: u64,
+    force: bool,
+    settle_price: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiSettle {
+            dex: *dex,
+            di_option: *di_option,
+            user: *user,
+            user_state: *user_state,
+            user_base_mint_acc: *user_base_mint_acc,
+            user_quote_mint_acc: *user_quote_mint_acc,
+            base_mint: *base_mint,
+            quote_mint: *quote_mint,
+            quote_asset_oracle: *quote_asset_oracle,
+            base_mint_vault: *base_mint_vault,
+            quote_mint_vault: *quote_mint_vault,
+            base_asset_program_signer: *base_asset_program_signer,
+            quote_asset_program_signer: *quote_asset_program_signer,
+            event_queue: *event_queue,
+            user_list_entry_page: *user_list_entry_page,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::DiSettle {
+            id,
+            force,
+            settle_price,
         })
         .instructions()
         .unwrap()

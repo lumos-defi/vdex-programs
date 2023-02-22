@@ -238,11 +238,11 @@ pub mod dex_program {
         dual_invest::remove::handler(ctx, id, force)
     }
 
-    pub fn di_buy(ctx: Context<DIBuy>, id: u64, premium_rate: u16, size: u64) -> DexResult {
+    pub fn di_buy(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> DexResult {
         dual_invest::buy::handler(ctx, id, premium_rate, size)
     }
 
-    pub fn di_settle(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) -> DexResult {
+    pub fn di_settle(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) -> DexResult {
         dual_invest::settle::handler(ctx, id, force, settle_price)
     }
 }

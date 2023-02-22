@@ -1,31 +1,31 @@
 use std::{
-    borrow::Borrow,
     cell::RefCell,
     ops::{Div, Mul},
     rc::Rc,
 };
 
 use crate::utils::{
-    assert_eq_with_dust, convert_to_big_number, create_associated_token_account,
-    create_token_account, get_dex_info, get_keypair, get_keypair_from_file, get_program,
-    get_token_balance, mint_tokens, set_add_liquidity, set_ask, set_bid, set_cancel,
-    set_cancel_all, set_close, set_crank, set_di_create, set_di_set_settle_price,
+    assert_eq_with_dust, btc, convert_to_big_number, create_associated_token_account,
+    create_token_account, get_dex_info, get_keypair, get_program, get_token_balance, mint_tokens,
+    set_add_liquidity, set_ask, set_bid, set_cancel, set_cancel_all, set_close, set_crank,
+    set_di_buy, set_di_create, set_di_remove_option, set_di_set_settle_price, set_di_settle,
     set_di_update_option, set_feed_mock_oracle, set_fill, set_market_swap, set_open,
-    set_remove_liquidity, set_user_state, transfer, DexAsset, DexMarket, TEST_SOL_DECIMALS,
+    set_remove_liquidity, set_user_state, transfer, usdc, DexAsset, DexMarket, TEST_SOL_DECIMALS,
     TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{
-        account::Account, clock::UnixTimestamp, signature::Keypair, signer::Signer, sysvar,
+        account::Account,
+        signature::{read_keypair_file, Keypair},
+        signer::Signer,
         transport::TransportError,
     },
     Program,
 };
 use anchor_lang::{
     error,
-    prelude::{AccountInfo, AccountMeta, Clock, Pubkey},
+    prelude::{AccountInfo, AccountMeta, Pubkey},
 };
-use bincode::deserialize;
 
 use crate::utils::constant::TEST_VLP_DECIMALS;
 use crate::utils::TestResult;
@@ -89,16 +89,13 @@ impl UserTestContext {
     }
 
     pub async fn get_account(&self, account_pubkey: Pubkey) -> Account {
-        let account = self
-            .context
+        self.context
             .borrow_mut()
             .banks_client
             .get_account(account_pubkey)
             .await
             .unwrap()
-            .unwrap();
-
-        account
+            .unwrap()
     }
 
     pub async fn get_ref_account(&self, account_pubkey: Pubkey) -> RefCell<Account> {
@@ -1429,11 +1426,9 @@ impl UserTestContext {
 
     pub async fn assert_di_admin(&self, admin: &Pubkey) {
         let mut di_account = self.get_account(self.dex_info.borrow().di_option).await;
-        let admin_key_pair =
-            get_keypair_from_file(&mut self.context.borrow_mut(), "tests/fixtures/admin.json")
-                .await;
+        let owner_key_pair = read_keypair_file("tests/fixtures/admin.json").unwrap();
 
-        let owner = admin_key_pair.pubkey();
+        let owner = owner_key_pair.pubkey();
         let di_option_account_info: AccountInfo = (&owner, true, &mut di_account).into();
         let di = DI::mount(&di_option_account_info, true).unwrap();
 
@@ -1442,11 +1437,9 @@ impl UserTestContext {
 
     pub async fn assert_di_fee_rate(&self, fee_rate: u16) {
         let mut di_account = self.get_account(self.dex_info.borrow().di_option).await;
-        let admin_key_pair =
-            get_keypair_from_file(&mut self.context.borrow_mut(), "tests/fixtures/admin.json")
-                .await;
+        let owner_key_pair = read_keypair_file("tests/fixtures/admin.json").unwrap();
 
-        let owner = admin_key_pair.pubkey();
+        let owner = owner_key_pair.pubkey();
         let di_option_account_info: AccountInfo = (&owner, true, &mut di_account).into();
         let di = DI::mount(&di_option_account_info, true).unwrap();
 
@@ -1455,11 +1448,9 @@ impl UserTestContext {
 
     pub async fn assert_di_options_count(&self, count: usize) {
         let mut di_account = self.get_account(self.dex_info.borrow().di_option).await;
-        let admin_key_pair =
-            get_keypair_from_file(&mut self.context.borrow_mut(), "tests/fixtures/admin.json")
-                .await;
+        let owner_key_pair = read_keypair_file("tests/fixtures/admin.json").unwrap();
 
-        let owner = admin_key_pair.pubkey();
+        let owner = owner_key_pair.pubkey();
         let di_option_account_info: AccountInfo = (&owner, true, &mut di_account).into();
         let di = DI::mount(&di_option_account_info, true).unwrap();
 
@@ -1504,6 +1495,50 @@ impl UserTestContext {
         }
     }
 
+    pub async fn di_create_btc_call(
+        &self,
+        id: u64,
+        premium_rate: u16,
+        expiry_date: i64,
+        strike_price: f64,
+        minimum_size: f64,
+    ) {
+        self.di_create_option(
+            id,
+            true,
+            DexAsset::BTC,
+            DexAsset::USDC,
+            premium_rate,
+            expiry_date,
+            usdc(strike_price),
+            btc(minimum_size),
+        )
+        .await
+        .assert_ok()
+    }
+
+    pub async fn di_create_btc_put(
+        &self,
+        id: u64,
+        premium_rate: u16,
+        expiry_date: i64,
+        strike_price: f64,
+        minimum_size: f64,
+    ) {
+        self.di_create_option(
+            id,
+            false,
+            DexAsset::BTC,
+            DexAsset::USDC,
+            premium_rate,
+            expiry_date,
+            usdc(strike_price),
+            usdc(minimum_size),
+        )
+        .await
+        .assert_ok()
+    }
+
     pub async fn di_set_settle_price(&self, id: u64, price: u64) -> DexResult {
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
@@ -1546,16 +1581,10 @@ impl UserTestContext {
     }
 
     pub async fn di_read_option(&self, id: u64) -> DIOption {
-        let mut di_account = self.get_account(self.dex_info.borrow().di_option).await;
-        let admin_key_pair =
-            get_keypair_from_file(&mut self.context.borrow_mut(), "tests/fixtures/admin.json")
-                .await;
-
-        let owner = admin_key_pair.pubkey();
-        let di_option_account_info: AccountInfo = (&owner, true, &mut di_account).into();
-        let di = DI::mount(&di_option_account_info, true).unwrap();
-
+        let di_account = self.get_account(self.dex_info.borrow().di_option).await;
+        let di = DI::mount_buf(di_account.data).unwrap();
         let di_ref = di.borrow();
+
         let slot = di_ref.find_option(id).unwrap();
 
         slot.data
@@ -1585,37 +1614,227 @@ impl UserTestContext {
         assert_eq!(stopped, option.stopped);
     }
 
+    pub async fn assert_di_option_volume(&self, id: u64, volume: u64) {
+        let option = self.di_read_option(id).await;
+
+        assert_eq!(volume, option.volume);
+    }
+
     pub async fn assert_di_settle_price(&self, id: u64, price: u64) {
         let option = self.di_read_option(id).await;
 
         assert_eq!(price, option.settle_price);
     }
 
-    pub async fn decode_account<T: serde::de::DeserializeOwned>(&self, address: &Pubkey) -> T {
-        self.context
-            .borrow_mut()
-            .banks_client
-            .get_account(*address)
-            .await
-            .unwrap()
-            .map(|a| deserialize::<T>(&a.data.borrow()).unwrap())
-            .expect(format!("Get Account Error {}", address).as_str())
-    }
+    pub async fn di_remove(&self, id: u64, force: bool) -> DexResult {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
-    pub async fn get_clock(&self) -> Clock {
-        self.decode_account::<Clock>(&sysvar::clock::id()).await
-    }
-
-    pub async fn advance_clock(&self, unix_timestamp: UnixTimestamp) {
-        let mut clock: Clock = self.get_clock().await;
-
-        while clock.unix_timestamp <= unix_timestamp {
-            self.context
-                .borrow_mut()
-                .warp_to_slot(clock.slot + 400)
-                .unwrap();
-
-            clock = self.get_clock().await;
+        if let Ok(_) = set_di_remove_option::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.dex_info.borrow().di_option,
+            &self.dex_info.borrow().event_queue,
+            id,
+            force,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::DIOptionNotFound));
         }
+    }
+
+    pub async fn di_buy_direct(
+        &self,
+        id: u64,
+        base_asset_index: DexAsset,
+        quote_asset_index: DexAsset,
+        is_call: bool,
+        premium_rate: u16,
+        size: u64,
+    ) -> DexResult {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let bai = self.dex_info.borrow().assets[base_asset_index as usize];
+        let qai = self.dex_info.borrow().assets[quote_asset_index as usize];
+
+        let in_mint_info = if is_call { &bai } else { &qai };
+        let user_state = self.user_state;
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
+
+        if let Ok(_) = set_di_buy::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.dex_info.borrow().di_option,
+            &bai.oracle,
+            &in_mint_info.mint,
+            &in_mint_info.vault,
+            &user_state,
+            &self.dex_info.borrow().user_list_entry_page,
+            remaining_accounts,
+            id,
+            premium_rate,
+            size,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::DIOptionNotFound));
+        }
+    }
+
+    pub async fn di_buy(&self, id: u64, premium_rate: u16, size: u64) -> DexResult {
+        let option = self.di_read_option(id).await;
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let bai = self.dex_info.borrow().assets[option.base_asset_index as usize];
+        let qai = self.dex_info.borrow().assets[option.quote_asset_index as usize];
+
+        let in_mint_info = if option.is_call { &bai } else { &qai };
+        let user_state = self.user_state;
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
+
+        if let Ok(_) = set_di_buy::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.dex_info.borrow().di_option,
+            &bai.oracle,
+            &in_mint_info.mint,
+            &in_mint_info.vault,
+            &user_state,
+            &self.dex_info.borrow().user_list_entry_page,
+            remaining_accounts,
+            id,
+            premium_rate,
+            size,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::DIOptionNotFound));
+        }
+    }
+
+    pub async fn di_settle(
+        &self,
+        user: &Pubkey,
+        id: u64,
+        force: bool,
+        settle_price: u64,
+    ) -> DexResult {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let option = self.di_read_option(id).await;
+
+        let bai = self.dex_info.borrow().assets[option.base_asset_index as usize];
+        let qai = self.dex_info.borrow().assets[option.quote_asset_index as usize];
+
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
+
+        let (user_state, _) = Pubkey::find_program_address(
+            &[&self.dex.to_bytes(), &user.to_bytes()],
+            &self.program.id(),
+        );
+
+        if let Ok(_) = set_di_settle::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.dex_info.borrow().di_option,
+            user,
+            &user_state,
+            &bai.mint,
+            &qai.mint,
+            &qai.oracle,
+            &bai.vault,
+            &qai.vault,
+            &bai.program_signer,
+            &qai.program_signer,
+            &self.dex_info.borrow().event_queue,
+            &self.dex_info.borrow().user_list_entry_page,
+            remaining_accounts,
+            id,
+            force,
+            settle_price,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::DIOptionNotFound));
+        }
+    }
+
+    pub async fn assert_di_user_call(
+        &self,
+        id: u64,
+        premium_rate: u16,
+        size: u64,
+        borrowed_base_funds: u64,
+        borrowed_quote_funds: u64,
+    ) {
+        let raw_option = self.di_read_option(id).await;
+
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let option = us.borrow().get_di_option(id).assert_unwrap();
+
+        assert_eq!(option.is_call, true);
+        assert_eq!(option.size, size);
+        assert_eq!(option.premium_rate, premium_rate);
+        assert_eq!(option.borrowed_base_funds, borrowed_base_funds);
+        assert_eq!(option.borrowed_quote_funds, borrowed_quote_funds);
+
+        assert_eq!(option.expiry_date, raw_option.expiry_date);
+        assert_eq!(option.strike_price, raw_option.strike_price);
+    }
+
+    pub async fn assert_di_user_put(
+        &self,
+        id: u64,
+        premium_rate: u16,
+        size: u64,
+        borrowed_base_funds: u64,
+        borrowed_quote_funds: u64,
+    ) {
+        let raw_option = self.di_read_option(id).await;
+
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let option = us.borrow().get_di_option(id).assert_unwrap();
+
+        assert_eq!(option.is_call, false);
+        assert_eq!(option.size, size);
+        assert_eq!(option.premium_rate, premium_rate);
+        assert_eq!(option.borrowed_base_funds, borrowed_base_funds);
+        assert_eq!(option.borrowed_quote_funds, borrowed_quote_funds);
+
+        assert_eq!(option.expiry_date, raw_option.expiry_date);
+        assert_eq!(option.strike_price, raw_option.strike_price);
+    }
+
+    pub async fn di_collect_user_options(&self, id: u64) -> Vec<dex_program::user::UserDIOption> {
+        let user_state_account = self.get_account(self.user_state).await;
+
+        let us = UserState::mount_buf(user_state_account.data).unwrap();
+        let options = us.borrow().collect_di_option(id);
+
+        options
     }
 }

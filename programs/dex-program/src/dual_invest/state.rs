@@ -245,7 +245,7 @@ impl<'a> DI<'a> {
         let option = self.find_option(id)?;
 
         let date = get_timestamp()?;
-        if date > option.data.expiry_date {
+        if date >= option.data.expiry_date {
             return Err(error!(DexError::DIOptionExpired));
         }
 

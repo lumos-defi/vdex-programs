@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{borrow::Borrow, cell::RefCell, rc::Rc};
 
 use crate::utils::{
     compose_add_asset_ix, compose_add_market_ixs, compose_di_set_admin_ix,
@@ -34,11 +34,16 @@ use crate::utils::{
 
 use anchor_client::{
     solana_sdk::{
-        signature::Keypair, signer::Signer, transaction::Transaction, transport::TransportError,
+        clock::UnixTimestamp, signature::Keypair, signer::Signer, sysvar, transaction::Transaction,
+        transport::TransportError,
     },
     Program,
 };
-use anchor_lang::{error, prelude::Pubkey};
+use anchor_lang::{
+    error,
+    prelude::{Clock, Pubkey},
+};
+use bincode::deserialize;
 use dex_program::{
     dex::Dex,
     errors::{DexError, DexResult},
@@ -417,6 +422,34 @@ impl DexTestContext {
             .process_transaction(transaction)
             .await
             .unwrap();
+    }
+
+    pub async fn decode_account<T: serde::de::DeserializeOwned>(&self, address: &Pubkey) -> T {
+        self.context
+            .borrow_mut()
+            .banks_client
+            .get_account(*address)
+            .await
+            .unwrap()
+            .map(|a| deserialize::<T>(&a.data.borrow()).unwrap())
+            .expect(format!("Get Account Error {}", address).as_str())
+    }
+
+    pub async fn get_clock(&self) -> Clock {
+        self.decode_account::<Clock>(&sysvar::clock::id()).await
+    }
+
+    pub async fn advance_clock(&self, unix_timestamp: UnixTimestamp) {
+        let mut clock: Clock = self.get_clock().await;
+
+        while clock.unix_timestamp <= unix_timestamp {
+            self.context
+                .borrow_mut()
+                .warp_to_slot(clock.slot + 400)
+                .unwrap();
+
+            clock = self.get_clock().await;
+        }
     }
 }
 

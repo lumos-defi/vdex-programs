@@ -11,7 +11,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
 
 #[derive(Accounts)]
-pub struct DISettle<'info> {
+pub struct DiSettle<'info> {
     #[account(mut, owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
@@ -79,7 +79,7 @@ pub struct DISettle<'info> {
 
 // Layout of remaining accounts:
 //  offset 0 ~ n: user_list remaining pages
-pub fn handler(ctx: Context<DISettle>, id: u64, force: bool, settle_price: u64) -> DexResult {
+pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
     require!(
         dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),

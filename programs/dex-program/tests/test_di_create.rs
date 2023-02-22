@@ -262,7 +262,7 @@ async fn test_di_create_multiple() {
         .assert_ok();
 
     now += 10;
-    admin.advance_clock(now).await;
+    dtc.advance_clock(now).await;
 
     admin
         .di_create_option(

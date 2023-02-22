@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct DIBuy<'info> {
+pub struct DiBuy<'info> {
     #[account(mut, owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
@@ -54,7 +54,7 @@ pub struct DIBuy<'info> {
 
 // Layout of remaining accounts:
 //  offset 0 ~ n: user_list remaining pages
-pub fn handler(ctx: Context<DIBuy>, id: u64, premium_rate: u16, size: u64) -> DexResult {
+pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
     require!(
         dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
@@ -68,7 +68,7 @@ pub fn handler(ctx: Context<DIBuy>, id: u64, premium_rate: u16, size: u64) -> De
     let di = DI::mount(&ctx.accounts.di_option, true)?;
 
     // Get option info
-    let option = di.borrow().get_di_option(id)?; // TODO: check if option stopped or expired
+    let option = di.borrow().get_di_option(id)?;
     let base_ai = dex.asset_as_ref(option.base_asset_index)?;
     let quote_ai = dex.asset_as_ref(option.quote_asset_index)?;
 
@@ -80,6 +80,8 @@ pub fn handler(ctx: Context<DIBuy>, id: u64, premium_rate: u16, size: u64) -> De
         premium_rate == option.premium_rate,
         DexError::DIInvalidPremium
     );
+
+    require!(!option.stopped, DexError::DIOptionNotFound);
 
     // Check date
     let now = get_timestamp()?;

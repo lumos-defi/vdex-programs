@@ -41,7 +41,7 @@ async fn test_no_authority() {
         .await
         .assert_ok();
 
-    admin.advance_clock(now + 10).await;
+    dtc.advance_clock(now + 10).await;
 
     user.di_set_settle_price(100, usdc(26000.))
         .await
@@ -98,7 +98,7 @@ async fn test_ok() {
         .await
         .assert_ok();
 
-    admin.advance_clock(now + 10).await;
+    dtc.advance_clock(now + 10).await;
 
     admin
         .di_set_settle_price(100, usdc(26000.))
