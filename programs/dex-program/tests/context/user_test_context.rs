@@ -1805,7 +1805,15 @@ impl UserTestContext {
         force: bool,
         settle_price: u64,
     ) -> DexResult {
-        let option = self.di_read_option(id).await;
+        // let option = self.di_read_option(id).await;
+        let options = self.di_collect_user_options(user, id).await;
+        let option = if options.len() > 0 {
+            options.get(0).unwrap()
+        } else {
+            println!("+++++++++++++");
+            return Err(error!(DexError::DIOptionNotFound));
+        };
+
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
         let bai = self.dex_info.borrow().assets[option.base_asset_index as usize];
@@ -1902,7 +1910,24 @@ impl UserTestContext {
         assert_eq!(option.strike_price, raw_option.strike_price);
     }
 
-    pub async fn di_collect_user_options(&self, id: u64) -> Vec<dex_program::user::UserDIOption> {
+    pub async fn di_collect_user_options(
+        &self,
+        user: &Pubkey,
+        id: u64,
+    ) -> Vec<dex_program::user::UserDIOption> {
+        let (user_state, _) = Pubkey::find_program_address(
+            &[&self.dex.to_bytes(), &user.to_bytes()],
+            &self.program.id(),
+        );
+        let user_state_account = self.get_account(user_state).await;
+
+        let us = UserState::mount_buf(user_state_account.data).unwrap();
+        let options = us.borrow().collect_di_option(id);
+
+        options
+    }
+
+    pub async fn di_collect_my_options(&self, id: u64) -> Vec<dex_program::user::UserDIOption> {
         let user_state_account = self.get_account(self.user_state).await;
 
         let us = UserState::mount_buf(user_state_account.data).unwrap();
@@ -1912,7 +1937,7 @@ impl UserTestContext {
     }
 
     pub async fn assert_di_user_option_count(&self, id: u64, count: usize) {
-        let options = self.di_collect_user_options(id).await;
+        let options = self.di_collect_my_options(id).await;
 
         assert_eq!(options.len(), count);
     }

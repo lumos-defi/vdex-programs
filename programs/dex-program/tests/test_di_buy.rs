@@ -541,7 +541,7 @@ async fn test_single_user_multiple_btc_call() {
     user.assert_btc_balance(0.).await;
 
     // Collect all options
-    let options = user.di_collect_user_options(100).await;
+    let options = user.di_collect_my_options(100).await;
     assert_eq!(options.len(), 2);
 
     assert_eq!(options[0].size, btc(0.1));
@@ -631,7 +631,7 @@ async fn test_single_user_multiple_btc_put() {
     user.assert_usdc_balance(0.).await;
 
     // Collect all options
-    let options = user.di_collect_user_options(100).await;
+    let options = user.di_collect_my_options(100).await;
     assert_eq!(options.len(), 2);
 
     assert_eq!(options[0].size, usdc(180.));

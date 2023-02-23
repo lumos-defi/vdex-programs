@@ -366,7 +366,7 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
         }
     };
 
-    di.borrow_mut().add_settle_size(id, option.size)?;
+    let _ = di.borrow_mut().add_settle_size(id, option.size);
     us.borrow_mut().remove_di_option(option_slot)?;
 
     // Save to event queue
