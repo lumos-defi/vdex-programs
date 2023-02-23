@@ -85,6 +85,8 @@ async fn test_btc_call_not_exercised() {
         .await
         .assert_ok();
 
+    admin.assert_di_settle_size(100, btc(0.1)).await;
+
     // Check liquidity
     market
         .assert_liquidity(DexAsset::BTC, 1. - borrowed_btc)
@@ -164,6 +166,8 @@ async fn test_btc_call_exercised() {
         .di_settle(&user.user.pubkey(), 100, false, usdc(0.))
         .await
         .assert_ok();
+
+    admin.assert_di_settle_size(100, btc(0.1)).await;
 
     // Check liquidity
     market.assert_liquidity(DexAsset::BTC, 1. + 0.1).await;
@@ -247,6 +251,8 @@ async fn test_btc_put_not_exercised() {
         .await
         .assert_ok();
 
+    admin.assert_di_settle_size(100, usdc(180.)).await;
+
     // Check liquidity
     market.assert_liquidity(DexAsset::BTC, 1.).await;
     market
@@ -329,6 +335,8 @@ async fn test_btc_put_exercised() {
         .await
         .assert_ok();
 
+    admin.assert_di_settle_size(100, usdc(180.)).await;
+
     // Check liquidity
     market
         .assert_liquidity(DexAsset::BTC, 1. - borrowed_btc)
@@ -343,7 +351,7 @@ async fn test_btc_put_exercised() {
 }
 
 #[tokio::test]
-async fn test_anyone_can_settle_non_force_price() {
+async fn test_anyone_can_settle_without_forcing_settle_price() {
     let dtc = DexTestContext::new().await;
     let admin = &dtc.user_context[0];
     let user = &dtc.user_context[1];
@@ -414,7 +422,7 @@ async fn test_anyone_can_settle_non_force_price() {
 }
 
 #[tokio::test]
-async fn test_only_admin_can_provide_settle_price() {
+async fn test_only_admin_can_force_settle_price() {
     let dtc = DexTestContext::new().await;
     let admin = &dtc.user_context[0];
     let user = &dtc.user_context[1];
@@ -548,7 +556,7 @@ async fn test_can_not_settle_twice() {
 }
 
 #[tokio::test]
-async fn test_settle_user_multiple_option() {
+async fn test_settle_user_multiple_options() {
     let dtc = DexTestContext::new().await;
     let admin = &dtc.user_context[0];
     let user = &dtc.user_context[1];
@@ -603,12 +611,15 @@ async fn test_settle_user_multiple_option() {
         .await
         .assert_ok();
 
+    admin.assert_di_settle_size(100, usdc(180.)).await;
+
     // Settle the second one
     anyone
         .di_settle(&user.user.pubkey(), 100, false, usdc(0.))
         .await
         .assert_ok();
 
+    admin.assert_di_settle_size(100, usdc(540.)).await;
     user.assert_di_user_option_count(100, 0).await
 }
 
@@ -619,13 +630,330 @@ async fn test_can_not_settle_removed_option() {}
 async fn test_can_settle_removed_option_using_provided_settle_price() {}
 
 #[tokio::test]
-async fn test_sol_call_not_exercised() {}
+async fn test_sol_call_not_exercised() {
+    let dtc = DexTestContext::new().await;
+    let admin = &dtc.user_context[0];
+    let user = &dtc.user_context[1];
+    let market = &dtc.user_context[2];
+    let anyone = &dtc.user_context[3];
+    dtc.di_set_admin(&admin.user.pubkey()).await;
+
+    // Prepare liquidity
+    market.feed_btc_price(20000.).await;
+    market.feed_eth_price(2000.).await;
+    market.feed_sol_price(20.).await;
+
+    market.add_liquidity_with_btc(1.0).await;
+    market.add_liquidity_with_eth(10.0).await;
+    market.add_liquidity_with_usdc(20000.).await;
+
+    market.assert_liquidity(DexAsset::BTC, 1.).await;
+    market.assert_liquidity(DexAsset::ETH, 10.).await;
+    market.assert_liquidity(DexAsset::USDC, 19980.).await;
+    market.assert_liquidity(DexAsset::SOL, 997.).await;
+    market.assert_fee(DexAsset::SOL, 0.).await;
+
+    // Create call option: premium = 5%, strike = 25000, minimum size = 10. sol
+    let mut now = now();
+    admin.di_create_sol_call(100, 500, now + 5, 25., 10.).await;
+
+    // Open size: 10 sol
+    user.di_buy(100, 500, sol(10.)).await.assert_ok();
+
+    // Check borrowed sol: size * premium_rate
+    let borrowed_sol = 10. * 500. / 10000.;
+    market
+        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .await;
+
+    // Check borrowed usdc: size * strike_price * ( 1 + premium_rate )
+    let borrowed_usdc = 10. * 25. * (1. + 500. / 10000.);
+    market
+        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .await;
+
+    // Check user state
+    user.assert_di_user_call(100, 500, sol(10.), sol(borrowed_sol), usdc(borrowed_usdc))
+        .await;
+
+    // Check option volume
+    admin.assert_di_option_volume(100, sol(10.)).await;
+
+    // Mock expiration
+    now += 10;
+    dtc.advance_clock(now).await;
+
+    // Set settle price
+    admin.di_set_settle_price(100, usdc(22.)).await.assert_ok();
+
+    let user_sol_balance_before = user.balance().await;
+    // Settle
+    anyone
+        .di_settle(&user.user.pubkey(), 100, false, usdc(0.))
+        .await
+        .assert_ok();
+
+    // Check liquidity
+    market
+        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .await;
+    market.assert_liquidity(DexAsset::USDC, 19980.).await;
+
+    let fee = (10. + borrowed_sol) * TEST_DI_FEE_RATE as f64 / 10000.;
+    market.assert_fee(DexAsset::SOL, fee).await;
+
+    let user_sol_balance_after = user.balance().await;
+
+    assert_eq!(
+        user_sol_balance_after - user_sol_balance_before,
+        sol(10. + borrowed_sol - fee)
+    )
+}
 
 #[tokio::test]
-async fn test_sol_call_exercised() {}
+async fn test_sol_call_exercised() {
+    let dtc = DexTestContext::new().await;
+    let admin = &dtc.user_context[0];
+    let user = &dtc.user_context[1];
+    let market = &dtc.user_context[2];
+    let anyone = &dtc.user_context[3];
+    dtc.di_set_admin(&admin.user.pubkey()).await;
+
+    // Prepare liquidity
+    market.feed_btc_price(20000.).await;
+    market.feed_eth_price(2000.).await;
+    market.feed_sol_price(20.).await;
+
+    market.add_liquidity_with_btc(1.0).await;
+    market.add_liquidity_with_eth(10.0).await;
+    market.add_liquidity_with_usdc(20000.).await;
+
+    market.assert_liquidity(DexAsset::BTC, 1.).await;
+    market.assert_liquidity(DexAsset::ETH, 10.).await;
+    market.assert_liquidity(DexAsset::USDC, 19980.).await;
+    market.assert_liquidity(DexAsset::SOL, 997.).await;
+    market.assert_fee(DexAsset::SOL, 0.).await;
+
+    // Create call option: premium = 5%, strike = 25000, minimum size = 10. sol
+    let mut now = now();
+    admin.di_create_sol_call(100, 500, now + 5, 25., 10.).await;
+
+    // Open size: 10 sol
+    user.di_buy(100, 500, sol(10.)).await.assert_ok();
+
+    // Check borrowed sol: size * premium_rate
+    let borrowed_sol = 10. * 500. / 10000.;
+    market
+        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .await;
+
+    // Check borrowed usdc: size * strike_price * ( 1 + premium_rate )
+    let borrowed_usdc = 10. * 25. * (1. + 500. / 10000.);
+    market
+        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .await;
+
+    // Check user state
+    user.assert_di_user_call(100, 500, sol(10.), sol(borrowed_sol), usdc(borrowed_usdc))
+        .await;
+
+    // Check option volume
+    admin.assert_di_option_volume(100, sol(10.)).await;
+
+    // Mock expiration
+    now += 10;
+    dtc.advance_clock(now).await;
+
+    // Set settle price
+    admin.di_set_settle_price(100, usdc(26.)).await.assert_ok();
+
+    let user_sol_balance_before = user.balance().await;
+
+    // Settle
+    anyone
+        .di_settle(&user.user.pubkey(), 100, false, usdc(0.))
+        .await
+        .assert_ok();
+
+    // Check liquidity
+    market.assert_liquidity(DexAsset::SOL, 997. + 10.).await;
+    market
+        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .await;
+
+    let fee = borrowed_usdc * TEST_DI_FEE_RATE as f64 / 10000.;
+    market.assert_fee(DexAsset::USDC, 20. + fee).await;
+    market.assert_fee(DexAsset::SOL, 0.).await;
+
+    let user_sol_balance_after = user.balance().await;
+    assert_eq!(user_sol_balance_after - user_sol_balance_before, sol(0.));
+
+    user.assert_usdc_balance(borrowed_usdc - fee).await;
+}
 
 #[tokio::test]
-async fn test_sol_put_not_exercised() {}
+async fn test_sol_put_not_exercised() {
+    let dtc = DexTestContext::new().await;
+    let admin = &dtc.user_context[0];
+    let user = &dtc.user_context[1];
+    let market = &dtc.user_context[2];
+    let anyone = &dtc.user_context[3];
+    dtc.di_set_admin(&admin.user.pubkey()).await;
+
+    // Prepare liquidity
+    market.feed_btc_price(20000.).await;
+    market.feed_eth_price(2000.).await;
+    market.feed_sol_price(20.).await;
+
+    market.add_liquidity_with_btc(1.0).await;
+    market.add_liquidity_with_eth(10.0).await;
+    market.add_liquidity_with_usdc(20000.).await;
+
+    market.assert_liquidity(DexAsset::BTC, 1.).await;
+    market.assert_liquidity(DexAsset::ETH, 10.).await;
+    market.assert_liquidity(DexAsset::USDC, 19980.).await;
+    market.assert_liquidity(DexAsset::SOL, 997.).await;
+    market.assert_fee(DexAsset::SOL, 0.).await;
+
+    // Create put option: premium = 5%, strike = 15, minimum size = 100. usdc
+    let mut now = now();
+    admin.di_create_sol_put(100, 500, now + 5, 15., 100.).await;
+
+    // Open size: 150 usdc
+    user.mint_usdc(150.).await;
+    user.di_buy(100, 500, usdc(150.)).await.assert_ok();
+
+    // Check borrowed sol: ( usdc_size / strike_price ) * ( 1 + premium_rate )
+    let borrowed_sol = (150. / 15.) * (1. + 500. / 10000.);
+    market
+        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .await;
+
+    // Check borrowed usdc: size * premium_rate
+    let borrowed_usdc = 150. * 500. / 10000.;
+    market
+        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .await;
+
+    // Check user state
+    user.assert_di_user_put(100, 500, usdc(150.), sol(borrowed_sol), usdc(borrowed_usdc))
+        .await;
+
+    // Check option volume
+    admin.assert_di_option_volume(100, usdc(150.)).await;
+
+    // Mock expiration
+    now += 10;
+    dtc.advance_clock(now).await;
+
+    // Set settle price
+    admin.di_set_settle_price(100, usdc(26.)).await.assert_ok();
+
+    let user_sol_balance_before = user.balance().await;
+
+    // Settle
+    anyone
+        .di_settle(&user.user.pubkey(), 100, false, usdc(0.))
+        .await
+        .assert_ok();
+
+    // Check liquidity
+    market.assert_liquidity(DexAsset::SOL, 997.).await;
+    market
+        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .await;
+
+    let fee = (150. + borrowed_usdc) * TEST_DI_FEE_RATE as f64 / 10000.;
+    market.assert_fee(DexAsset::USDC, 20. + fee).await;
+    market.assert_fee(DexAsset::SOL, 0.).await;
+
+    let user_sol_balance_after = user.balance().await;
+    assert_eq!(user_sol_balance_after - user_sol_balance_before, sol(0.));
+
+    user.assert_usdc_balance(150. + borrowed_usdc - fee).await;
+}
 
 #[tokio::test]
-async fn test_sol_put_exercised() {}
+async fn test_sol_put_exercised() {
+    let dtc = DexTestContext::new().await;
+    let admin = &dtc.user_context[0];
+    let user = &dtc.user_context[1];
+    let market = &dtc.user_context[2];
+    let anyone = &dtc.user_context[3];
+    dtc.di_set_admin(&admin.user.pubkey()).await;
+
+    // Prepare liquidity
+    market.feed_btc_price(20000.).await;
+    market.feed_eth_price(2000.).await;
+    market.feed_sol_price(20.).await;
+
+    market.add_liquidity_with_btc(1.0).await;
+    market.add_liquidity_with_eth(10.0).await;
+    market.add_liquidity_with_usdc(20000.).await;
+
+    market.assert_liquidity(DexAsset::BTC, 1.).await;
+    market.assert_liquidity(DexAsset::ETH, 10.).await;
+    market.assert_liquidity(DexAsset::USDC, 19980.).await;
+    market.assert_liquidity(DexAsset::SOL, 997.).await;
+    market.assert_fee(DexAsset::SOL, 0.).await;
+
+    // Create put option: premium = 5%, strike = 15, minimum size = 100. usdc
+    let mut now = now();
+    admin.di_create_sol_put(100, 500, now + 5, 15., 100.).await;
+
+    // Open size: 150 usdc
+    user.mint_usdc(150.).await;
+    user.di_buy(100, 500, usdc(150.)).await.assert_ok();
+
+    // Check borrowed sol: ( usdc_size / strike_price ) * ( 1 + premium_rate )
+    let borrowed_sol = (150. / 15.) * (1. + 500. / 10000.);
+    market
+        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .await;
+
+    // Check borrowed usdc: size * premium_rate
+    let borrowed_usdc = 150. * 500. / 10000.;
+    market
+        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .await;
+
+    // Check user state
+    user.assert_di_user_put(100, 500, usdc(150.), sol(borrowed_sol), usdc(borrowed_usdc))
+        .await;
+
+    // Check option volume
+    admin.assert_di_option_volume(100, usdc(150.)).await;
+
+    // Mock expiration
+    now += 10;
+    dtc.advance_clock(now).await;
+
+    // Set settle price
+    admin.di_set_settle_price(100, usdc(14.)).await.assert_ok();
+
+    let user_sol_balance_before = user.balance().await;
+
+    // Settle
+    anyone
+        .di_settle(&user.user.pubkey(), 100, false, usdc(0.))
+        .await
+        .assert_ok();
+
+    // Check liquidity
+    market
+        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .await;
+    market.assert_liquidity(DexAsset::USDC, 19980. + 150.).await;
+
+    let fee = borrowed_sol * TEST_DI_FEE_RATE as f64 / 10000.;
+    market.assert_fee(DexAsset::SOL, fee).await;
+    market.assert_fee(DexAsset::USDC, 20.).await;
+
+    let user_sol_balance_after = user.balance().await;
+    assert_eq!(
+        user_sol_balance_after - user_sol_balance_before,
+        sol(borrowed_sol - fee)
+    );
+
+    user.assert_usdc_balance(0.).await;
+}

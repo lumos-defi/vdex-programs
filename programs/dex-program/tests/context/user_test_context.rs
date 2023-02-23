@@ -1688,6 +1688,12 @@ impl UserTestContext {
         assert_eq!(volume, option.volume);
     }
 
+    pub async fn assert_di_settle_size(&self, id: u64, size: u64) {
+        let option = self.di_read_option(id).await;
+
+        assert_eq!(size, option.settle_size);
+    }
+
     pub async fn assert_di_settle_price(&self, id: u64, price: u64) {
         let option = self.di_read_option(id).await;
 

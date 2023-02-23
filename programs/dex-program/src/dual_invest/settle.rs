@@ -20,7 +20,7 @@ pub struct DiSettle<'info> {
     #[account(mut, constraint= di_option.owner == program_id)]
     pub di_option: UncheckedAccount<'info>,
 
-    /// CHECK
+    #[account(mut)]
     pub user: AccountInfo<'info>,
 
     /// CHECK
