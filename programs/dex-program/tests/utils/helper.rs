@@ -279,7 +279,6 @@ pub async fn create_associated_token_account(
     context
         .borrow_mut()
         .banks_client
-        //.process_transaction_with_preflight(transaction)
         .process_transaction(transaction)
         .await
         .unwrap();

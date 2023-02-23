@@ -577,6 +577,30 @@ impl UserTestContext {
         self.get_account(self.user.pubkey()).await.lamports
     }
 
+    pub async fn mint_balance(&self, asset: DexAsset, user_asset_acc: &Pubkey) -> f64 {
+        let asset_info = self.dex_info.borrow().assets[asset as usize];
+
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+        if let Ok(None) = context.banks_client.get_account(*user_asset_acc).await {
+            create_associated_token_account(
+                context,
+                &self.user,
+                &self.user.pubkey(),
+                &asset_info.mint,
+            )
+            .await
+        }
+
+        let asset_amount = get_token_balance(&mut context.banks_client, user_asset_acc).await;
+
+        asset_amount as f64 / 10f64.powf(asset_info.decimals.into())
+    }
+
+    pub async fn usdc_balance(&self) -> f64 {
+        let user_asset_acc = self.get_user_usdc_token_pubkey().await;
+        self.mint_balance(DexAsset::USDC, &user_asset_acc).await
+    }
+
     pub async fn assert_mint_balance(&self, user_asset_acc: &Pubkey, asset: usize, amount: f64) {
         let asset_info = self.dex_info.borrow().assets[asset];
         let asset_amount =
@@ -1539,6 +1563,50 @@ impl UserTestContext {
         .assert_ok()
     }
 
+    pub async fn di_create_sol_call(
+        &self,
+        id: u64,
+        premium_rate: u16,
+        expiry_date: i64,
+        strike_price: f64,
+        minimum_size: f64,
+    ) {
+        self.di_create_option(
+            id,
+            true,
+            DexAsset::SOL,
+            DexAsset::USDC,
+            premium_rate,
+            expiry_date,
+            usdc(strike_price),
+            btc(minimum_size),
+        )
+        .await
+        .assert_ok()
+    }
+
+    pub async fn di_create_sol_put(
+        &self,
+        id: u64,
+        premium_rate: u16,
+        expiry_date: i64,
+        strike_price: f64,
+        minimum_size: f64,
+    ) {
+        self.di_create_option(
+            id,
+            false,
+            DexAsset::SOL,
+            DexAsset::USDC,
+            premium_rate,
+            expiry_date,
+            usdc(strike_price),
+            usdc(minimum_size),
+        )
+        .await
+        .assert_ok()
+    }
+
     pub async fn di_set_settle_price(&self, id: u64, price: u64) -> DexResult {
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
@@ -1731,9 +1799,8 @@ impl UserTestContext {
         force: bool,
         settle_price: u64,
     ) -> DexResult {
-        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
-
         let option = self.di_read_option(id).await;
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
         let bai = self.dex_info.borrow().assets[option.base_asset_index as usize];
         let qai = self.dex_info.borrow().assets[option.quote_asset_index as usize];
@@ -1790,7 +1857,7 @@ impl UserTestContext {
             (&self.user_state, true, &mut user_state_account).into();
 
         let us = UserState::mount(&user_state_account_info, true).unwrap();
-        let option = us.borrow().get_di_option(id).assert_unwrap();
+        let (_, option) = us.borrow().get_di_option(id).assert_unwrap();
 
         assert_eq!(option.is_call, true);
         assert_eq!(option.size, size);
@@ -1817,7 +1884,7 @@ impl UserTestContext {
             (&self.user_state, true, &mut user_state_account).into();
 
         let us = UserState::mount(&user_state_account_info, true).unwrap();
-        let option = us.borrow().get_di_option(id).assert_unwrap();
+        let (_, option) = us.borrow().get_di_option(id).assert_unwrap();
 
         assert_eq!(option.is_call, false);
         assert_eq!(option.size, size);
@@ -1836,5 +1903,11 @@ impl UserTestContext {
         let options = us.borrow().collect_di_option(id);
 
         options
+    }
+
+    pub async fn assert_di_user_option_count(&self, id: u64, count: usize) {
+        let options = self.di_collect_user_options(id).await;
+
+        assert_eq!(options.len(), count);
     }
 }

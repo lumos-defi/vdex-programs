@@ -161,6 +161,7 @@ impl UserPosition {
 #[derive(Clone, Copy)]
 pub struct UserDIOption {
     pub id: u64,
+    pub created: u64,
     pub expiry_date: i64,
     pub strike_price: u64,
     pub size: u64,
@@ -180,8 +181,9 @@ impl UserDIOption {
         size: u64,
         borrow_base_funds: u64,
         borrow_quote_funds: u64,
-    ) {
+    ) -> DexResult {
         self.id = option.id;
+        self.created = get_timestamp()? as u64;
         self.expiry_date = option.expiry_date;
         self.strike_price = option.strike_price;
         self.size = size;
@@ -192,6 +194,8 @@ impl UserDIOption {
         self.quote_asset_index = option.quote_asset_index;
         self.is_call = option.is_call;
         self.size = size;
+
+        Ok(())
     }
 }
 
@@ -573,20 +577,24 @@ impl<'a> UserState<'a> {
         let option = self.di_option_pool.new_slot()?;
         option
             .data
-            .init(raw, size, borrow_base_funds, borrow_quote_funds);
+            .init(raw, size, borrow_base_funds, borrow_quote_funds)?;
 
         self.di_option_pool.add_to_tail(option)?;
 
         Ok(())
     }
 
-    pub fn get_di_option(&self, id: u64) -> DexResult<UserDIOption> {
+    pub fn get_di_option(&self, id: u64) -> DexResult<(u8, UserDIOption)> {
         let lookup = self.di_option_pool.into_iter().find(|x| x.data.id == id);
         if let Some(p) = lookup {
-            return Ok(p.data);
+            return Ok((p.index, p.data));
         }
 
         return Err(error!(DexError::DIOptionNotFound));
+    }
+
+    pub fn remove_di_option(&mut self, slot: u8) -> DexResult {
+        self.di_option_pool.remove(slot)
     }
 
     #[cfg(feature = "client-support")]

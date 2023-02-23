@@ -957,6 +957,7 @@ pub async fn compose_di_settle_ix(
             user_list_entry_page: *user_list_entry_page,
             authority: payer.pubkey(),
             token_program: spl_token::id(),
+            system_program: system_program::id(),
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::DiSettle {

@@ -7,8 +7,9 @@ use crate::{
     user::state::*,
     utils::{get_timestamp, swap, SafeMath, FEE_RATE_BASE, USER_LIST_MAGIC_BYTE},
 };
-use anchor_lang::prelude::*;
-use anchor_spl::token::{self, TokenAccount, Transfer};
+
+use anchor_lang::{prelude::*, system_program};
+use anchor_spl::token::{self, CloseAccount, TokenAccount, Transfer};
 
 #[derive(Accounts)]
 pub struct DiSettle<'info> {
@@ -28,7 +29,7 @@ pub struct DiSettle<'info> {
 
     #[account(
         mut,
-        constraint = (user_base_mint_acc.owner == *user.key && user_base_mint_acc.mint == *base_mint.key)
+        constraint = (user_base_mint_acc.mint == *base_mint.key)
     )]
     pub user_base_mint_acc: Box<Account<'info, TokenAccount>>,
 
@@ -75,6 +76,61 @@ pub struct DiSettle<'info> {
     /// CHECK
     #[account(executable, constraint = (token_program.key == &token::ID))]
     pub token_program: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(executable, constraint = (system_program.key == &system_program::ID))]
+    pub system_program: AccountInfo<'info>,
+}
+
+fn withdraw(
+    ctx: &Context<DiSettle>,
+    is_base_mint: bool,
+    seeds: &[&[u8]; 3],
+    amount: u64,
+) -> DexResult {
+    let signer_seeds = &[&seeds[..]];
+
+    let cpi_accounts = if is_base_mint {
+        Transfer {
+            from: ctx.accounts.base_mint_vault.to_account_info(),
+            to: ctx.accounts.user_base_mint_acc.to_account_info(),
+            authority: ctx.accounts.base_asset_program_signer.to_account_info(),
+        }
+    } else {
+        Transfer {
+            from: ctx.accounts.quote_mint_vault.to_account_info(),
+            to: ctx.accounts.user_quote_mint_acc.to_account_info(),
+            authority: ctx.accounts.quote_asset_program_signer.to_account_info(),
+        }
+    };
+
+    let cpi_ctx = CpiContext::new_with_signer(
+        ctx.accounts.token_program.clone(),
+        cpi_accounts,
+        signer_seeds,
+    );
+
+    token::transfer(cpi_ctx, amount)?;
+    Ok(())
+}
+
+fn relay_native_mint_to_user(ctx: &Context<DiSettle>, lamports: u64) -> DexResult {
+    let cpi_close = CloseAccount {
+        account: ctx.accounts.user_base_mint_acc.to_account_info(),
+        destination: ctx.accounts.authority.to_account_info(),
+        authority: ctx.accounts.authority.to_account_info(),
+    };
+
+    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_close);
+    token::close_account(cpi_ctx)?;
+
+    let cpi_sys_transfer = system_program::Transfer {
+        from: ctx.accounts.authority.to_account_info(),
+        to: ctx.accounts.user.to_account_info(),
+    };
+    let cpi_ctx = CpiContext::new(ctx.accounts.system_program.clone(), cpi_sys_transfer);
+
+    system_program::transfer(cpi_ctx, lamports)
 }
 
 // Layout of remaining accounts:
@@ -95,15 +151,18 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
         DexError::InvalidDIOptionAccount
     );
     let di = DI::mount(&ctx.accounts.di_option, true)?;
-    require!(
-        di.borrow().meta.admin == ctx.accounts.authority.key(),
-        DexError::InvalidDIAdmin
-    );
+    if force {
+        // Force to use the provided settle price
+        require!(
+            di.borrow().meta.admin == ctx.accounts.authority.key(),
+            DexError::InvalidDIAdmin
+        );
+    }
 
     // Get strike price
     let actual_settle_price = if let Ok(option) = di.borrow().get_di_option(id) {
         let now = get_timestamp()?;
-        require!(now < option.expiry_date, DexError::DIOptionNotExpired);
+        require!(now >= option.expiry_date, DexError::DIOptionNotExpired);
         require!(option.settle_price != 0, DexError::DIOptionNoSettlePrice);
 
         option.settle_price
@@ -113,7 +172,7 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
     };
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let option = us.borrow().get_di_option(id)?;
+    let (option_slot, option) = us.borrow().get_di_option(id)?;
 
     let base_ai = dex.asset_as_ref(option.base_asset_index)?;
     let quote_ai = dex.asset_as_ref(option.quote_asset_index)?;
@@ -137,6 +196,20 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
             && quote_ai.program_signer == ctx.accounts.quote_asset_program_signer.key(),
         DexError::InvalidProgramSigner
     );
+
+    if ctx.accounts.base_mint.key() == token::spl_token::native_mint::id() {
+        require!(
+            ctx.accounts.user_base_mint_acc.owner == ctx.accounts.authority.key()
+                && ctx.accounts.user_base_mint_acc.mint == ctx.accounts.base_mint.key(),
+            DexError::InvalidUserMintAccount
+        );
+    } else {
+        require!(
+            ctx.accounts.user_base_mint_acc.owner == ctx.accounts.user.key()
+                && ctx.accounts.user_base_mint_acc.mint == ctx.accounts.base_mint.key(),
+            DexError::InvalidUserMintAccount
+        );
+    }
 
     let quote_asset_seeds = &[
         ctx.accounts.quote_mint.key.as_ref(),
@@ -163,7 +236,7 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
 
             let swapped_quote_asset = swap(
                 option.size,
-                actual_settle_price,
+                option.strike_price,
                 base_ai.decimals,
                 quote_asset_price,
                 quote_ai.decimals,
@@ -189,6 +262,7 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
                     option.borrowed_quote_funds
                 }
             };
+
             dex.di_option_loss(option.quote_asset_index, total)?;
 
             dex.di_option_refund(option.base_asset_index, option.borrowed_base_funds)?;
@@ -197,47 +271,28 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
             let fee = total.safe_mul(fee_rate)?.safe_div(FEE_RATE_BASE)? as u64;
             let withdrawable = total.safe_sub(fee)?;
 
-            let signer_seeds = &[&quote_asset_seeds[..]];
-            let cpi_accounts = Transfer {
-                from: ctx.accounts.quote_mint_vault.to_account_info(),
-                to: ctx.accounts.user_quote_mint_acc.to_account_info(),
-                authority: ctx.accounts.quote_asset_program_signer.to_account_info(),
-            };
-
-            let cpi_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.clone(),
-                cpi_accounts,
-                signer_seeds,
-            );
-            token::transfer(cpi_ctx, withdrawable)?;
             dex.di_option_charge_fee(option.quote_asset_index, fee)?;
+            withdraw(&ctx, false, quote_asset_seeds, withdrawable)?;
 
             fee
         } else {
             // Call option, not exercised, return base asset + premium to user
             let total = option.size + option.borrowed_base_funds;
+
+            dex.di_option_loss(option.base_asset_index, option.borrowed_base_funds)?;
+            dex.di_option_refund(option.quote_asset_index, option.borrowed_quote_funds)?;
+
             let fee = total.safe_mul(fee_rate)?.safe_div(FEE_RATE_BASE)? as u64;
+            dex.di_option_charge_fee(option.base_asset_index, fee)?;
 
             let withdrawable = total.safe_sub(fee)?;
+            withdraw(&ctx, true, base_asset_seeds, withdrawable)?;
 
-            let signer_seeds = &[&base_asset_seeds[..]];
-            let cpi_accounts = Transfer {
-                from: ctx.accounts.base_mint_vault.to_account_info(),
-                to: ctx.accounts.user_base_mint_acc.to_account_info(),
-                authority: ctx.accounts.base_asset_program_signer.to_account_info(),
-            };
-
-            let cpi_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.clone(),
-                cpi_accounts,
-                signer_seeds,
-            );
-            token::transfer(cpi_ctx, withdrawable)?;
-
-            dex.di_option_charge_fee(option.base_asset_index, fee)?;
-            dex.di_option_loss(option.base_asset_index, option.borrowed_base_funds)?;
-
-            dex.di_option_refund(option.quote_asset_index, option.borrowed_quote_funds)?;
+            // If base mint is SOL,we can't create a temp WSOL account for the end user(we are settling, no user sign),
+            // so have to use the authority as a "replay" to transfer the native mint to user
+            if ctx.accounts.base_mint.key() == token::spl_token::native_mint::id() {
+                relay_native_mint_to_user(&ctx, withdrawable)?;
+            }
 
             fee
         }
@@ -251,7 +306,7 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
                 option.size,
                 quote_asset_price,
                 quote_ai.decimals,
-                actual_settle_price,
+                option.strike_price,
                 base_ai.decimals,
             )?;
 
@@ -281,55 +336,38 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
             dex.di_option_add_fund(option.quote_asset_index, option.size)?;
 
             let fee = total.safe_mul(fee_rate)?.safe_div(FEE_RATE_BASE)? as u64;
+            dex.di_option_charge_fee(option.base_asset_index, fee)?;
+
             let withdrawable = total.safe_sub(fee)?;
 
-            let signer_seeds = &[&base_asset_seeds[..]];
-            let cpi_accounts = Transfer {
-                from: ctx.accounts.base_mint_vault.to_account_info(),
-                to: ctx.accounts.user_base_mint_acc.to_account_info(),
-                authority: ctx.accounts.base_asset_program_signer.to_account_info(),
-            };
+            withdraw(&ctx, true, base_asset_seeds, withdrawable)?;
 
-            let cpi_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.clone(),
-                cpi_accounts,
-                signer_seeds,
-            );
-            token::transfer(cpi_ctx, withdrawable)?;
-            dex.di_option_charge_fee(option.base_asset_index, fee)?;
+            // If base mint is SOL,we can't create a temp WSOL account for the end user(we are settling, no user sign),
+            // so have to use the authority as a "replay" to transfer the native mint to user
+            if ctx.accounts.base_mint.key() == token::spl_token::native_mint::id() {
+                relay_native_mint_to_user(&ctx, withdrawable)?;
+            }
 
             fee
         } else {
             // Put option, not exercised
             let total = option.size + option.borrowed_quote_funds;
+
+            dex.di_option_loss(option.quote_asset_index, option.borrowed_quote_funds)?;
+            dex.di_option_refund(option.base_asset_index, option.borrowed_base_funds)?;
+
             let fee = total.safe_mul(fee_rate)?.safe_div(FEE_RATE_BASE)? as u64;
+            dex.di_option_charge_fee(option.quote_asset_index, fee)?;
 
             let withdrawable = total.safe_sub(fee)?;
-
-            let signer_seeds = &[&quote_asset_seeds[..]];
-            let cpi_accounts = Transfer {
-                from: ctx.accounts.quote_mint_vault.to_account_info(),
-                to: ctx.accounts.user_quote_mint_acc.to_account_info(),
-                authority: ctx.accounts.quote_asset_program_signer.to_account_info(),
-            };
-
-            let cpi_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.clone(),
-                cpi_accounts,
-                signer_seeds,
-            );
-            token::transfer(cpi_ctx, withdrawable)?;
-
-            dex.di_option_charge_fee(option.quote_asset_index, fee)?;
-            dex.di_option_loss(option.quote_asset_index, option.borrowed_quote_funds)?;
-
-            dex.di_option_refund(option.base_asset_index, option.borrowed_base_funds)?;
+            withdraw(&ctx, false, quote_asset_seeds, withdrawable)?;
 
             fee
         }
     };
 
     di.borrow_mut().add_settle_size(id, option.size)?;
+    us.borrow_mut().remove_di_option(option_slot)?;
 
     // Save to event queue
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
