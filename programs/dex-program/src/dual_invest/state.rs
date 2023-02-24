@@ -29,6 +29,8 @@ pub struct DIOption {
     pub strike_price: u64,
     pub settle_price: u64,
     pub minimum_open_size: u64,
+    pub maximum_open_size: u64,
+    pub stop_before_expiry: u64,
     pub volume: u64,
     pub settle_size: u64,
     pub premium_rate: u16,
@@ -50,6 +52,8 @@ impl DIOption {
         expiry_date: i64,
         strike_price: u64,
         minimum_open_size: u64,
+        maximum_open_size: u64,
+        stop_before_expiry: u64,
     ) {
         self.id = id;
         self.is_call = is_call;
@@ -59,6 +63,8 @@ impl DIOption {
         self.expiry_date = expiry_date;
         self.strike_price = strike_price;
         self.minimum_open_size = minimum_open_size;
+        self.maximum_open_size = maximum_open_size;
+        self.stop_before_expiry = stop_before_expiry;
         self.stopped = false;
         self.settle_price = 0;
         self.settle_size = 0;
@@ -167,6 +173,8 @@ impl<'a> DI<'a> {
         expiry_date: i64,
         strike_price: u64,
         minimum_open_size: u64,
+        maximum_open_size: u64,
+        stop_before_expiry: u64,
     ) -> DexResult {
         // Check no dup id
         if let Ok(_) = self.find_option(id) {
@@ -195,6 +203,8 @@ impl<'a> DI<'a> {
             expiry_date,
             strike_price,
             minimum_open_size,
+            maximum_open_size,
+            stop_before_expiry,
         );
         self.options.add_to_tail(option)
     }
@@ -245,7 +255,7 @@ impl<'a> DI<'a> {
         let option = self.find_option(id)?;
 
         let date = get_timestamp()?;
-        if date >= option.data.expiry_date {
+        if date >= option.data.expiry_date - option.data.stop_before_expiry as i64 {
             return Err(error!(DexError::DIOptionExpired));
         }
 

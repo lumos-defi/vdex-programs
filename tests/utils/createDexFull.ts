@@ -59,7 +59,7 @@ export async function createDexFull(authority: Keypair) {
 
   //init dex
   await program.methods
-    .initDex(VLP_DECIMALS)
+    .initDex(VLP_DECIMALS, 30)
     .accounts({
       dex: dex.publicKey,
       usdcMint,

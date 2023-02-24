@@ -33,7 +33,7 @@ describe('Init Dex', () => {
 
   it('should init dex account successfully', async () => {
     await program.methods
-      .initDex(VLP_DECIMALS)
+      .initDex(VLP_DECIMALS, 30)
       .accounts({
         dex: dex.publicKey,
         usdcMint: usdcMint,

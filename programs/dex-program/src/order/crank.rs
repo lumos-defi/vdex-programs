@@ -19,6 +19,7 @@ pub struct Crank<'info> {
     #[account(mut, owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
+    /// CHECK
     #[account(mut)]
     pub user: AccountInfo<'info>,
 

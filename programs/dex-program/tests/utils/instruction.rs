@@ -774,6 +774,8 @@ pub async fn compose_di_create_option_ix(
     expiry_date: i64,
     strike_price: u64,
     minimum_open_size: u64,
+    maximum_open_size: u64,
+    stop_before_expiry: u64,
 ) -> Instruction {
     program
         .request()
@@ -792,6 +794,8 @@ pub async fn compose_di_create_option_ix(
             expiry_date,
             strike_price,
             minimum_open_size,
+            maximum_open_size,
+            stop_before_expiry,
         })
         .instructions()
         .unwrap()

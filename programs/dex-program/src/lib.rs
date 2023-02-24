@@ -207,6 +207,8 @@ pub mod dex_program {
         expiry_date: i64,
         strike_price: u64,
         minimum_open_size: u64,
+        maximum_open_size: u64,
+        stop_before_expiry: u64,
     ) -> DexResult {
         dual_invest::create::handler(
             ctx,
@@ -218,6 +220,8 @@ pub mod dex_program {
             expiry_date,
             strike_price,
             minimum_open_size,
+            maximum_open_size,
+            stop_before_expiry,
         )
     }
 

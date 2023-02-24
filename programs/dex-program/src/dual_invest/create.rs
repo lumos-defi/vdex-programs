@@ -32,6 +32,8 @@ pub fn handler(
     expiry_date: i64,
     strike_price: u64,
     minimum_open_size: u64,
+    maximum_open_size: u64,
+    stop_before_expiry: u64,
 ) -> DexResult {
     let dex = &mut ctx.accounts.dex.load()?;
     require!(
@@ -80,6 +82,8 @@ pub fn handler(
         expiry_date,
         strike_price,
         minimum_open_size,
+        maximum_open_size,
+        stop_before_expiry,
     )?;
 
     Ok(())

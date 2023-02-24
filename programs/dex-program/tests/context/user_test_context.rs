@@ -1510,6 +1510,8 @@ impl UserTestContext {
             expiry_date,
             strike_price,
             minimum_open_size,
+            minimum_open_size * 20,
+            0,
         )
         .await
         {

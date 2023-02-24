@@ -395,15 +395,14 @@ async fn test_btc_call_multiple_users() {
         .await;
 
     // Check user state
-    alice
-        .assert_di_user_call(
-            100,
-            500,
-            btc(0.1),
-            btc(bob_borrowed_btc),
-            usdc(bob_borrowed_usdc),
-        )
-        .await;
+    bob.assert_di_user_call(
+        100,
+        500,
+        btc(0.1),
+        btc(bob_borrowed_btc),
+        usdc(bob_borrowed_usdc),
+    )
+    .await;
 
     // Check option volume
     admin.assert_di_option_volume(100, btc(0.2)).await;

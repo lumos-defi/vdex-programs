@@ -267,7 +267,7 @@ pub enum DexError {
     DIInvalidPremium,
 
     #[msg("DI size too small")]
-    DISizeTooSmall,
+    DIInvalidSize,
 
     #[msg("DI option no settle price")]
     DIOptionNoSettlePrice,

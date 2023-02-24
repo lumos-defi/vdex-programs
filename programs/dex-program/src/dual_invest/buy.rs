@@ -73,7 +73,10 @@ pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> De
     let quote_ai = dex.asset_as_ref(option.quote_asset_index)?;
 
     // Check size
-    require!(size >= option.minimum_open_size, DexError::DISizeTooSmall);
+    require!(
+        size >= option.minimum_open_size && size <= option.maximum_open_size,
+        DexError::DIInvalidSize
+    );
 
     // Check premium
     require!(
