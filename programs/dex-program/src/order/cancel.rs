@@ -50,7 +50,7 @@ pub struct CancelOrder<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-/// Layout of remaining counts:
+/// Layout of remaining accounts:
 /// 1. Order pool remaining pages
 pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
     // Mount user state

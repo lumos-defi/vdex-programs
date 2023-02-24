@@ -68,7 +68,7 @@ pub struct LiquidatePosition<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-// Layout of remaining counts:
+// Layout of remaining accounts:
 //  offset 0 ~ m: order pool remaining pages
 //  offset m + 1 ~ n: user list remaining pages
 pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexResult {

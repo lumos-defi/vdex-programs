@@ -20,6 +20,7 @@ pub struct Dex {
     pub event_queue: Pubkey,
     pub match_queue: Pubkey,
     pub usdc_mint: Pubkey,
+    pub di_option: Pubkey,
     pub user_list_entry_page: Pubkey,
     pub user_list_remaining_pages: [Pubkey; 8],
     pub user_list_remaining_pages_number: u8,
@@ -282,6 +283,15 @@ impl Dex {
 
     pub fn has_sufficient_liquidity(&self, market: u8, long: bool, borrow: u64) -> DexResult {
         let ai = self.market_asset_as_ref(market, long)?;
+        if ai.liquidity_amount > borrow {
+            Ok(())
+        } else {
+            Err(error!(DexError::InsufficientLiquidity))
+        }
+    }
+
+    pub fn has_sufficient_asset(&self, asset_index: u8, borrow: u64) -> DexResult {
+        let ai = self.asset_as_ref(asset_index)?;
         if ai.liquidity_amount > borrow {
             Ok(())
         } else {
@@ -569,6 +579,56 @@ impl Dex {
         let ai = self.asset_as_mut(index)?;
 
         ai.liquidity_amount = ai.liquidity_amount.safe_sub(amount)?;
+
+        Ok(())
+    }
+
+    pub fn di_option_borrow(&mut self, asset_index: u8, borrow: u64) -> DexResult {
+        let ai = self.asset_as_mut(asset_index)?;
+
+        ai.liquidity_amount = ai
+            .liquidity_amount
+            .safe_sub(borrow)
+            .map_err(|_| error!(DexError::InsufficientLiquidity))?;
+        ai.borrowed_amount = ai.borrowed_amount.safe_add(borrow)?;
+
+        Ok(())
+    }
+
+    pub fn di_option_loss(&mut self, asset_index: u8, borrowed: u64) -> DexResult {
+        let ai = self.asset_as_mut(asset_index)?;
+
+        ai.borrowed_amount = ai
+            .borrowed_amount
+            .safe_sub(borrowed)
+            .map_err(|_| error!(DexError::InsufficientBorrow))?;
+
+        Ok(())
+    }
+
+    pub fn di_option_refund(&mut self, asset_index: u8, borrowed: u64) -> DexResult {
+        let ai = self.asset_as_mut(asset_index)?;
+
+        ai.liquidity_amount = ai.liquidity_amount.safe_add(borrowed)?;
+        ai.borrowed_amount = ai
+            .borrowed_amount
+            .safe_sub(borrowed)
+            .map_err(|_| error!(DexError::InsufficientBorrow))?;
+
+        Ok(())
+    }
+
+    pub fn di_option_add_fund(&mut self, asset_index: u8, fund: u64) -> DexResult {
+        let ai = self.asset_as_mut(asset_index)?;
+
+        ai.liquidity_amount = ai.liquidity_amount.safe_add(fund)?;
+
+        Ok(())
+    }
+
+    pub fn di_option_charge_fee(&mut self, asset_index: u8, fee: u64) -> DexResult {
+        let ai = self.asset_as_mut(asset_index)?;
+        ai.fee_amount = ai.fee_amount.safe_add(fee)?;
 
         Ok(())
     }

@@ -65,6 +65,9 @@ pub enum DexError {
     #[msg("Failed initialize user list")]
     FailedInitializeUserList,
 
+    #[msg("Invalid user list entry page")]
+    InvalidUserListEntryPage,
+
     #[msg(" Failed init match queue")]
     FailedInitMatchQueue,
 
@@ -140,8 +143,11 @@ pub enum DexError {
     #[msg("Insufficient liquidity")]
     InsufficientLiquidity,
 
-    #[msg("Position not existed")]
-    PositionNotExisted,
+    #[msg("Insufficient borrow")]
+    InsufficientBorrow,
+
+    #[msg("Position not exist")]
+    PositionNotExist,
 
     #[msg("Pice greater than market price")]
     PriceGTMarketPrice,
@@ -229,6 +235,48 @@ pub enum DexError {
 
     #[msg("No position size for ask order")]
     NoSizeForAskOrder,
+
+    #[msg("DI option not exist")]
+    DIOptionNotExist,
+
+    #[msg("DI option not expired")]
+    DIOptionNotExpired,
+
+    #[msg("DI option expired")]
+    DIOptionExpired,
+
+    #[msg("DI option not found")]
+    DIOptionNotFound,
+
+    #[msg("Invalid DI option account")]
+    InvalidDIOptionAccount,
+
+    #[msg("Invalid strike price")]
+    InvalidStrikePrice,
+
+    #[msg("Invalid expiry date")]
+    InvalidExpiryDate,
+
+    #[msg("DI option not all settled")]
+    DIOptionNotAllSettled,
+
+    #[msg("Invalid DI admin")]
+    InvalidDIAdmin,
+
+    #[msg("Invalid DI premium")]
+    DIInvalidPremium,
+
+    #[msg("DI size too small")]
+    DIInvalidSize,
+
+    #[msg("DI option no settle price")]
+    DIOptionNoSettlePrice,
+
+    #[msg("DI option dup ID")]
+    DIOptionDupID,
+
+    #[msg("DI dup option")]
+    DIOptionDup,
 }
 
 pub type DexResult<T = ()> = Result<T>;

@@ -18,7 +18,7 @@ export async function createDex(authority: Keypair) {
   const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
 
   await program.methods
-    .initDex(VLP_DECIMALS)
+    .initDex(VLP_DECIMALS, 30)
     .accounts({
       dex: dex.publicKey,
       usdcMint,

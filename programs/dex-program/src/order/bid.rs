@@ -59,7 +59,7 @@ pub struct LimitBid<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-/// Layout of remaining counts:
+/// Layout of remaining accounts:
 /// 1. Order pool remaining pages
 #[allow(clippy::too_many_arguments)]
 pub fn handler(

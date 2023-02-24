@@ -1,7 +1,8 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{borrow::Borrow, cell::RefCell, rc::Rc};
 
 use crate::utils::{
-    compose_add_asset_ix, compose_add_market_ixs, compose_init_dex_ixs,
+    compose_add_asset_ix, compose_add_market_ixs, compose_di_set_admin_ix,
+    compose_di_set_fee_rate_ix, compose_init_dex_ixs,
     constant::{
         INIT_ADD_SOL_AMOUNT, TEST_BTC_ADD_LIQUIDITY_FEE_RATE, TEST_BTC_ASSET_INDEX,
         TEST_BTC_BORROW_FEE_RATE, TEST_BTC_CHARGE_BORROW_FEE_INTERVAL, TEST_BTC_CLOSE_FEE_RATE,
@@ -28,15 +29,25 @@ use crate::utils::{
         TEST_USDC_TARGET_WEIGHT, TEST_VLP_DECIMALS,
     },
     convert_to_big_number, create_mint, create_token_account, get_context, get_dex_info,
-    get_keypair_from_file, get_program, set_mock_oracle, MAX_LEVERAGE,
+    get_keypair_from_file, get_program, set_mock_oracle, MAX_LEVERAGE, TEST_DI_FEE_RATE,
 };
 
 use anchor_client::{
-    solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction},
+    solana_sdk::{
+        clock::UnixTimestamp, signature::Keypair, signer::Signer, sysvar, transaction::Transaction,
+        transport::TransportError,
+    },
     Program,
 };
-use anchor_lang::prelude::Pubkey;
-use dex_program::dex::Dex;
+use anchor_lang::{
+    error,
+    prelude::{Clock, Pubkey},
+};
+use bincode::deserialize;
+use dex_program::{
+    dex::Dex,
+    errors::{DexError, DexResult},
+};
 use solana_program_test::ProgramTestContext;
 
 use crate::context::UserTestContext;
@@ -352,6 +363,94 @@ impl DexTestContext {
             user_context: users,
         }
     }
+
+    pub async fn di_set_fee_rate(&self, admin: &Keypair, fee_rate: u16) -> DexResult {
+        let context = &mut self.context.borrow_mut();
+        let binding = self.dex_info.borrow();
+
+        let ix = compose_di_set_fee_rate_ix(
+            &self.program,
+            admin,
+            &self.dex,
+            &binding.di_option,
+            fee_rate,
+        )
+        .await;
+
+        let transaction = Transaction::new_signed_with_payer(
+            &vec![ix],
+            Some(&admin.pubkey()),
+            &[admin],
+            context.last_blockhash,
+        );
+
+        let res: Result<(), TransportError> = context
+            .banks_client
+            .process_transaction(transaction)
+            .await
+            .map_err(|e| e.into());
+
+        if res.is_ok() {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::DIOptionNotFound));
+        }
+    }
+
+    pub async fn di_set_admin(&self, admin: &Pubkey) {
+        let context = &mut self.context.borrow_mut();
+        let binding = self.dex_info.borrow();
+
+        let ix = compose_di_set_admin_ix(
+            &self.program,
+            &self.admin,
+            &self.dex,
+            &binding.di_option,
+            admin,
+        )
+        .await;
+
+        let transaction = Transaction::new_signed_with_payer(
+            &vec![ix],
+            Some(&self.admin.pubkey()),
+            &[&self.admin],
+            context.last_blockhash,
+        );
+
+        context
+            .banks_client
+            .process_transaction(transaction)
+            .await
+            .unwrap();
+    }
+
+    pub async fn decode_account<T: serde::de::DeserializeOwned>(&self, address: &Pubkey) -> T {
+        self.context
+            .borrow_mut()
+            .banks_client
+            .get_account(*address)
+            .await
+            .unwrap()
+            .map(|a| deserialize::<T>(&a.data.borrow()).unwrap())
+            .expect(format!("Get Account Error {}", address).as_str())
+    }
+
+    pub async fn get_clock(&self) -> Clock {
+        self.decode_account::<Clock>(&sysvar::clock::id()).await
+    }
+
+    pub async fn advance_clock(&self, unix_timestamp: UnixTimestamp) {
+        let mut clock: Clock = self.get_clock().await;
+
+        while clock.unix_timestamp <= unix_timestamp {
+            self.context
+                .borrow_mut()
+                .warp_to_slot(clock.slot + 400)
+                .unwrap();
+
+            clock = self.get_clock().await;
+        }
+    }
 }
 
 pub async fn add_market(
@@ -522,6 +621,7 @@ pub async fn init_dex(
     let event_queue = Keypair::new();
     let match_queue = Keypair::new();
     let user_list_entry_page = Keypair::new();
+    let di_option = Keypair::new();
     let reward_mint = spl_token::native_mint::id();
 
     let vlp_decimals = TEST_VLP_DECIMALS;
@@ -535,8 +635,10 @@ pub async fn init_dex(
         &event_queue,
         &match_queue,
         &user_list_entry_page,
+        &di_option,
         &reward_mint,
         vlp_decimals,
+        TEST_DI_FEE_RATE,
     )
     .await;
 
@@ -546,6 +648,7 @@ pub async fn init_dex(
     signers.push(&event_queue);
     signers.push(&match_queue);
     signers.push(&user_list_entry_page);
+    signers.push(&di_option);
 
     let transaction = Transaction::new_signed_with_payer(
         &init_dex_ixs,

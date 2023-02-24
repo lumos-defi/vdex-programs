@@ -56,7 +56,7 @@ pub struct ClosePosition<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-// Layout of remaining counts:
+// Layout of remaining accounts:
 //  offset 0 ~ n: user_list remaining pages
 pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;

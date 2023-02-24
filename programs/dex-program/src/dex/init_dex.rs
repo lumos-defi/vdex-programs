@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{
     collections::{EventQueue, MountMode, PagedList, SingleEventQueue},
     dex::state::*,
+    dual_invest::DI,
     errors::{DexError, DexResult},
     order::MatchEvent,
     utils::{DEX_MAGIC_NUMBER, USER_LIST_MAGIC_BYTE},
@@ -33,9 +34,13 @@ pub struct InitDex<'info> {
 
     /// CHECK
     pub reward_mint: UncheckedAccount<'info>,
+
+    /// CHECK
+    #[account(mut, constraint= di_option.owner == program_id)]
+    pub di_option: UncheckedAccount<'info>,
 }
 
-pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
+pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8, di_fee_rate: u16) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_init()?;
 
     dex.magic = DEX_MAGIC_NUMBER;
@@ -43,6 +48,7 @@ pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
     dex.event_queue = ctx.accounts.event_queue.key();
     dex.match_queue = ctx.accounts.match_queue.key();
     dex.usdc_mint = ctx.accounts.usdc_mint.key();
+    dex.di_option = ctx.accounts.di_option.key();
     dex.user_list_entry_page = ctx.accounts.user_list_entry_page.key();
     dex.user_list_remaining_pages_number = 0;
     dex.assets_number = 0;
@@ -72,5 +78,10 @@ pub fn handler(ctx: Context<InitDex>, vlp_decimals: u8) -> DexResult {
     )
     .map_err(|_| DexError::FailedInitializeUserList)?;
 
-    Ok(())
+    DI::initialize(
+        &mut ctx.accounts.di_option,
+        64u8,
+        ctx.accounts.authority.key(),
+        di_fee_rate,
+    )
 }

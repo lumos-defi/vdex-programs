@@ -20,6 +20,7 @@ pub struct Crank<'info> {
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
+    #[account(mut)]
     pub user: AccountInfo<'info>,
 
     /// CHECK
@@ -82,7 +83,7 @@ pub struct Crank<'info> {
     pub system_program: AccountInfo<'info>,
 }
 
-/// Layout of remaining counts:
+/// Layout of remaining accounts:
 ///  offset 0 ~ n: user_list remaining pages
 pub fn handler(ctx: Context<Crank>) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;

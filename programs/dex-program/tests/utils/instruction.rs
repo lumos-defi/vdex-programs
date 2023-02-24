@@ -10,10 +10,12 @@ use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
     accounts::{
         AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClosePosition, Crank,
-        CreateUserState, FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, LimitAsk,
-        LimitBid, OpenPosition, RemoveLiquidity, Swap,
+        CreateUserState, DiBuy, DiCreateOption, DiRemoveOption, DiSetAdmin, DiSetFeeRate,
+        DiSetSettlePrice, DiSettle, DiUpdateOption, FeedMockOraclePrice, FillOrder, InitDex,
+        InitMockOracle, LimitAsk, LimitBid, OpenPosition, RemoveLiquidity, Swap,
     },
     dex::Dex,
+    dual_invest::DI,
 };
 use solana_program_test::ProgramTestContext;
 
@@ -28,14 +30,17 @@ pub async fn compose_init_dex_ixs(
     event_queue: &Keypair,
     match_queue: &Keypair,
     user_list_entry_page: &Keypair,
+    di_option: &Keypair,
     reward_mint: &Pubkey,
     vlp_decimals: u8,
+    di_fee_rate: u16,
 ) -> Vec<Instruction> {
     let rent = context.banks_client.get_rent().await.unwrap();
     let dex_account_size = 8 + mem::size_of::<Dex>();
     let event_queue_account_size = 16 * 1024;
     let match_queue_account_size = 16 * 1024;
     let user_list_entry_page_account_size = 4 * 1024;
+    let di_option_account_size = DI::required_account_size(64u8);
 
     let init_dex_ixs = program
         .request()
@@ -67,6 +72,13 @@ pub async fn compose_init_dex_ixs(
             user_list_entry_page_account_size as u64,
             &program.id(),
         ))
+        .instruction(system_instruction::create_account(
+            &payer.pubkey(),
+            &di_option.pubkey(),
+            rent.minimum_balance(di_option_account_size),
+            di_option_account_size as u64,
+            &program.id(),
+        ))
         .accounts(InitDex {
             dex: dex.pubkey(),
             usdc_mint: usdc_mint.pubkey(),
@@ -75,8 +87,12 @@ pub async fn compose_init_dex_ixs(
             match_queue: match_queue.pubkey(),
             user_list_entry_page: user_list_entry_page.pubkey(),
             reward_mint: *reward_mint,
+            di_option: di_option.pubkey(),
         })
-        .args(dex_program::instruction::InitDex { vlp_decimals })
+        .args(dex_program::instruction::InitDex {
+            vlp_decimals,
+            di_fee_rate,
+        })
         .instructions()
         .unwrap();
 
@@ -249,6 +265,7 @@ pub async fn compose_init_user_state_ixs(
 ) -> Vec<Instruction> {
     let order_slot_count: u8 = 32;
     let position_slot_count: u8 = 32;
+    let di_option_slot_count: u8 = 32;
 
     let init_user_state_ixs = program
         .request()
@@ -261,6 +278,7 @@ pub async fn compose_init_user_state_ixs(
         .args(dex_program::instruction::CreateUserState {
             order_slot_count,
             position_slot_count,
+            di_option_slot_count,
         })
         .instructions()
         .unwrap();
@@ -693,6 +711,264 @@ pub async fn compose_market_swap_ix(
             token_program: spl_token::id(),
         })
         .args(dex_program::instruction::Swap { amount })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_set_fee_rate_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    fee_rate: u16,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiSetFeeRate {
+            dex: *dex,
+            di_option: *di_option,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiSetFeeRate { fee_rate })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_set_admin_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    admin: &Pubkey,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiSetAdmin {
+            dex: *dex,
+            di_option: *di_option,
+            admin: *admin,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiSetAdmin {})
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_create_option_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    base_asset_oracle: &Pubkey,
+    id: u64,
+    is_call: bool,
+    base_asset_index: u8,
+    quote_asset_index: u8,
+    premium_rate: u16,
+    expiry_date: i64,
+    strike_price: u64,
+    minimum_open_size: u64,
+    maximum_open_size: u64,
+    stop_before_expiry: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiCreateOption {
+            dex: *dex,
+            di_option: *di_option,
+            base_asset_oracle: *base_asset_oracle,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiCreateOption {
+            id,
+            is_call,
+            base_asset_index,
+            quote_asset_index,
+            premium_rate,
+            expiry_date,
+            strike_price,
+            minimum_open_size,
+            maximum_open_size,
+            stop_before_expiry,
+        })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_set_settle_price_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    id: u64,
+    price: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiSetSettlePrice {
+            dex: *dex,
+            di_option: *di_option,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiSetSettlePrice { id, price })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_update_option_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    id: u64,
+    premium_rate: u16,
+    stop: bool,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiUpdateOption {
+            dex: *dex,
+            di_option: *di_option,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiUpdateOption {
+            id,
+            premium_rate,
+            stop,
+        })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_remove_option_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    event_queue: &Pubkey,
+    id: u64,
+    force: bool,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiRemoveOption {
+            dex: *dex,
+            di_option: *di_option,
+            event_queue: *event_queue,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::DiRemoveOption { id, force })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_buy_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    base_asset_oracle: &Pubkey,
+    in_mint: &Pubkey,
+    in_mint_vault: &Pubkey,
+    user_mint_acc: &Pubkey,
+    user_state: &Pubkey,
+    user_list_entry_page: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    id: u64,
+    premium_rate: u16,
+    size: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiBuy {
+            dex: *dex,
+            di_option: *di_option,
+            base_asset_oracle: *base_asset_oracle,
+            in_mint: *in_mint,
+            in_mint_vault: *in_mint_vault,
+            user_mint_acc: *user_mint_acc,
+            user_state: *user_state,
+            user_list_entry_page: *user_list_entry_page,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::DiBuy {
+            id,
+            premium_rate,
+            size,
+        })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_settle_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    di_option: &Pubkey,
+    user: &Pubkey,
+    user_state: &Pubkey,
+    user_base_mint_acc: &Pubkey,
+    user_quote_mint_acc: &Pubkey,
+    base_mint: &Pubkey,
+    quote_mint: &Pubkey,
+    quote_asset_oracle: &Pubkey,
+    base_mint_vault: &Pubkey,
+    quote_mint_vault: &Pubkey,
+    base_asset_program_signer: &Pubkey,
+    quote_asset_program_signer: &Pubkey,
+    event_queue: &Pubkey,
+    user_list_entry_page: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    id: u64,
+    force: bool,
+    settle_price: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiSettle {
+            dex: *dex,
+            di_option: *di_option,
+            user: *user,
+            user_state: *user_state,
+            user_base_mint_acc: *user_base_mint_acc,
+            user_quote_mint_acc: *user_quote_mint_acc,
+            base_mint: *base_mint,
+            quote_mint: *quote_mint,
+            quote_asset_oracle: *quote_asset_oracle,
+            base_mint_vault: *base_mint_vault,
+            quote_mint_vault: *quote_mint_vault,
+            base_asset_program_signer: *base_asset_program_signer,
+            quote_asset_program_signer: *quote_asset_program_signer,
+            event_queue: *event_queue,
+            user_list_entry_page: *user_list_entry_page,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+            system_program: system_program::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::DiSettle {
+            id,
+            force,
+            settle_price,
+        })
         .instructions()
         .unwrap()
         .pop()
