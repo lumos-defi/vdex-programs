@@ -1807,13 +1807,30 @@ impl UserTestContext {
         force: bool,
         settle_price: u64,
     ) -> DexResult {
-        // let option = self.di_read_option(id).await;
+        let di_account = self.get_account(self.dex_info.borrow().di_option).await;
+        let di = DI::mount_buf(di_account.data).unwrap();
+        let di_ref = di.borrow();
+
+        let actual_settle_price = if let Ok(slot) = di_ref.find_option(id) {
+            slot.data.settle_price
+        } else {
+            if !force {
+                return Err(error!(DexError::DIOptionNotFound));
+            }
+            settle_price
+        };
+
         let options = self.di_collect_user_options(user, id).await;
         let option = if options.len() > 0 {
             options.get(0).unwrap()
         } else {
-            println!("+++++++++++++");
             return Err(error!(DexError::DIOptionNotFound));
+        };
+
+        let exercised = if option.is_call {
+            actual_settle_price >= option.strike_price
+        } else {
+            actual_settle_price <= option.strike_price
         };
 
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
@@ -1828,6 +1845,20 @@ impl UserTestContext {
             &self.program.id(),
         );
 
+        let (mint, mint_vault, asset_program_signer) = if option.is_call {
+            if exercised {
+                (qai.mint, qai.vault, qai.program_signer)
+            } else {
+                (bai.mint, bai.vault, bai.program_signer)
+            }
+        } else {
+            if exercised {
+                (bai.mint, bai.vault, bai.program_signer)
+            } else {
+                (qai.mint, qai.vault, qai.program_signer)
+            }
+        };
+
         if let Ok(_) = set_di_settle::setup(
             context,
             &self.program,
@@ -1836,13 +1867,10 @@ impl UserTestContext {
             &self.dex_info.borrow().di_option,
             user,
             &user_state,
-            &bai.mint,
-            &qai.mint,
+            &mint,
             &qai.oracle,
-            &bai.vault,
-            &qai.vault,
-            &bai.program_signer,
-            &qai.program_signer,
+            &mint_vault,
+            &asset_program_signer,
             &self.dex_info.borrow().event_queue,
             &self.dex_info.borrow().user_list_entry_page,
             remaining_accounts,

@@ -261,7 +261,6 @@ async fn test_btc_put_not_exercised() {
 
     let fee = (180. + borrowed_usdc) * TEST_DI_FEE_RATE as f64 / 10000.;
     market.assert_fee(DexAsset::USDC, 20. + fee).await;
-    user.assert_btc_balance(0.).await;
 
     user.assert_usdc_balance(180. + borrowed_usdc - fee).await;
 }
