@@ -268,9 +268,16 @@ impl<'a> DI<'a> {
         let option = self.find_option(id)?;
 
         let date = get_timestamp()?;
-        if date < option.data.expiry_date {
-            return Err(error!(DexError::DIOptionNotExpired));
+
+        if option.data.volume == 0 {
+            self.options.remove(option.index)?;
+            return Ok(());
         }
+
+        require!(
+            date >= option.data.expiry_date,
+            DexError::DIOptionNotExpired
+        );
 
         if !force {
             require!(
@@ -293,5 +300,16 @@ impl<'a> DI<'a> {
 
     pub fn get_di_option(&self, id: u64) -> DexResult<DIOption> {
         Ok(self.find_option(id)?.data)
+    }
+
+    #[cfg(feature = "client-support")]
+    pub fn collect(&self) -> Vec<DIOption> {
+        let mut options: Vec<DIOption> = vec![];
+
+        for o in self.options.into_iter() {
+            options.push(o.data);
+        }
+
+        options
     }
 }

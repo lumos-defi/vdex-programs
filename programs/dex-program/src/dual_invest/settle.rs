@@ -1,6 +1,6 @@
 use crate::{
     collections::{EventQueue, MountMode, PagedList},
-    dex::{event::AppendEvent, get_oracle_price, Dex, UserListItem},
+    dex::{event::AppendEvent, get_oracle_price, AssetInfo, Dex, UserListItem},
     dual_invest::DI,
     errors::{DexError, DexResult},
     position::update_user_serial_number,
@@ -28,41 +28,21 @@ pub struct DiSettle<'info> {
     #[account(mut, seeds = [dex.key().as_ref(), user.key().as_ref()], bump)]
     pub user_state: UncheckedAccount<'info>,
 
-    #[account(
-        mut,
-        constraint = (user_base_mint_acc.mint == *base_mint.key)
-    )]
-    pub user_base_mint_acc: Box<Account<'info, TokenAccount>>,
-
-    #[account(
-        mut,
-        constraint = (user_quote_mint_acc.owner == *user.key && user_quote_mint_acc.mint == *quote_mint.key)
-    )]
-    pub user_quote_mint_acc: Box<Account<'info, TokenAccount>>,
-
     /// CHECK
-    pub base_mint: AccountInfo<'info>,
-
-    /// CHECK
-    pub quote_mint: AccountInfo<'info>,
+    #[account(mut)]
+    pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
     /// CHECK
     pub quote_asset_oracle: AccountInfo<'info>,
 
     /// CHECK
     #[account(mut)]
-    pub base_mint_vault: AccountInfo<'info>,
+    pub mint_vault: AccountInfo<'info>,
 
     /// CHECK
-    #[account(mut)]
-    pub quote_mint_vault: AccountInfo<'info>,
+    pub asset_program_signer: AccountInfo<'info>,
 
     /// CHECK
-    pub base_asset_program_signer: AccountInfo<'info>,
-
-    /// CHECK
-    pub quote_asset_program_signer: AccountInfo<'info>,
-
     #[account(mut)]
     pub authority: Signer<'info>,
 
@@ -83,26 +63,41 @@ pub struct DiSettle<'info> {
     pub system_program: AccountInfo<'info>,
 }
 
-fn withdraw(
-    ctx: &Context<DiSettle>,
-    is_base_mint: bool,
-    seeds: &[&[u8]; 3],
-    amount: u64,
-) -> DexResult {
+fn validate_accounts(ctx: &Context<DiSettle>, is_base: bool, ai: &AssetInfo) -> DexResult {
+    require!(
+        ai.vault == ctx.accounts.mint_vault.key(),
+        DexError::InvalidVault
+    );
+
+    require!(
+        ai.program_signer == ctx.accounts.asset_program_signer.key(),
+        DexError::InvalidProgramSigner
+    );
+
+    if is_base && ai.mint == token::spl_token::native_mint::id() {
+        require!(
+            ctx.accounts.user_mint_acc.owner == ctx.accounts.authority.key()
+                && ctx.accounts.user_mint_acc.mint == ai.mint,
+            DexError::InvalidUserMintAccount
+        );
+    } else {
+        require!(
+            ctx.accounts.user_mint_acc.owner == ctx.accounts.user.key()
+                && ctx.accounts.user_mint_acc.mint == ai.mint,
+            DexError::InvalidUserMintAccount
+        );
+    }
+
+    Ok(())
+}
+
+fn withdraw(ctx: &Context<DiSettle>, seeds: &[&[u8]; 3], amount: u64) -> DexResult {
     let signer_seeds = &[&seeds[..]];
 
-    let cpi_accounts = if is_base_mint {
-        Transfer {
-            from: ctx.accounts.base_mint_vault.to_account_info(),
-            to: ctx.accounts.user_base_mint_acc.to_account_info(),
-            authority: ctx.accounts.base_asset_program_signer.to_account_info(),
-        }
-    } else {
-        Transfer {
-            from: ctx.accounts.quote_mint_vault.to_account_info(),
-            to: ctx.accounts.user_quote_mint_acc.to_account_info(),
-            authority: ctx.accounts.quote_asset_program_signer.to_account_info(),
-        }
+    let cpi_accounts = Transfer {
+        from: ctx.accounts.mint_vault.to_account_info(),
+        to: ctx.accounts.user_mint_acc.to_account_info(),
+        authority: ctx.accounts.asset_program_signer.to_account_info(),
     };
 
     let cpi_ctx = CpiContext::new_with_signer(
@@ -117,7 +112,7 @@ fn withdraw(
 
 fn relay_native_mint_to_user(ctx: &Context<DiSettle>, lamports: u64) -> DexResult {
     let cpi_close = CloseAccount {
-        account: ctx.accounts.user_base_mint_acc.to_account_info(),
+        account: ctx.accounts.user_mint_acc.to_account_info(),
         destination: ctx.accounts.authority.to_account_info(),
         authority: ctx.accounts.authority.to_account_info(),
     };
@@ -134,7 +129,7 @@ fn relay_native_mint_to_user(ctx: &Context<DiSettle>, lamports: u64) -> DexResul
     system_program::transfer(cpi_ctx, lamports)
 }
 
-//TODO: user base/quote mint acc can be created by bot authority, we need deduct the rent from user's withdrawal amount.
+//TODO: user base/quote mint acc could be non-exist, we need to update the option state and let the user withdraw after creating user mint acc.
 
 // Layout of remaining accounts:
 //  offset 0 ~ n: user_list remaining pages
@@ -162,12 +157,9 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
         );
     }
 
-    // Get strike price
+    // Get settle price
     let actual_settle_price = if let Ok(option) = di.borrow().get_di_option(id) {
-        let now = get_timestamp()?;
-        require!(now >= option.expiry_date, DexError::DIOptionNotExpired);
         require!(option.settle_price != 0, DexError::DIOptionNoSettlePrice);
-
         option.settle_price
     } else {
         require!(force && settle_price != 0, DexError::DIOptionNoSettlePrice);
@@ -177,63 +169,39 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     let (option_slot, option) = us.borrow().get_di_option(id)?;
 
+    let now = get_timestamp()?;
+    require!(now >= option.expiry_date, DexError::DIOptionNotExpired);
+
     let base_ai = dex.asset_as_ref(option.base_asset_index)?;
     let quote_ai = dex.asset_as_ref(option.quote_asset_index)?;
+
+    let base_mint = base_ai.mint;
+    let quote_mint = quote_ai.mint;
+
+    let base_asset_seeds = &[
+        base_mint.as_ref(),
+        ctx.accounts.dex.to_account_info().key.as_ref(),
+        &[base_ai.nonce],
+    ];
+
+    let quote_asset_seeds = &[
+        quote_mint.as_ref(),
+        ctx.accounts.dex.to_account_info().key.as_ref(),
+        &[quote_ai.nonce],
+    ];
 
     require!(
         quote_ai.oracle == ctx.accounts.quote_asset_oracle.key(),
         DexError::InvalidOracle
     );
-    require!(
-        base_ai.mint == ctx.accounts.base_mint.key()
-            && quote_ai.mint == ctx.accounts.quote_mint.key(),
-        DexError::InvalidMint
-    );
-    require!(
-        base_ai.vault == ctx.accounts.base_mint_vault.key()
-            && quote_ai.vault == ctx.accounts.quote_mint_vault.key(),
-        DexError::InvalidVault
-    );
-    require!(
-        base_ai.program_signer == ctx.accounts.base_asset_program_signer.key()
-            && quote_ai.program_signer == ctx.accounts.quote_asset_program_signer.key(),
-        DexError::InvalidProgramSigner
-    );
-
-    if ctx.accounts.base_mint.key() == token::spl_token::native_mint::id() {
-        require!(
-            ctx.accounts.user_base_mint_acc.owner == ctx.accounts.authority.key()
-                && ctx.accounts.user_base_mint_acc.mint == ctx.accounts.base_mint.key(),
-            DexError::InvalidUserMintAccount
-        );
-    } else {
-        require!(
-            ctx.accounts.user_base_mint_acc.owner == ctx.accounts.user.key()
-                && ctx.accounts.user_base_mint_acc.mint == ctx.accounts.base_mint.key(),
-            DexError::InvalidUserMintAccount
-        );
-    }
-
-    let quote_asset_seeds = &[
-        ctx.accounts.quote_mint.key.as_ref(),
-        ctx.accounts.dex.to_account_info().key.as_ref(),
-        &[quote_ai.nonce],
-    ];
-
-    let base_asset_seeds = &[
-        ctx.accounts.base_mint.key.as_ref(),
-        ctx.accounts.dex.to_account_info().key.as_ref(),
-        &[base_ai.nonce],
-    ];
-
-    let base_mint = base_ai.mint.to_bytes();
-    let quote_mint = quote_ai.mint.to_bytes();
 
     let fee_rate = di.borrow().meta.fee_rate as u64;
 
     let fee = if option.is_call {
         if actual_settle_price >= option.strike_price {
             // Call option, exercised, swap base asset to quote asset, return quote asset + premium to user
+            validate_accounts(&ctx, false, quote_ai)?;
+
             let quote_asset_price =
                 get_oracle_price(quote_ai.oracle_source, &ctx.accounts.quote_asset_oracle)?;
 
@@ -275,11 +243,13 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
             let withdrawable = total.safe_sub(fee)?;
 
             dex.di_option_charge_fee(option.quote_asset_index, fee)?;
-            withdraw(&ctx, false, quote_asset_seeds, withdrawable)?;
+            withdraw(&ctx, quote_asset_seeds, withdrawable)?;
 
             fee
         } else {
             // Call option, not exercised, return base asset + premium to user
+            validate_accounts(&ctx, true, base_ai)?;
+
             let total = option.size + option.borrowed_base_funds;
 
             dex.di_option_loss(option.base_asset_index, option.borrowed_base_funds)?;
@@ -289,11 +259,11 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
             dex.di_option_charge_fee(option.base_asset_index, fee)?;
 
             let withdrawable = total.safe_sub(fee)?;
-            withdraw(&ctx, true, base_asset_seeds, withdrawable)?;
+            withdraw(&ctx, base_asset_seeds, withdrawable)?;
 
             // If base mint is SOL,we can't create a temp WSOL account for the end user(we are settling, no user sign),
             // so have to use the authority as a "replay" to transfer the native mint to user
-            if ctx.accounts.base_mint.key() == token::spl_token::native_mint::id() {
+            if base_mint == token::spl_token::native_mint::id() {
                 relay_native_mint_to_user(&ctx, withdrawable)?;
             }
 
@@ -302,6 +272,8 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
     } else {
         if actual_settle_price <= option.strike_price {
             // Put option, exercised, swap quote asset to base asset, return base asset + premium to user
+            validate_accounts(&ctx, true, base_ai)?;
+
             let quote_asset_price =
                 get_oracle_price(quote_ai.oracle_source, &ctx.accounts.quote_asset_oracle)?;
 
@@ -343,17 +315,19 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
 
             let withdrawable = total.safe_sub(fee)?;
 
-            withdraw(&ctx, true, base_asset_seeds, withdrawable)?;
+            withdraw(&ctx, base_asset_seeds, withdrawable)?;
 
             // If base mint is SOL,we can't create a temp WSOL account for the end user(we are settling, no user sign),
             // so have to use the authority as a "replay" to transfer the native mint to user
-            if ctx.accounts.base_mint.key() == token::spl_token::native_mint::id() {
+            if base_mint == token::spl_token::native_mint::id() {
                 relay_native_mint_to_user(&ctx, withdrawable)?;
             }
 
             fee
         } else {
             // Put option, not exercised
+            validate_accounts(&ctx, false, quote_ai)?;
+
             let total = option.size + option.borrowed_quote_funds;
 
             dex.di_option_loss(option.quote_asset_index, option.borrowed_quote_funds)?;
@@ -363,7 +337,7 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
             dex.di_option_charge_fee(option.quote_asset_index, fee)?;
 
             let withdrawable = total.safe_sub(fee)?;
-            withdraw(&ctx, false, quote_asset_seeds, withdrawable)?;
+            withdraw(&ctx, quote_asset_seeds, withdrawable)?;
 
             fee
         }
@@ -379,8 +353,8 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
     event_queue.settle_di_option(
         user_state_key,
-        base_mint,
-        quote_mint,
+        base_mint.to_bytes(),
+        quote_mint.to_bytes(),
         option.expiry_date,
         option.strike_price,
         actual_settle_price,

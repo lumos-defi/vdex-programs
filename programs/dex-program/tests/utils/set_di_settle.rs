@@ -21,13 +21,10 @@ pub async fn setup(
     di_option: &Pubkey,
     user: &Pubkey,
     user_state: &Pubkey,
-    base_mint: &Pubkey,
-    quote_mint: &Pubkey,
+    mint: &Pubkey,
     quote_asset_oracle: &Pubkey,
-    base_mint_vault: &Pubkey,
-    quote_mint_vault: &Pubkey,
-    base_asset_program_signer: &Pubkey,
-    quote_asset_program_signer: &Pubkey,
+    mint_vault: &Pubkey,
+    asset_program_signer: &Pubkey,
     event_queue: &Pubkey,
     user_list_entry_page: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
@@ -37,31 +34,19 @@ pub async fn setup(
 ) -> Result<(), TransportError> {
     let user_wsol_acc = Keypair::new();
 
-    let user_base_mint_acc = if *base_mint == spl_token::native_mint::id() {
-        create_token_account(
-            context,
-            payer,
-            &user_wsol_acc,
-            base_mint,
-            &payer.pubkey(),
-            0,
-        )
-        .await
-        .unwrap();
+    let user_mint_acc = if *mint == spl_token::native_mint::id() {
+        create_token_account(context, payer, &user_wsol_acc, mint, &payer.pubkey(), 0)
+            .await
+            .unwrap();
         user_wsol_acc.pubkey()
     } else {
-        let acc = get_associated_token_address(user, base_mint);
+        let acc = get_associated_token_address(user, mint);
         if let Ok(None) = context.banks_client.get_account(acc).await {
-            create_associated_token_account(context, payer, user, base_mint).await
+            create_associated_token_account(context, payer, user, mint).await
         }
 
         acc
     };
-
-    let user_quote_mint_acc = get_associated_token_address(user, quote_mint);
-    if let Ok(None) = context.banks_client.get_account(user_quote_mint_acc).await {
-        create_associated_token_account(context, payer, user, quote_mint).await
-    }
 
     let di_settle_ix = compose_di_settle_ix(
         program,
@@ -70,15 +55,10 @@ pub async fn setup(
         di_option,
         user,
         user_state,
-        &user_base_mint_acc,
-        &user_quote_mint_acc,
-        base_mint,
-        quote_mint,
+        &user_mint_acc,
         quote_asset_oracle,
-        base_mint_vault,
-        quote_mint_vault,
-        base_asset_program_signer,
-        quote_asset_program_signer,
+        mint_vault,
+        asset_program_signer,
         event_queue,
         user_list_entry_page,
         remaining_accounts,
