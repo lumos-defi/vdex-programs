@@ -129,7 +129,7 @@ fn relay_native_mint_to_user(ctx: &Context<DiSettle>, lamports: u64) -> DexResul
     system_program::transfer(cpi_ctx, lamports)
 }
 
-//TODO: user base/quote mint acc can be created by bot authority, we need deduct the rent from user's withdrawal amount.
+//TODO: user base/quote mint acc could be non-exist, we need to update the option state and let the user withdraw after creating user mint acc.
 
 // Layout of remaining accounts:
 //  offset 0 ~ n: user_list remaining pages
