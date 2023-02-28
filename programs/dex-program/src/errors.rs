@@ -277,6 +277,9 @@ pub enum DexError {
 
     #[msg("DI dup option")]
     DIOptionDup,
+
+    #[msg("DI option not settled")]
+    DIOptionNotSettled,
 }
 
 pub type DexResult<T = ()> = Result<T>;

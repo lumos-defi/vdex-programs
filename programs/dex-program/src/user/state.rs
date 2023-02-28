@@ -171,7 +171,9 @@ pub struct UserDIOption {
     pub base_asset_index: u8,
     pub quote_asset_index: u8,
     pub is_call: bool,
-    padding: [u8; 3],
+    pub exercised: bool,
+    pub settled: bool,
+    padding: u8,
 }
 
 impl UserDIOption {
@@ -567,7 +569,7 @@ impl<'a> UserState<'a> {
         self.meta.vlp.staked.min(amount)
     }
 
-    pub fn new_di_option(
+    pub fn di_new_option(
         &mut self,
         raw: &DIOption,
         size: u64,
@@ -584,7 +586,7 @@ impl<'a> UserState<'a> {
         Ok(())
     }
 
-    pub fn get_di_option(&self, id: u64) -> DexResult<(u8, UserDIOption)> {
+    pub fn di_get_option(&self, id: u64) -> DexResult<(u8, UserDIOption)> {
         let lookup = self.di_option_pool.into_iter().find(|x| x.data.id == id);
         if let Some(p) = lookup {
             return Ok((p.index, p.data));
@@ -593,8 +595,61 @@ impl<'a> UserState<'a> {
         return Err(error!(DexError::DIOptionNotFound));
     }
 
-    pub fn remove_di_option(&mut self, slot: u8) -> DexResult {
+    pub fn di_remove_option(&mut self, slot: u8) -> DexResult {
         self.di_option_pool.remove(slot)
+    }
+
+    pub fn di_settle_option(&mut self, slot: u8, exercised: bool, withdrawable: u64) -> DexResult {
+        let option = self.di_option_pool.from_index(slot)?;
+        if option.data.is_call {
+            if exercised {
+                option.data.borrowed_quote_funds = withdrawable;
+                option.data.borrowed_base_funds = 0;
+            } else {
+                option.data.borrowed_base_funds = withdrawable;
+                option.data.borrowed_quote_funds = 0;
+            }
+        } else {
+            if exercised {
+                option.data.borrowed_base_funds = withdrawable;
+                option.data.borrowed_quote_funds = 0;
+            } else {
+                option.data.borrowed_quote_funds = withdrawable;
+                option.data.borrowed_base_funds = 0;
+            }
+        }
+
+        option.data.exercised = exercised;
+        option.data.settled = true;
+
+        Ok(())
+    }
+
+    pub fn di_withdraw_from_settled_option(&mut self, id: u64) -> DexResult<(u8, u64)> {
+        let lookup = self.di_option_pool.into_iter().find(|x| x.data.id == id);
+        if let Some(p) = lookup {
+            require!(p.data.settled, DexError::DIOptionNotSettled);
+
+            let (asset_index, withdrawable) = if p.data.is_call {
+                if p.data.exercised {
+                    (p.data.quote_asset_index, p.data.borrowed_quote_funds)
+                } else {
+                    (p.data.base_asset_index, p.data.borrowed_base_funds)
+                }
+            } else {
+                if p.data.exercised {
+                    (p.data.base_asset_index, p.data.borrowed_base_funds)
+                } else {
+                    (p.data.quote_asset_index, p.data.borrowed_quote_funds)
+                }
+            };
+
+            self.di_option_pool.remove(p.index)?;
+
+            return Ok((asset_index, withdrawable));
+        }
+
+        return Err(error!(DexError::DIOptionNotFound));
     }
 
     #[cfg(feature = "client-support")]

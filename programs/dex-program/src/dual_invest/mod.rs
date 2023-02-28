@@ -7,6 +7,7 @@ pub mod set_settle_price;
 pub mod settle;
 pub mod state;
 pub mod update;
+pub mod withdraw_settled;
 
 pub use buy::*;
 pub use create::*;
@@ -17,3 +18,4 @@ pub use set_settle_price::*;
 pub use settle::*;
 pub use state::*;
 pub use update::*;
+pub use withdraw_settled::*;

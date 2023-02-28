@@ -1901,7 +1901,7 @@ impl UserTestContext {
             (&self.user_state, true, &mut user_state_account).into();
 
         let us = UserState::mount(&user_state_account_info, true).unwrap();
-        let (_, option) = us.borrow().get_di_option(id).assert_unwrap();
+        let (_, option) = us.borrow().di_get_option(id).assert_unwrap();
 
         assert_eq!(option.is_call, true);
         assert_eq!(option.size, size);
@@ -1928,7 +1928,7 @@ impl UserTestContext {
             (&self.user_state, true, &mut user_state_account).into();
 
         let us = UserState::mount(&user_state_account_info, true).unwrap();
-        let (_, option) = us.borrow().get_di_option(id).assert_unwrap();
+        let (_, option) = us.borrow().di_get_option(id).assert_unwrap();
 
         assert_eq!(option.is_call, false);
         assert_eq!(option.size, size);
