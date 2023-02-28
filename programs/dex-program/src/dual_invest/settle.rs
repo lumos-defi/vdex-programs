@@ -329,7 +329,6 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
 
             if user_mint_acc.is_some() {
                 withdraw(&ctx, base_asset_seeds, withdrawable)?;
-            } else {
             }
 
             // If base mint is SOL,we can't create a temp WSOL account for the end user(we are settling, no user sign),
@@ -355,7 +354,6 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
 
             if user_mint_acc.is_some() {
                 withdraw(&ctx, quote_asset_seeds, withdrawable)?;
-            } else {
             }
 
             (false, withdrawable, fee)
