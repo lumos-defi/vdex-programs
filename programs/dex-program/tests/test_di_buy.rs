@@ -535,6 +535,8 @@ async fn test_single_user_multiple_btc_call() {
 
     admin.di_update_option(100, 1000, false).await.assert_ok();
 
+    dtc.advance_clock(now + 1).await;
+
     // Another 0.1 btc
     user.di_buy(100, 1000, btc(0.2)).await.assert_ok();
     user.assert_btc_balance(0.).await;
@@ -624,6 +626,8 @@ async fn test_single_user_multiple_btc_put() {
     user.assert_usdc_balance(360.).await;
 
     admin.di_update_option(100, 1000, false).await.assert_ok();
+
+    dtc.advance_clock(now + 1).await;
 
     // Another 360 usdc
     user.di_buy(100, 1000, usdc(360.)).await.assert_ok();

@@ -40,11 +40,11 @@ pub struct DiWithdrawSettled<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-pub fn handler(ctx: Context<DiWithdrawSettled>, id: u64) -> DexResult {
+pub fn handler(ctx: Context<DiWithdrawSettled>, created: u64) -> DexResult {
     let dex = &ctx.accounts.dex.load()?;
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let (asset_index, withdrawable) = us.borrow_mut().di_withdraw_from_settled_option(id)?;
+    let (asset_index, withdrawable) = us.borrow_mut().di_withdraw_from_settled_option(created)?;
 
     let ai = dex.asset_as_ref(asset_index)?;
     require!(ai.mint == ctx.accounts.mint.key(), DexError::InvalidMint);

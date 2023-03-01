@@ -9,15 +9,17 @@ use crate::utils::{
     create_token_account, get_dex_info, get_keypair, get_program, get_token_balance, mint_tokens,
     set_add_liquidity, set_ask, set_bid, set_cancel, set_cancel_all, set_close, set_crank,
     set_di_buy, set_di_create, set_di_remove_option, set_di_set_settle_price, set_di_settle,
-    set_di_update_option, set_feed_mock_oracle, set_fill, set_market_swap, set_open,
-    set_remove_liquidity, set_user_state, transfer, usdc, DexAsset, DexMarket, TEST_SOL_DECIMALS,
-    TEST_USDC_DECIMALS,
+    set_di_update_option, set_di_withdraw_settled, set_feed_mock_oracle, set_fill, set_market_swap,
+    set_open, set_remove_liquidity, set_user_state, transfer, usdc, DexAsset, DexMarket,
+    TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{
         account::Account,
+        instruction::Instruction,
         signature::{read_keypair_file, Keypair},
         signer::Signer,
+        transaction::Transaction,
         transport::TransportError,
     },
     Program,
@@ -1877,6 +1879,94 @@ impl UserTestContext {
             id,
             force,
             settle_price,
+            true,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::DIOptionNotFound));
+        }
+    }
+
+    pub async fn di_settle_with_invalid_user_mint_acc(
+        &self,
+        user: &Pubkey,
+        id: u64,
+        force: bool,
+        settle_price: u64,
+    ) -> DexResult {
+        let di_account = self.get_account(self.dex_info.borrow().di_option).await;
+        let di = DI::mount_buf(di_account.data).unwrap();
+        let di_ref = di.borrow();
+
+        let actual_settle_price = if let Ok(slot) = di_ref.find_option(id) {
+            slot.data.settle_price
+        } else {
+            if !force {
+                return Err(error!(DexError::DIOptionNotFound));
+            }
+            settle_price
+        };
+
+        let options = self.di_collect_user_options(user, id).await;
+        let option = if options.len() > 0 {
+            options.get(0).unwrap()
+        } else {
+            return Err(error!(DexError::DIOptionNotFound));
+        };
+
+        let exercised = if option.is_call {
+            actual_settle_price >= option.strike_price
+        } else {
+            actual_settle_price <= option.strike_price
+        };
+
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let bai = self.dex_info.borrow().assets[option.base_asset_index as usize];
+        let qai = self.dex_info.borrow().assets[option.quote_asset_index as usize];
+
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
+
+        let (user_state, _) = Pubkey::find_program_address(
+            &[&self.dex.to_bytes(), &user.to_bytes()],
+            &self.program.id(),
+        );
+
+        let (mint, mint_vault, asset_program_signer) = if option.is_call {
+            if exercised {
+                (qai.mint, qai.vault, qai.program_signer)
+            } else {
+                (bai.mint, bai.vault, bai.program_signer)
+            }
+        } else {
+            if exercised {
+                (bai.mint, bai.vault, bai.program_signer)
+            } else {
+                (qai.mint, qai.vault, qai.program_signer)
+            }
+        };
+
+        if let Ok(_) = set_di_settle::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.dex_info.borrow().di_option,
+            user,
+            &user_state,
+            &mint,
+            &qai.oracle,
+            &mint_vault,
+            &asset_program_signer,
+            &self.dex_info.borrow().event_queue,
+            &self.dex_info.borrow().user_list_entry_page,
+            remaining_accounts,
+            id,
+            force,
+            settle_price,
+            false,
         )
         .await
         {
@@ -1901,7 +1991,7 @@ impl UserTestContext {
             (&self.user_state, true, &mut user_state_account).into();
 
         let us = UserState::mount(&user_state_account_info, true).unwrap();
-        let (_, option) = us.borrow().di_get_option(id).assert_unwrap();
+        let (_, option) = us.borrow().di_get_option(id, false).assert_unwrap();
 
         assert_eq!(option.is_call, true);
         assert_eq!(option.size, size);
@@ -1928,7 +2018,7 @@ impl UserTestContext {
             (&self.user_state, true, &mut user_state_account).into();
 
         let us = UserState::mount(&user_state_account_info, true).unwrap();
-        let (_, option) = us.borrow().di_get_option(id).assert_unwrap();
+        let (_, option) = us.borrow().di_get_option(id, false).assert_unwrap();
 
         assert_eq!(option.is_call, false);
         assert_eq!(option.size, size);
@@ -1970,5 +2060,101 @@ impl UserTestContext {
         let options = self.di_collect_my_options(id).await;
 
         assert_eq!(options.len(), count);
+    }
+
+    pub async fn assert_di_option_settled(&self, id: u64, exercised: bool, withdrawable: f64) {
+        let options = self.di_collect_my_options(id).await;
+
+        assert_eq!(options.len(), 1);
+
+        assert_eq!(options[0].exercised, exercised);
+
+        if options[0].is_call {
+            if exercised {
+                let ai = self.dex_info.borrow().assets[options[0].quote_asset_index as usize];
+                let amount = (withdrawable * (10u64.pow(ai.decimals as u32) as f64)) as u64;
+                assert_eq!(options[0].borrowed_quote_funds, amount);
+            } else {
+                let ai = self.dex_info.borrow().assets[options[0].base_asset_index as usize];
+                let amount = (withdrawable * (10u64.pow(ai.decimals as u32) as f64)) as u64;
+                assert_eq!(options[0].borrowed_base_funds, amount);
+            }
+        } else {
+            if exercised {
+                let ai = self.dex_info.borrow().assets[options[0].base_asset_index as usize];
+                let amount = (withdrawable * (10u64.pow(ai.decimals as u32) as f64)) as u64;
+                assert_eq!(options[0].borrowed_base_funds, amount);
+            } else {
+                let ai = self.dex_info.borrow().assets[options[0].quote_asset_index as usize];
+                let amount = (withdrawable * (10u64.pow(ai.decimals as u32) as f64)) as u64;
+                assert_eq!(options[0].borrowed_quote_funds, amount);
+            }
+        }
+    }
+
+    pub async fn close_mint_account(&self, asset: DexAsset) {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let ai = self.dex_info.borrow().assets[asset as usize];
+
+        let user_mint_acc = get_associated_token_address(&self.user.pubkey(), &ai.mint);
+
+        let close_account_ix = spl_token::instruction::close_account(
+            &spl_token::id(),
+            &user_mint_acc,
+            &self.user.pubkey(),
+            &self.user.pubkey(),
+            &[&self.user.pubkey()],
+        )
+        .unwrap();
+
+        let instructions: Vec<Instruction> = vec![close_account_ix];
+
+        let transaction = Transaction::new_signed_with_payer(
+            &instructions,
+            Some(&self.user.pubkey()),
+            &[&self.user],
+            context.banks_client.get_latest_blockhash().await.unwrap(),
+        );
+
+        context
+            .banks_client
+            .process_transaction_with_preflight(transaction)
+            .await
+            .assert_ok();
+    }
+
+    pub async fn create_mint_account(&self, asset: DexAsset) {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let ai = self.dex_info.borrow().assets[asset as usize];
+        create_associated_token_account(context, &self.user, &self.user.pubkey(), &ai.mint).await
+    }
+
+    pub async fn di_withdraw_settled(&self, created: u64) -> DexResult {
+        let user_state_account = self.get_account(self.user_state).await;
+        let us = UserState::mount_buf(user_state_account.data).unwrap();
+
+        let (asset_index, _) = us.borrow().di_read_created_option(created)?;
+        let ai = self.dex_info.borrow().assets[asset_index as usize];
+
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+        if let Ok(_) = set_di_withdraw_settled::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.user_state,
+            &ai.mint,
+            &ai.vault,
+            &ai.program_signer,
+            created,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::DIOptionNotFound));
+        }
     }
 }

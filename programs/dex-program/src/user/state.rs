@@ -180,12 +180,13 @@ impl UserDIOption {
     pub fn init(
         &mut self,
         option: &DIOption,
+        created: u64,
         size: u64,
         borrow_base_funds: u64,
         borrow_quote_funds: u64,
     ) -> DexResult {
         self.id = option.id;
-        self.created = get_timestamp()? as u64;
+        self.created = created;
         self.expiry_date = option.expiry_date;
         self.strike_price = option.strike_price;
         self.size = size;
@@ -576,18 +577,31 @@ impl<'a> UserState<'a> {
         borrow_base_funds: u64,
         borrow_quote_funds: u64,
     ) -> DexResult {
+        let created = get_timestamp()? as u64;
+        let dup = self
+            .di_option_pool
+            .into_iter()
+            .find(|x| x.data.created == created);
+
+        if dup.is_some() {
+            return Err(error!(DexError::DIOptionDupID));
+        }
+
         let option = self.di_option_pool.new_slot()?;
         option
             .data
-            .init(raw, size, borrow_base_funds, borrow_quote_funds)?;
+            .init(raw, created, size, borrow_base_funds, borrow_quote_funds)?;
 
         self.di_option_pool.add_to_tail(option)?;
 
         Ok(())
     }
 
-    pub fn di_get_option(&self, id: u64) -> DexResult<(u8, UserDIOption)> {
-        let lookup = self.di_option_pool.into_iter().find(|x| x.data.id == id);
+    pub fn di_get_option(&self, id: u64, settled: bool) -> DexResult<(u8, UserDIOption)> {
+        let lookup = self
+            .di_option_pool
+            .into_iter()
+            .find(|x| x.data.id == id && x.data.settled == settled);
         if let Some(p) = lookup {
             return Ok((p.index, p.data));
         }
@@ -625,8 +639,11 @@ impl<'a> UserState<'a> {
         Ok(())
     }
 
-    pub fn di_withdraw_from_settled_option(&mut self, id: u64) -> DexResult<(u8, u64)> {
-        let lookup = self.di_option_pool.into_iter().find(|x| x.data.id == id);
+    pub fn di_withdraw_from_settled_option(&mut self, created: u64) -> DexResult<(u8, u64)> {
+        let lookup = self
+            .di_option_pool
+            .into_iter()
+            .find(|x| x.data.created == created);
         if let Some(p) = lookup {
             require!(p.data.settled, DexError::DIOptionNotSettled);
 
@@ -663,6 +680,35 @@ impl<'a> UserState<'a> {
         }
 
         options
+    }
+
+    #[cfg(feature = "client-support")]
+    pub fn di_read_created_option(&self, created: u64) -> DexResult<(u8, u64)> {
+        let lookup = self
+            .di_option_pool
+            .into_iter()
+            .find(|x| x.data.created == created);
+        if let Some(p) = lookup {
+            require!(p.data.settled, DexError::DIOptionNotSettled);
+
+            let (asset_index, withdrawable) = if p.data.is_call {
+                if p.data.exercised {
+                    (p.data.quote_asset_index, p.data.borrowed_quote_funds)
+                } else {
+                    (p.data.base_asset_index, p.data.borrowed_base_funds)
+                }
+            } else {
+                if p.data.exercised {
+                    (p.data.base_asset_index, p.data.borrowed_base_funds)
+                } else {
+                    (p.data.quote_asset_index, p.data.borrowed_quote_funds)
+                }
+            };
+
+            return Ok((asset_index, withdrawable));
+        }
+
+        return Err(error!(DexError::DIOptionNotFound));
     }
 }
 

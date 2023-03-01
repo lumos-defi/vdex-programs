@@ -173,7 +173,7 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
     };
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let (option_slot, option) = us.borrow().di_get_option(id)?;
+    let (option_slot, option) = us.borrow().di_get_option(id, false)?;
 
     let now = get_timestamp()?;
     require!(now >= option.expiry_date, DexError::DIOptionNotExpired);

@@ -249,6 +249,10 @@ pub mod dex_program {
     pub fn di_settle(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) -> DexResult {
         dual_invest::settle::handler(ctx, id, force, settle_price)
     }
+
+    pub fn di_withdraw_settled(ctx: Context<DiWithdrawSettled>, created: u64) -> DexResult {
+        dual_invest::withdraw_settled::handler(ctx, created)
+    }
 }
 
 #[derive(Accounts)]
