@@ -23,9 +23,6 @@ pub struct CancelOrder<'info> {
     pub order_pool_entry_page: UncheckedAccount<'info>,
 
     /// CHECK
-    pub mint: AccountInfo<'info>,
-
-    /// CHECK
     #[account(mut)]
     pub vault: AccountInfo<'info>,
 
@@ -34,7 +31,7 @@ pub struct CancelOrder<'info> {
 
     #[account(
             mut,
-            constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *mint.key)
+            constraint = (user_mint_acc.owner == *authority.key)
         )]
     pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
@@ -73,14 +70,18 @@ pub fn handler(ctx: Context<CancelOrder>, user_order_slot: u8) -> DexResult {
         let ai = dex.asset_as_ref(asset)?;
         require!(
             ai.valid
-                && ai.mint == ctx.accounts.mint.key()
                 && ai.vault == ctx.accounts.vault.key()
                 && ai.program_signer == ctx.accounts.program_signer.key(),
             DexError::InvalidAssetIndex
         );
 
+        require!(
+            ai.mint == ctx.accounts.user_mint_acc.mint,
+            DexError::InvalidUserMintAccount
+        );
+
         let seeds = &[
-            ctx.accounts.mint.key.as_ref(),
+            ai.mint.as_ref(),
             ctx.accounts.dex.to_account_info().key.as_ref(),
             &[ai.nonce],
         ];

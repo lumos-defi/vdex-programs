@@ -46,7 +46,6 @@ pub async fn setup(
         dex,
         di_option,
         base_asset_oracle,
-        in_mint,
         in_mint_vault,
         &user_mint_acc,
         user_state,

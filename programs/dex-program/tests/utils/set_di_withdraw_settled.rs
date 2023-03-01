@@ -32,7 +32,6 @@ pub async fn setup(
         dex,
         user_state,
         &user_mint_acc,
-        mint,
         vault,
         program_signer,
         created,
