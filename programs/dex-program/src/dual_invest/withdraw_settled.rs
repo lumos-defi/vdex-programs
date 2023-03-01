@@ -13,9 +13,6 @@ pub struct DiWithdrawSettled<'info> {
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
-    pub mint: AccountInfo<'info>,
-
-    /// CHECK
     #[account(mut)]
     pub mint_vault: AccountInfo<'info>,
 
@@ -47,7 +44,6 @@ pub fn handler(ctx: Context<DiWithdrawSettled>, created: u64) -> DexResult {
     let (asset_index, withdrawable) = us.borrow_mut().di_withdraw_from_settled_option(created)?;
 
     let ai = dex.asset_as_ref(asset_index)?;
-    require!(ai.mint == ctx.accounts.mint.key(), DexError::InvalidMint);
     require!(
         ai.vault == ctx.accounts.mint_vault.key(),
         DexError::InvalidVault

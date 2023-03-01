@@ -413,7 +413,6 @@ pub async fn compose_close_market_position_ix(
     program: &Program,
     payer: &Keypair,
     dex: &Pubkey,
-    mint: &Pubkey,
     oracle: &Pubkey,
     vault: &Pubkey,
     program_signer: &Pubkey,
@@ -430,7 +429,6 @@ pub async fn compose_close_market_position_ix(
         .request()
         .accounts(ClosePosition {
             dex: *dex,
-            mint: *mint,
             oracle: *oracle,
             vault: *vault,
             program_signer: *program_signer,
@@ -624,7 +622,6 @@ pub async fn compose_cancel_ix(
     user_state: &Pubkey,
     order_book: &Pubkey,
     order_pool_entry_page: &Pubkey,
-    mint: &Pubkey,
     vault: &Pubkey,
     program_signer: &Pubkey,
     user_mint_acc: &Pubkey,
@@ -637,7 +634,6 @@ pub async fn compose_cancel_ix(
             dex: *dex,
             order_book: *order_book,
             order_pool_entry_page: *order_pool_entry_page,
-            mint: *mint,
             vault: *vault,
             program_signer: *program_signer,
             user_mint_acc: *user_mint_acc,
@@ -883,7 +879,6 @@ pub async fn compose_di_buy_ix(
     dex: &Pubkey,
     di_option: &Pubkey,
     base_asset_oracle: &Pubkey,
-    in_mint: &Pubkey,
     in_mint_vault: &Pubkey,
     user_mint_acc: &Pubkey,
     user_state: &Pubkey,
@@ -899,7 +894,6 @@ pub async fn compose_di_buy_ix(
             dex: *dex,
             di_option: *di_option,
             base_asset_oracle: *base_asset_oracle,
-            in_mint: *in_mint,
             in_mint_vault: *in_mint_vault,
             user_mint_acc: *user_mint_acc,
             user_state: *user_state,
@@ -972,7 +966,6 @@ pub async fn compose_di_withdraw_settled_ix(
     dex: &Pubkey,
     user_state: &Pubkey,
     user_mint_acc: &Pubkey,
-    mint: &Pubkey,
     vault: &Pubkey,
     program_signer: &Pubkey,
     created: u64,
@@ -981,7 +974,6 @@ pub async fn compose_di_withdraw_settled_ix(
         .request()
         .accounts(DiWithdrawSettled {
             dex: *dex,
-            mint: *mint,
             mint_vault: *vault,
             asset_program_signer: *program_signer,
             user_state: *user_state,

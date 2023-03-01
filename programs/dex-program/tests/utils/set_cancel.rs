@@ -49,7 +49,6 @@ pub async fn setup(
         user_state,
         order_book,
         order_pool_entry_page,
-        mint,
         vault,
         program_signer,
         &user_mint_acc,

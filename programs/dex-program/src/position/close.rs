@@ -18,9 +18,6 @@ pub struct ClosePosition<'info> {
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
-    pub mint: AccountInfo<'info>,
-
-    /// CHECK
     pub oracle: AccountInfo<'info>,
 
     /// CHECK
@@ -32,7 +29,7 @@ pub struct ClosePosition<'info> {
 
     #[account(
         mut,
-        constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *mint.key)
+        constraint = (user_mint_acc.owner == *authority.key)
     )]
     pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
@@ -86,14 +83,18 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
 
     require!(
         ai.valid
-            && ai.mint == ctx.accounts.mint.key()
             && ai.vault == ctx.accounts.vault.key()
             && ai.program_signer == ctx.accounts.program_signer.key(),
         DexError::InvalidMarketIndex
     );
+    require!(
+        ai.mint == ctx.accounts.user_mint_acc.mint,
+        DexError::InvalidUserMintAccount
+    );
+    let mint = ai.mint;
 
     let seeds = &[
-        ctx.accounts.mint.key.as_ref(),
+        mint.as_ref(),
         ctx.accounts.dex.to_account_info().key.as_ref(),
         &[ai.nonce],
     ];

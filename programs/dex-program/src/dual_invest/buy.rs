@@ -24,15 +24,12 @@ pub struct DiBuy<'info> {
     pub base_asset_oracle: AccountInfo<'info>,
 
     /// CHECK
-    pub in_mint: AccountInfo<'info>,
-
-    /// CHECK
     #[account(mut)]
     pub in_mint_vault: AccountInfo<'info>,
 
     #[account(
         mut,
-        constraint = (user_mint_acc.owner == *authority.key && user_mint_acc.mint == *in_mint.key)
+        constraint = (user_mint_acc.owner == *authority.key)
     )]
     pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
@@ -92,11 +89,16 @@ pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> De
 
     // Check account
     let ai = if option.is_call { base_ai } else { quote_ai };
-    require!(ai.mint == ctx.accounts.in_mint.key(), DexError::InvalidMint);
+    require!(
+        ai.mint == ctx.accounts.user_mint_acc.mint,
+        DexError::InvalidUserMintAccount
+    );
+
     require!(
         base_ai.oracle == ctx.accounts.base_asset_oracle.key(),
         DexError::InvalidOracle
     );
+
     require!(
         ai.vault == ctx.accounts.in_mint_vault.key(),
         DexError::InvalidVault

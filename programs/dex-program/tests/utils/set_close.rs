@@ -45,7 +45,6 @@ pub async fn setup(
         program,
         user,
         dex,
-        mint,
         oracle,
         vault,
         program_signer,
