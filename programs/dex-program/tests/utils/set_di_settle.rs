@@ -31,6 +31,7 @@ pub async fn setup(
     id: u64,
     force: bool,
     settle_price: u64,
+    create_user_mint_acc: bool,
 ) -> Result<(), TransportError> {
     let user_wsol_acc = Keypair::new();
 
@@ -42,7 +43,9 @@ pub async fn setup(
     } else {
         let acc = get_associated_token_address(user, mint);
         if let Ok(None) = context.banks_client.get_account(acc).await {
-            create_associated_token_account(context, payer, user, mint).await
+            if create_user_mint_acc {
+                create_associated_token_account(context, payer, user, mint).await
+            }
         }
 
         acc

@@ -11,8 +11,9 @@ use dex_program::{
     accounts::{
         AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClosePosition, Crank,
         CreateUserState, DiBuy, DiCreateOption, DiRemoveOption, DiSetAdmin, DiSetFeeRate,
-        DiSetSettlePrice, DiSettle, DiUpdateOption, FeedMockOraclePrice, FillOrder, InitDex,
-        InitMockOracle, LimitAsk, LimitBid, OpenPosition, RemoveLiquidity, Swap,
+        DiSetSettlePrice, DiSettle, DiUpdateOption, DiWithdrawSettled, FeedMockOraclePrice,
+        FillOrder, InitDex, InitMockOracle, LimitAsk, LimitBid, OpenPosition, RemoveLiquidity,
+        Swap,
     },
     dex::Dex,
     dual_invest::DI,
@@ -959,6 +960,36 @@ pub async fn compose_di_settle_ix(
             force,
             settle_price,
         })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_di_withdraw_settled_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    user_state: &Pubkey,
+    user_mint_acc: &Pubkey,
+    mint: &Pubkey,
+    vault: &Pubkey,
+    program_signer: &Pubkey,
+    created: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(DiWithdrawSettled {
+            dex: *dex,
+            mint: *mint,
+            mint_vault: *vault,
+            asset_program_signer: *program_signer,
+            user_state: *user_state,
+            user_mint_acc: *user_mint_acc,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .args(dex_program::instruction::DiWithdrawSettled { created })
         .instructions()
         .unwrap()
         .pop()

@@ -589,6 +589,8 @@ async fn test_settle_user_multiple_options() {
     user.di_buy(100, 500, usdc(180.)).await.assert_ok();
     user.assert_usdc_balance(0.).await;
 
+    dtc.advance_clock(now + 1).await;
+
     // Another position
     user.mint_usdc(360.).await;
     user.di_buy(100, 500, usdc(360.)).await.assert_ok();

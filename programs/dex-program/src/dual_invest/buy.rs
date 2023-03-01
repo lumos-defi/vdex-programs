@@ -173,7 +173,7 @@ pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> De
     // Create the option
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     us.borrow_mut()
-        .new_di_option(&option, size, borrow_base_funds, borrow_quote_funds)?;
+        .di_new_option(&option, size, borrow_base_funds, borrow_quote_funds)?;
 
     // Update user
     let user_list = PagedList::<UserListItem>::mount(
