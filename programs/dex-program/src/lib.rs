@@ -188,6 +188,10 @@ pub mod dex_program {
         order::crank::handler(ctx)
     }
 
+    pub fn withdraw_asset(ctx: Context<WithdrawAsset>, asset: u8) -> DexResult {
+        order::withdraw::handler(ctx, asset)
+    }
+
     // Dual investment
     pub fn di_set_admin(ctx: Context<DiSetAdmin>) -> DexResult {
         dual_invest::set_admin::handler(ctx)

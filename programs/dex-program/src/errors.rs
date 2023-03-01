@@ -149,6 +149,9 @@ pub enum DexError {
     #[msg("Position not exist")]
     PositionNotExist,
 
+    #[msg("Asset not exist")]
+    AssetNotExist,
+
     #[msg("Pice greater than market price")]
     PriceGTMarketPrice,
 

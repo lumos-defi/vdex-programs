@@ -263,7 +263,7 @@ pub async fn create_associated_token_account(
     wallet_address: &Pubkey,
     token_mint_address: &Pubkey,
 ) {
-    let mut transaction = Transaction::new_with_payer(
+    let transaction = Transaction::new_signed_with_payer(
         &[
             spl_associated_token_account::instruction::create_associated_token_account(
                 &payer.pubkey(),
@@ -273,13 +273,15 @@ pub async fn create_associated_token_account(
             ),
         ],
         Some(&payer.pubkey()),
+        &[payer],
+        context.banks_client.get_latest_blockhash().await.unwrap(),
     );
-    transaction.sign(&[payer], context.last_blockhash);
+    // transaction.sign(&[payer], context.last_blockhash);
 
     context
         .borrow_mut()
         .banks_client
-        .process_transaction(transaction)
+        .process_transaction_with_preflight(transaction)
         .await
         .unwrap();
 }

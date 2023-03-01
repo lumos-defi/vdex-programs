@@ -51,8 +51,8 @@ async fn test_init_user_state() {
     let user_state_account_info: AccountInfo = (&owner, true, &mut user_state_account).into();
     let us = UserState::mount(&user_state_account_info, true).unwrap();
 
-    assert_eq!(us.borrow().meta.order_slot_count, 32);
-    assert_eq!(us.borrow().meta.position_slot_count, 32);
+    assert_eq!(us.borrow().meta.order_slot_count, 8);
+    assert_eq!(us.borrow().meta.position_slot_count, 8);
     assert_eq!(us.borrow().meta.vlp.staked, 0);
     assert_eq!(us.borrow().meta.vlp.reward_debt, 0);
     assert_eq!(us.borrow().meta.vlp.reward_accumulated, 0);

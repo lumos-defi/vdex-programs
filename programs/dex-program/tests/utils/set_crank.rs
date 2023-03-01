@@ -34,13 +34,16 @@ pub async fn setup(
     event_queue: &Pubkey,
     user_list_entry_page: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
+    create_user_mint_acc: bool,
 ) -> Result<(), TransportError> {
     let user_wsol_acc = Keypair::new();
 
     let user_mint_acc = if open {
         let acc = get_associated_token_address(user, in_mint);
         if let Ok(None) = context.banks_client.get_account(acc).await {
-            create_associated_token_account(context, payer, user, in_mint).await
+            if create_user_mint_acc {
+                create_associated_token_account(context, payer, user, in_mint).await
+            }
         }
 
         acc
@@ -53,7 +56,9 @@ pub async fn setup(
         } else {
             let acc = get_associated_token_address(user, out_mint);
             if let Ok(None) = context.banks_client.get_account(acc).await {
-                create_associated_token_account(context, payer, user, in_mint).await
+                if create_user_mint_acc {
+                    create_associated_token_account(context, payer, user, in_mint).await
+                }
             }
 
             acc

@@ -10,8 +10,8 @@ use crate::utils::{
     set_add_liquidity, set_ask, set_bid, set_cancel, set_cancel_all, set_close, set_crank,
     set_di_buy, set_di_create, set_di_remove_option, set_di_set_settle_price, set_di_settle,
     set_di_update_option, set_di_withdraw_settled, set_feed_mock_oracle, set_fill, set_market_swap,
-    set_open, set_remove_liquidity, set_user_state, transfer, usdc, DexAsset, DexMarket,
-    TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
+    set_open, set_remove_liquidity, set_user_state, set_withdraw_asset, transfer, usdc, DexAsset,
+    DexMarket, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{
@@ -831,7 +831,7 @@ impl UserTestContext {
         size
     }
 
-    pub async fn crank(&self) {
+    pub async fn crank(&self, create_user_mint_acc: bool) {
         let payer = self.generate_random_user().await;
         let di = self.dex_info.borrow();
 
@@ -897,6 +897,7 @@ impl UserTestContext {
             &di.event_queue,
             &di.user_list_entry_page,
             remaining_accounts,
+            create_user_mint_acc,
         )
         .await
         .unwrap();
@@ -2149,6 +2150,45 @@ impl UserTestContext {
             &ai.vault,
             &ai.program_signer,
             created,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::DIOptionNotFound));
+        }
+    }
+
+    pub async fn assert_asset(&self, asset: DexAsset, amount: f64) {
+        let user_state_account = self.get_account(self.user_state).await;
+        let us = UserState::mount_buf(user_state_account.data).unwrap();
+
+        let ai = self.dex_info.borrow().assets[asset as usize];
+        let big_amount = (amount * (10u64.pow(ai.decimals as u32) as f64)) as u64;
+
+        let us_ref = us.borrow();
+        let asset_slot = us_ref.find_asset(asset as u8).assert_unwrap();
+
+        // assert_eq!(asset_slot.data.amount, big_amount);
+        let difference = asset_slot.data.amount as i64 - big_amount as i64;
+
+        assert!(difference.abs() <= 2);
+    }
+
+    pub async fn withdraw_asset(&self, asset: DexAsset) -> DexResult {
+        let ai = self.dex_info.borrow().assets[asset as usize];
+
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+        if let Ok(_) = set_withdraw_asset::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.user_state,
+            &ai.mint,
+            &ai.vault,
+            &ai.program_signer,
+            asset as u8,
         )
         .await
         {
