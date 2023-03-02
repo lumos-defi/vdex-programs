@@ -13,7 +13,7 @@ use dex_program::{
         CreateUserState, DiBuy, DiCreateOption, DiRemoveOption, DiSetAdmin, DiSetFeeRate,
         DiSetSettlePrice, DiSettle, DiUpdateOption, DiWithdrawSettled, FeedMockOraclePrice,
         FillOrder, InitDex, InitMockOracle, LimitAsk, LimitBid, OpenPosition, RemoveLiquidity,
-        Swap,
+        Swap, WithdrawAsset,
     },
     dex::Dex,
     dual_invest::DI,
@@ -264,11 +264,11 @@ pub async fn compose_init_user_state_ixs(
     dex: &Pubkey,
     user_state: &Pubkey,
 ) -> Vec<Instruction> {
-    let order_slot_count: u8 = 32;
-    let position_slot_count: u8 = 32;
-    let di_option_slot_count: u8 = 32;
+    let order_slot_count: u8 = 8;
+    let position_slot_count: u8 = 8;
+    let di_option_slot_count: u8 = 8;
 
-    let init_user_state_ixs = program
+    program
         .request()
         .accounts(CreateUserState {
             user_state: *user_state,
@@ -282,9 +282,7 @@ pub async fn compose_init_user_state_ixs(
             di_option_slot_count,
         })
         .instructions()
-        .unwrap();
-
-    init_user_state_ixs
+        .unwrap()
 }
 
 pub async fn compose_add_liquidity_ix(
@@ -982,6 +980,34 @@ pub async fn compose_di_withdraw_settled_ix(
             token_program: spl_token::id(),
         })
         .args(dex_program::instruction::DiWithdrawSettled { created })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_withdraw_asset_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    user_state: &Pubkey,
+    user_mint_acc: &Pubkey,
+    vault: &Pubkey,
+    program_signer: &Pubkey,
+    asset: u8,
+) -> Instruction {
+    program
+        .request()
+        .accounts(WithdrawAsset {
+            dex: *dex,
+            mint_vault: *vault,
+            asset_program_signer: *program_signer,
+            user_state: *user_state,
+            user_mint_acc: *user_mint_acc,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .args(dex_program::instruction::WithdrawAsset { asset })
         .instructions()
         .unwrap()
         .pop()

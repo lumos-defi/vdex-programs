@@ -97,12 +97,12 @@ async fn test_close_size() {
     let event = user.read_match_event().await;
     assert_eq!(event.user, alice.user.pubkey().to_bytes());
     assert_eq!(event.user_order_slot, 0);
-    user.crank().await;
+    user.crank(true).await;
 
     let event = user.read_match_event().await;
     assert_eq!(event.user, alice.user.pubkey().to_bytes());
     assert_eq!(event.user_order_slot, 1);
-    user.crank().await;
+    user.crank(true).await;
 
     user.assert_no_match_event().await;
 }

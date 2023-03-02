@@ -6,7 +6,9 @@ mod utils;
 use anchor_client::solana_sdk::signer::Signer;
 use solana_program_test::tokio;
 
-use crate::utils::{add_fee, close_fee, collateral_to_size, minus_add_fee, DexAsset, DexMarket};
+use crate::utils::{
+    add_fee, close_fee, collateral_to_size, minus_add_fee, DexAsset, DexMarket, TestResult,
+};
 use context::DexTestContext;
 
 #[tokio::test]
@@ -75,7 +77,8 @@ async fn test_crank_ask_long_with_loss() {
     assert_eq!(event.user, alice.user.pubkey().to_bytes());
     assert_eq!(event.user_order_slot, 0);
 
-    user.crank(true).await;
+    alice.close_mint_account(DexAsset::BTC).await;
+    user.crank(false).await;
     user.assert_no_match_event().await;
 
     // Ask order should be filled
@@ -85,9 +88,6 @@ async fn test_crank_ask_long_with_loss() {
         "collateral {}, close fee {}, loss {}",
         expected_collateral, expected_close_fee, expected_loss
     );
-    alice
-        .assert_btc_balance(expected_collateral - expected_close_fee - expected_loss)
-        .await;
 
     alice
         .assert_position(DexMarket::BTC, true, 0., 0., 0., 0., 0.)
@@ -103,6 +103,22 @@ async fn test_crank_ask_long_with_loss() {
     .await;
     user.assert_borrow(DexAsset::BTC, 0.).await;
     user.assert_collateral(DexAsset::BTC, 0.).await;
+
+    // Check Alice's asset
+    alice
+        .assert_asset(
+            DexAsset::BTC,
+            expected_collateral - expected_close_fee - expected_loss,
+        )
+        .await;
+
+    // Alice withdraws asset
+    alice.create_mint_account(DexAsset::BTC).await;
+    alice.withdraw_asset(DexAsset::BTC).await.assert_ok();
+
+    alice
+        .assert_btc_balance(expected_collateral - expected_close_fee - expected_loss)
+        .await;
 }
 
 #[tokio::test]
@@ -173,16 +189,14 @@ async fn test_crank_ask_short_with_loss() {
     assert_eq!(event.user, alice.user.pubkey().to_bytes());
     assert_eq!(event.user_order_slot, 0);
 
-    user.crank(true).await;
+    alice.close_mint_account(DexAsset::USDC).await;
+    user.crank(false).await;
     user.assert_no_match_event().await;
 
     // Ask order should be filled
     let expected_close_fee = close_fee(expected_size) * 21000.;
     println!("close fee {}", expected_close_fee);
     let expected_loss = expected_size * (21000. - 20000.);
-    alice
-        .assert_usdc_balance(expected_collateral - expected_close_fee - expected_loss)
-        .await;
 
     alice
         .assert_position(DexMarket::BTC, false, 0., 0., 0., 0., 0.)
@@ -198,6 +212,21 @@ async fn test_crank_ask_short_with_loss() {
     .await;
     user.assert_borrow(DexAsset::USDC, 0.).await;
     user.assert_collateral(DexAsset::USDC, 0.).await;
+
+    // Check Alice's asset
+    alice
+        .assert_asset(
+            DexAsset::USDC,
+            expected_collateral - expected_close_fee - expected_loss,
+        )
+        .await;
+
+    // Alice withdraws asset
+    alice.create_mint_account(DexAsset::USDC).await;
+    alice.withdraw_asset(DexAsset::USDC).await.assert_ok();
+    alice
+        .assert_usdc_balance(expected_collateral - expected_close_fee - expected_loss)
+        .await;
 }
 
 #[tokio::test]
@@ -266,7 +295,8 @@ async fn test_crank_ask_long_with_profit() {
     assert_eq!(event.user, alice.user.pubkey().to_bytes());
     assert_eq!(event.user_order_slot, 0);
 
-    user.crank(true).await;
+    alice.close_mint_account(DexAsset::BTC).await;
+    user.crank(false).await;
     user.assert_no_match_event().await;
 
     let expected_close_fee = close_fee(expected_size);
@@ -275,9 +305,6 @@ async fn test_crank_ask_long_with_profit() {
         "collateral {}, close fee {}, loss {}",
         expected_collateral, expected_close_fee, expected_profit
     );
-    alice
-        .assert_btc_balance(expected_collateral - expected_close_fee + expected_profit)
-        .await;
 
     alice
         .assert_position(DexMarket::BTC, true, 0., 0., 0., 0., 0.)
@@ -293,6 +320,22 @@ async fn test_crank_ask_long_with_profit() {
     .await;
     user.assert_borrow(DexAsset::BTC, 0.).await;
     user.assert_collateral(DexAsset::BTC, 0.).await;
+
+    // Check Alice's asset
+    alice
+        .assert_asset(
+            DexAsset::BTC,
+            expected_collateral - expected_close_fee + expected_profit,
+        )
+        .await;
+
+    // Alice withdraws asset
+    alice.create_mint_account(DexAsset::BTC).await;
+    alice.withdraw_asset(DexAsset::BTC).await.assert_ok();
+
+    alice
+        .assert_btc_balance(expected_collateral - expected_close_fee + expected_profit)
+        .await;
 }
 
 #[tokio::test]
@@ -363,15 +406,13 @@ async fn test_crank_ask_short_with_profit() {
     assert_eq!(event.user, alice.user.pubkey().to_bytes());
     assert_eq!(event.user_order_slot, 0);
 
-    user.crank(true).await;
+    alice.close_mint_account(DexAsset::USDC).await;
+    user.crank(false).await;
     user.assert_no_match_event().await;
 
     let expected_close_fee = close_fee(expected_size) * 19000.;
     println!("close fee {}", expected_close_fee);
     let expected_profit = expected_size * (20000. - 19000.);
-    alice
-        .assert_usdc_balance(expected_collateral - expected_close_fee + expected_profit)
-        .await;
 
     alice
         .assert_position(DexMarket::BTC, false, 0., 0., 0., 0., 0.)
@@ -387,4 +428,19 @@ async fn test_crank_ask_short_with_profit() {
     .await;
     user.assert_borrow(DexAsset::USDC, 0.).await;
     user.assert_collateral(DexAsset::USDC, 0.).await;
+
+    // Check Alice's asset
+    alice
+        .assert_asset(
+            DexAsset::USDC,
+            expected_collateral - expected_close_fee + expected_profit,
+        )
+        .await;
+
+    // Alice withdraws asset
+    alice.create_mint_account(DexAsset::USDC).await;
+    alice.withdraw_asset(DexAsset::USDC).await.assert_ok();
+    alice
+        .assert_usdc_balance(expected_collateral - expected_close_fee + expected_profit)
+        .await;
 }

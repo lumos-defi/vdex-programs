@@ -22,6 +22,7 @@ pub mod set_mock_oracle;
 pub mod set_open;
 pub mod set_remove_liquidity;
 pub mod set_user_state;
+pub mod set_withdraw_asset;
 
 pub mod state;
 
@@ -49,6 +50,7 @@ pub use set_mock_oracle::*;
 pub use set_open::*;
 pub use set_remove_liquidity::*;
 pub use set_user_state::*;
+pub use set_withdraw_asset::*;
 pub use state::*;
 
 use std::fmt::Debug;

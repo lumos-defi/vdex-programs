@@ -66,7 +66,7 @@ async fn test_crank_bid_long_no_swap() {
     assert_eq!(event.user_order_slot, 0);
 
     // Crank the filled order
-    user.crank().await;
+    user.crank(true).await;
     user.assert_no_match_event().await;
 
     let expected_open_fee = 0.002912621;
@@ -164,7 +164,7 @@ async fn test_crank_bid_long_with_eth() {
     assert_eq!(event.user_order_slot, 0);
 
     // Crank the filled order
-    user.crank().await;
+    user.crank(true).await;
     user.assert_no_match_event().await;
 
     let swap_fee = swap_fee(input_eth);
@@ -277,7 +277,7 @@ async fn test_crank_bid_long_with_usdc() {
     assert_eq!(event.user_order_slot, 0);
 
     // Crank the filled order
-    user.crank().await;
+    user.crank(true).await;
     user.assert_no_match_event().await;
 
     let swap_fee = swap_fee(input_usdc);
@@ -380,7 +380,7 @@ async fn test_crank_bid_long_with_sol() {
     assert_eq!(event.user_order_slot, 0);
 
     // Crank the filled order
-    user.crank().await;
+    user.crank(true).await;
     user.assert_no_match_event().await;
 
     let swap_fee = swap_fee(input_sol);
@@ -471,7 +471,7 @@ async fn test_crank_bid_short_no_swap() {
     assert_eq!(event.user_order_slot, 0);
 
     // Crank the filled order
-    user.crank().await;
+    user.crank(true).await;
     user.assert_no_match_event().await;
 
     let expected_open_fee = 58.252427;
@@ -562,7 +562,7 @@ async fn test_crank_bid_short_with_eth() {
     assert_eq!(event.user_order_slot, 0);
 
     // Crank the filled order
-    user.crank().await;
+    user.crank(true).await;
     user.assert_no_match_event().await;
 
     let swap_fee = swap_fee(input_eth);
@@ -675,7 +675,7 @@ async fn test_crank_bid_short_with_btc() {
     assert_eq!(event.user_order_slot, 0);
 
     // Crank the filled order
-    user.crank().await;
+    user.crank(true).await;
     user.assert_no_match_event().await;
 
     let swap_fee = swap_fee(input_btc);
@@ -777,7 +777,7 @@ async fn test_crank_bid_short_with_sol() {
     assert_eq!(event.user_order_slot, 0);
 
     // Crank the filled order
-    user.crank().await;
+    user.crank(true).await;
     user.assert_no_match_event().await;
 
     let swap_fee = swap_fee(input_sol);

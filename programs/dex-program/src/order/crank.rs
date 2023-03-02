@@ -2,7 +2,7 @@ use crate::{
     collections::{EventQueue, MountMode, PagedList, SingleEvent, SingleEventQueue},
     dex::{
         event::{AppendEvent, PositionAct},
-        Dex, Position, UserListItem,
+        AssetInfo, Dex, Position, UserListItem,
     },
     errors::{DexError, DexResult},
     order::MatchEvent,
@@ -29,7 +29,7 @@ pub struct Crank<'info> {
 
     /// CHECK
     #[account(mut)]
-    pub user_mint_acc: Box<Account<'info, TokenAccount>>,
+    pub user_mint_acc: UncheckedAccount<'info>,
 
     /// Possibly used for bid order that needs swap assets
     /// CHECK
@@ -81,6 +81,104 @@ pub struct Crank<'info> {
     /// CHECK
     #[account(executable, constraint = (system_program.key == &system_program::ID))]
     pub system_program: AccountInfo<'info>,
+}
+
+fn refund_in_mint(
+    ctx: &Context<Crank>,
+    user_mint_acc: &Account<TokenAccount>,
+    in_mint_info: &AssetInfo,
+    amount: u64,
+) -> DexResult {
+    require!(
+        user_mint_acc.owner == ctx.accounts.user.key()
+            && user_mint_acc.mint == ctx.accounts.in_mint.key(),
+        DexError::InvalidUserMintAccount
+    );
+
+    require!(
+        in_mint_info.mint == ctx.accounts.in_mint.key()
+            && in_mint_info.vault == ctx.accounts.in_mint_vault.key()
+            && in_mint_info.program_signer == ctx.accounts.in_mint_program_signer.key(),
+        DexError::InvalidMint
+    );
+
+    let seeds = &[
+        ctx.accounts.in_mint.key.as_ref(),
+        ctx.accounts.dex.to_account_info().key.as_ref(),
+        &[in_mint_info.nonce],
+    ];
+    let signer = &[&seeds[..]];
+
+    let cpi_accounts = Transfer {
+        from: ctx.accounts.in_mint_vault.to_account_info(),
+        to: ctx.accounts.user_mint_acc.to_account_info(),
+        authority: ctx.accounts.in_mint_program_signer.to_account_info(),
+    };
+
+    let cpi_ctx =
+        CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_accounts, signer);
+    token::transfer(cpi_ctx, amount)
+}
+
+fn withdraw_market_mint(
+    ctx: &Context<Crank>,
+    user_mint_acc: &Account<TokenAccount>,
+    market_asset_nonce: u8,
+    amount: u64,
+) -> DexResult {
+    if ctx.accounts.market_mint.key() == token::spl_token::native_mint::id() {
+        require!(
+            user_mint_acc.owner == ctx.accounts.authority.key()
+                && user_mint_acc.mint == ctx.accounts.market_mint.key(),
+            DexError::InvalidUserMintAccount
+        );
+    } else {
+        require!(
+            user_mint_acc.owner == ctx.accounts.user.key()
+                && user_mint_acc.mint == ctx.accounts.market_mint.key(),
+            DexError::InvalidUserMintAccount
+        );
+    }
+
+    let seeds = &[
+        ctx.accounts.market_mint.key.as_ref(),
+        ctx.accounts.dex.to_account_info().key.as_ref(),
+        &[market_asset_nonce],
+    ];
+
+    let signer = &[&seeds[..]];
+    let cpi_transfer = Transfer {
+        from: ctx.accounts.market_mint_vault.to_account_info(),
+        to: ctx.accounts.user_mint_acc.to_account_info(),
+        authority: ctx.accounts.market_mint_program_signer.to_account_info(),
+    };
+
+    let cpi_ctx =
+        CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_transfer, signer);
+    token::transfer(cpi_ctx, amount)?;
+
+    // If market mint is SOL,we can't create a temp WSOL account for the end user(we are cranking, no user sign),
+    // so have to use the authority as a "replay" to transfer the native mint to user
+    if ctx.accounts.market_mint.key() == token::spl_token::native_mint::id() {
+        let cpi_close = CloseAccount {
+            account: ctx.accounts.user_mint_acc.to_account_info(),
+            destination: ctx.accounts.authority.to_account_info(),
+            authority: ctx.accounts.authority.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_close);
+        token::close_account(cpi_ctx)?;
+
+        let cpi_sys_transfer = system_program::Transfer {
+            from: ctx.accounts.authority.to_account_info(),
+            to: ctx.accounts.user.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(ctx.accounts.system_program.clone(), cpi_sys_transfer);
+
+        system_program::transfer(cpi_ctx, amount)?;
+    }
+
+    Ok(())
 }
 
 /// Layout of remaining accounts:
@@ -145,6 +243,9 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
     let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
 
+    let user_mint_acc =
+        Account::<TokenAccount>::try_from_unchecked(&ctx.accounts.user_mint_acc).ok();
+
     if order.open {
         require_neq!(order.size, 0u64, DexError::InvalidAmount);
 
@@ -187,97 +288,50 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         } else {
             borrow + actual_amount
         };
+
         if let Err(_) = dex.has_sufficient_liquidity(order.market, order.long, required_liquidity) {
-            // refund
-            require!(
-                ctx.accounts.user_mint_acc.owner == ctx.accounts.user.key()
-                    && ctx.accounts.user_mint_acc.mint == ctx.accounts.in_mint.key(),
-                DexError::InvalidUserMintAccount
-            );
-
-            require!(
-                ai.mint == ctx.accounts.in_mint.key()
-                    && ai.vault == ctx.accounts.in_mint_vault.key()
-                    && ai.program_signer == ctx.accounts.in_mint_program_signer.key(),
-                DexError::InvalidMint
-            );
-
-            let seeds = &[
-                ctx.accounts.in_mint.key.as_ref(),
-                ctx.accounts.dex.to_account_info().key.as_ref(),
-                &[ai.nonce],
-            ];
-            let signer = &[&seeds[..]];
-
-            let cpi_accounts = Transfer {
-                from: ctx.accounts.in_mint_vault.to_account_info(),
-                to: ctx.accounts.user_mint_acc.to_account_info(),
-                authority: ctx.accounts.in_mint_program_signer.to_account_info(),
-            };
-
-            let cpi_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.clone(),
-                cpi_accounts,
-                signer,
-            );
-            token::transfer(cpi_ctx, order.size)?;
-
-            return Ok(());
-        }
-
-        if need_swap {
-            dex.swap_in(order.asset, order.size.safe_sub(swap_fee)?, swap_fee)?;
-            dex.swap_out(market_asset_index, actual_amount)?;
-        }
-
-        // Ready to swap & open position
-        let (size, collateral, borrow, open_fee) = us.borrow_mut().open_position(
-            order.market,
-            order.price,
-            actual_amount,
-            order.long,
-            order.leverage,
-            &mfr,
-        )?;
-
-        dex.borrow_fund(order.market, order.long, collateral, borrow, open_fee)?;
-        dex.increase_global_position(order.market, order.long, order.price, size, collateral)?;
-        dex.increase_volume(order.market, order.price, size)?;
-
-        // Save to event queue
-        event_queue.fill_position(
-            user_state_key,
-            order.market,
-            PositionAct::Open,
-            order.long,
-            order.price,
-            size,
-            collateral,
-            borrow,
-            open_fee,
-            0,
-            0,
-        )?;
-    } else {
-        if ctx.accounts.market_mint.key() == token::spl_token::native_mint::id() {
-            require!(
-                ctx.accounts.user_mint_acc.owner == ctx.accounts.authority.key()
-                    && ctx.accounts.user_mint_acc.mint == ctx.accounts.market_mint.key(),
-                DexError::InvalidUserMintAccount
-            );
+            if let Some(acc) = user_mint_acc {
+                refund_in_mint(&ctx, &acc, ai, order.size)?;
+            } else {
+                us.borrow_mut().deposit_asset(order.asset, order.size)?;
+            }
         } else {
-            require!(
-                ctx.accounts.user_mint_acc.owner == ctx.accounts.user.key()
-                    && ctx.accounts.user_mint_acc.mint == ctx.accounts.market_mint.key(),
-                DexError::InvalidUserMintAccount
-            );
-        }
+            if need_swap {
+                dex.swap_in(order.asset, order.size.safe_sub(swap_fee)?, swap_fee)?;
+                dex.swap_out(market_asset_index, actual_amount)?;
+            }
 
-        let seeds = &[
-            ctx.accounts.market_mint.key.as_ref(),
-            ctx.accounts.dex.to_account_info().key.as_ref(),
-            &[mai.nonce],
-        ];
+            // Ready to swap & open position
+            let (size, collateral, borrow, open_fee) = us.borrow_mut().open_position(
+                order.market,
+                order.price,
+                actual_amount,
+                order.long,
+                order.leverage,
+                &mfr,
+            )?;
+
+            dex.borrow_fund(order.market, order.long, collateral, borrow, open_fee)?;
+            dex.increase_global_position(order.market, order.long, order.price, size, collateral)?;
+            dex.increase_volume(order.market, order.price, size)?;
+
+            // Save to event queue
+            event_queue.fill_position(
+                user_state_key,
+                order.market,
+                PositionAct::Open,
+                order.long,
+                order.price,
+                size,
+                collateral,
+                borrow,
+                open_fee,
+                0,
+                0,
+            )?;
+        }
+    } else {
+        let market_asset_nonce = mai.nonce;
 
         let (borrow, collateral, pnl, closed_size, close_fee, borrow_fee) =
             us.borrow_mut().close_position(
@@ -304,40 +358,11 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         )?;
 
         if withdrawable > 0 {
-            let signer = &[&seeds[..]];
-            let cpi_transfer = Transfer {
-                from: ctx.accounts.market_mint_vault.to_account_info(),
-                to: ctx.accounts.user_mint_acc.to_account_info(),
-                authority: ctx.accounts.market_mint_program_signer.to_account_info(),
-            };
-
-            let cpi_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.clone(),
-                cpi_transfer,
-                signer,
-            );
-            token::transfer(cpi_ctx, withdrawable)?;
-
-            // If market mint is SOL,we can't create a temp WSOL account for the end user(we are cranking, no user sign),
-            // so have to use the authority as a "replay" to transfer the native mint to user
-            if ctx.accounts.market_mint.key() == token::spl_token::native_mint::id() {
-                let cpi_close = CloseAccount {
-                    account: ctx.accounts.user_mint_acc.to_account_info(),
-                    destination: ctx.accounts.authority.to_account_info(),
-                    authority: ctx.accounts.authority.to_account_info(),
-                };
-
-                let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_close);
-                token::close_account(cpi_ctx)?;
-
-                let cpi_sys_transfer = system_program::Transfer {
-                    from: ctx.accounts.authority.to_account_info(),
-                    to: ctx.accounts.user.to_account_info(),
-                };
-                let cpi_ctx =
-                    CpiContext::new(ctx.accounts.system_program.clone(), cpi_sys_transfer);
-
-                system_program::transfer(cpi_ctx, withdrawable)?;
+            if let Some(acc) = user_mint_acc {
+                withdraw_market_mint(&ctx, &acc, market_asset_nonce, withdrawable)?;
+            } else {
+                us.borrow_mut()
+                    .deposit_asset(market_asset_index, withdrawable)?;
             }
         }
 
