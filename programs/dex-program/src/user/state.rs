@@ -619,11 +619,11 @@ impl<'a> UserState<'a> {
         Ok(())
     }
 
-    pub fn di_get_option(&self, id: u64, settled: bool) -> DexResult<(u8, UserDIOption)> {
+    pub fn di_get_option(&self, created: u64, settled: bool) -> DexResult<(u8, UserDIOption)> {
         let lookup = self
             .di_option_pool
             .into_iter()
-            .find(|x| x.data.id == id && x.data.settled == settled);
+            .find(|x| x.data.created == created && x.data.settled == settled);
         if let Some(p) = lookup {
             return Ok((p.index, p.data));
         }

@@ -46,6 +46,8 @@ async fn test_anyone_can_remove_all_settled_option() {
     user.di_buy(100, 500, btc(0.1)).await.assert_ok();
     user.assert_btc_balance(0.).await;
 
+    let options = user.di_collect_my_options(100).await;
+
     // Mock expiration
     now += 10;
     dtc.advance_clock(now).await;
@@ -58,7 +60,7 @@ async fn test_anyone_can_remove_all_settled_option() {
 
     // Settle user's option
     admin
-        .di_settle(&user.user.pubkey(), 100, false, usdc(0.))
+        .di_settle(&user.user.pubkey(), options[0].created, false, usdc(0.))
         .await
         .assert_ok();
 

@@ -136,7 +136,7 @@ fn relay_native_mint_to_user(ctx: &Context<DiSettle>, lamports: u64) -> DexResul
 
 // Layout of remaining accounts:
 //  offset 0 ~ n: user_list remaining pages
-pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) -> DexResult {
+pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
     require!(
         dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
@@ -163,17 +163,17 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
     let user_mint_acc =
         Account::<TokenAccount>::try_from_unchecked(&ctx.accounts.user_mint_acc).ok();
 
+    let us = UserState::mount(&ctx.accounts.user_state, true)?;
+    let (option_slot, option) = us.borrow().di_get_option(created, false)?;
+
     // Get settle price
-    let actual_settle_price = if let Ok(option) = di.borrow().get_di_option(id) {
-        require!(option.settle_price != 0, DexError::DIOptionNoSettlePrice);
+    let actual_settle_price = if let Ok(option) = di.borrow().get_option(option.id) {
+        require!(option.settled, DexError::DIOptionNotSettled);
         option.settle_price
     } else {
         require!(force && settle_price != 0, DexError::DIOptionNoSettlePrice);
         settle_price
     };
-
-    let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let (option_slot, option) = us.borrow().di_get_option(id, false)?;
 
     let now = get_timestamp()?;
     require!(now >= option.expiry_date, DexError::DIOptionNotExpired);
@@ -360,7 +360,7 @@ pub fn handler(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) 
         }
     };
 
-    let _ = di.borrow_mut().add_settle_size(id, option.size);
+    let _ = di.borrow_mut().add_settle_size(option.id, option.size);
     if user_mint_acc.is_some() {
         us.borrow_mut().di_remove_option(option_slot)?;
     } else {

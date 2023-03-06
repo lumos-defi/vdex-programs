@@ -43,7 +43,7 @@ pub fn handler(ctx: Context<DiRemoveOption>, id: u64, force: bool) -> DexResult 
     }
 
     // Save to event queue
-    let option = di.borrow().get_di_option(id)?;
+    let option = di.borrow().get_option(id)?;
 
     let base_ai = dex.asset_as_ref(option.base_asset_index)?;
     let quote_ai = dex.asset_as_ref(option.quote_asset_index)?;

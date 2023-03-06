@@ -65,7 +65,7 @@ pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> De
     let di = DI::mount(&ctx.accounts.di_option, true)?;
 
     // Get option info
-    let option = di.borrow().get_di_option(id)?;
+    let option = di.borrow().get_option(id)?;
     let base_ai = dex.asset_as_ref(option.base_asset_index)?;
     let quote_ai = dex.asset_as_ref(option.quote_asset_index)?;
 
