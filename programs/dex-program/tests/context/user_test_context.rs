@@ -1806,7 +1806,7 @@ impl UserTestContext {
     pub async fn di_settle(
         &self,
         user: &Pubkey,
-        id: u64,
+        created: u64,
         force: bool,
         settle_price: u64,
     ) -> DexResult {
@@ -1814,20 +1814,14 @@ impl UserTestContext {
         let di = DI::mount_buf(di_account.data).unwrap();
         let di_ref = di.borrow();
 
-        let actual_settle_price = if let Ok(slot) = di_ref.find_option(id) {
+        let option = self.di_find_option(user, created).await;
+        let actual_settle_price = if let Ok(slot) = di_ref.find_option(option.id) {
             slot.data.settle_price
         } else {
             if !force {
                 return Err(error!(DexError::DIOptionNotFound));
             }
             settle_price
-        };
-
-        let options = self.di_collect_user_options(user, id).await;
-        let option = if options.len() > 0 {
-            options.get(0).unwrap()
-        } else {
-            return Err(error!(DexError::DIOptionNotFound));
         };
 
         let exercised = if option.is_call {
@@ -1877,7 +1871,7 @@ impl UserTestContext {
             &self.dex_info.borrow().event_queue,
             &self.dex_info.borrow().user_list_entry_page,
             remaining_accounts,
-            id,
+            created,
             force,
             settle_price,
             true,
@@ -1893,7 +1887,7 @@ impl UserTestContext {
     pub async fn di_settle_with_invalid_user_mint_acc(
         &self,
         user: &Pubkey,
-        id: u64,
+        created: u64,
         force: bool,
         settle_price: u64,
     ) -> DexResult {
@@ -1901,20 +1895,15 @@ impl UserTestContext {
         let di = DI::mount_buf(di_account.data).unwrap();
         let di_ref = di.borrow();
 
-        let actual_settle_price = if let Ok(slot) = di_ref.find_option(id) {
+        let option = self.di_find_option(user, created).await;
+
+        let actual_settle_price = if let Ok(slot) = di_ref.find_option(option.id) {
             slot.data.settle_price
         } else {
             if !force {
                 return Err(error!(DexError::DIOptionNotFound));
             }
             settle_price
-        };
-
-        let options = self.di_collect_user_options(user, id).await;
-        let option = if options.len() > 0 {
-            options.get(0).unwrap()
-        } else {
-            return Err(error!(DexError::DIOptionNotFound));
         };
 
         let exercised = if option.is_call {
@@ -1964,7 +1953,7 @@ impl UserTestContext {
             &self.dex_info.borrow().event_queue,
             &self.dex_info.borrow().user_list_entry_page,
             remaining_accounts,
-            id,
+            created,
             force,
             settle_price,
             false,
@@ -1979,20 +1968,18 @@ impl UserTestContext {
 
     pub async fn assert_di_user_call(
         &self,
-        id: u64,
+        created: u64,
         premium_rate: u16,
         size: u64,
         borrowed_base_funds: u64,
         borrowed_quote_funds: u64,
     ) {
-        let raw_option = self.di_read_option(id).await;
-
         let mut user_state_account = self.get_account(self.user_state).await;
         let user_state_account_info: AccountInfo =
             (&self.user_state, true, &mut user_state_account).into();
 
         let us = UserState::mount(&user_state_account_info, true).unwrap();
-        let (_, option) = us.borrow().di_get_option(id, false).assert_unwrap();
+        let (_, option) = us.borrow().di_get_option(created, false).assert_unwrap();
 
         assert_eq!(option.is_call, true);
         assert_eq!(option.size, size);
@@ -2000,26 +1987,26 @@ impl UserTestContext {
         assert_eq!(option.borrowed_base_funds, borrowed_base_funds);
         assert_eq!(option.borrowed_quote_funds, borrowed_quote_funds);
 
+        let raw_option = self.di_read_option(option.id).await;
+
         assert_eq!(option.expiry_date, raw_option.expiry_date);
         assert_eq!(option.strike_price, raw_option.strike_price);
     }
 
     pub async fn assert_di_user_put(
         &self,
-        id: u64,
+        created: u64,
         premium_rate: u16,
         size: u64,
         borrowed_base_funds: u64,
         borrowed_quote_funds: u64,
     ) {
-        let raw_option = self.di_read_option(id).await;
-
         let mut user_state_account = self.get_account(self.user_state).await;
         let user_state_account_info: AccountInfo =
             (&self.user_state, true, &mut user_state_account).into();
 
         let us = UserState::mount(&user_state_account_info, true).unwrap();
-        let (_, option) = us.borrow().di_get_option(id, false).assert_unwrap();
+        let (_, option) = us.borrow().di_get_option(created, false).assert_unwrap();
 
         assert_eq!(option.is_call, false);
         assert_eq!(option.size, size);
@@ -2027,15 +2014,17 @@ impl UserTestContext {
         assert_eq!(option.borrowed_base_funds, borrowed_base_funds);
         assert_eq!(option.borrowed_quote_funds, borrowed_quote_funds);
 
+        let raw_option = self.di_read_option(option.id).await;
+
         assert_eq!(option.expiry_date, raw_option.expiry_date);
         assert_eq!(option.strike_price, raw_option.strike_price);
     }
 
-    pub async fn di_collect_user_options(
+    pub async fn di_find_option(
         &self,
         user: &Pubkey,
-        id: u64,
-    ) -> Vec<dex_program::user::UserDIOption> {
+        created: u64,
+    ) -> dex_program::user::UserDIOption {
         let (user_state, _) = Pubkey::find_program_address(
             &[&self.dex.to_bytes(), &user.to_bytes()],
             &self.program.id(),
@@ -2043,9 +2032,9 @@ impl UserTestContext {
         let user_state_account = self.get_account(user_state).await;
 
         let us = UserState::mount_buf(user_state_account.data).unwrap();
-        let options = us.borrow().collect_di_option(id);
+        let (_, option) = us.borrow().di_get_option(created, false).assert_unwrap();
 
-        options
+        option
     }
 
     pub async fn di_collect_my_options(&self, id: u64) -> Vec<dex_program::user::UserDIOption> {

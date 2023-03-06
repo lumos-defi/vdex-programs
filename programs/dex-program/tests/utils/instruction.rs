@@ -925,7 +925,7 @@ pub async fn compose_di_settle_ix(
     event_queue: &Pubkey,
     user_list_entry_page: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
-    id: u64,
+    created: u64,
     force: bool,
     settle_price: u64,
 ) -> Instruction {
@@ -948,7 +948,7 @@ pub async fn compose_di_settle_ix(
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::DiSettle {
-            id,
+            created,
             force,
             settle_price,
         })

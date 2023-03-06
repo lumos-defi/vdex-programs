@@ -255,9 +255,16 @@ async fn test_btc_call_success() {
         .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
         .await;
 
+    let option = user.di_collect_my_options(100).await;
     // Check user state
-    user.assert_di_user_call(100, 500, btc(0.1), btc(borrowed_btc), usdc(borrowed_usdc))
-        .await;
+    user.assert_di_user_call(
+        option[0].created,
+        500,
+        btc(0.1),
+        btc(borrowed_btc),
+        usdc(borrowed_usdc),
+    )
+    .await;
 
     // Check option volume
     admin.assert_di_option_volume(100, btc(0.1)).await;
@@ -307,9 +314,16 @@ async fn test_btc_put_success() {
         .assert_liquidity(DexAsset::BTC, 1. - borrowed_btc)
         .await;
 
+    let options = user.di_collect_my_options(100).await;
     // Check user state
-    user.assert_di_user_put(100, 500, usdc(180.), btc(borrowed_btc), usdc(borrowed_usdc))
-        .await;
+    user.assert_di_user_put(
+        options[0].created,
+        500,
+        usdc(180.),
+        btc(borrowed_btc),
+        usdc(borrowed_usdc),
+    )
+    .await;
 
     // Check option volume
     admin.assert_di_option_volume(100, usdc(180.)).await;
@@ -360,10 +374,11 @@ async fn test_btc_call_multiple_users() {
         .assert_liquidity(DexAsset::USDC, 19980. - alice_borrowed_usdc)
         .await;
 
+    let options = alice.di_collect_my_options(100).await;
     // Check user state
     alice
         .assert_di_user_call(
-            100,
+            options[0].created,
             500,
             btc(0.1),
             btc(alice_borrowed_btc),
@@ -394,9 +409,10 @@ async fn test_btc_call_multiple_users() {
         )
         .await;
 
+    let options = bob.di_collect_my_options(100).await;
     // Check user state
     bob.assert_di_user_call(
-        100,
+        options[0].created,
         500,
         btc(0.1),
         btc(bob_borrowed_btc),
@@ -453,10 +469,11 @@ async fn test_btc_put_multiple_users() {
         .assert_liquidity(DexAsset::BTC, 1. - alice_borrowed_btc)
         .await;
 
+    let options = alice.di_collect_my_options(100).await;
     // Check user state
     alice
         .assert_di_user_put(
-            100,
+            options[0].created,
             500,
             usdc(180.),
             btc(alice_borrowed_btc),
@@ -487,9 +504,10 @@ async fn test_btc_put_multiple_users() {
         .assert_liquidity(DexAsset::BTC, 1. - bob_borrowed_btc - alice_borrowed_btc)
         .await;
 
+    let options = bob.di_collect_my_options(100).await;
     // Check user state
     bob.assert_di_user_put(
-        100,
+        options[0].created,
         500,
         usdc(180.),
         btc(bob_borrowed_btc),
@@ -728,9 +746,16 @@ async fn test_sol_call_success() {
         .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
         .await;
 
+    let options = user.di_collect_my_options(100).await;
     // Check user state
-    user.assert_di_user_call(100, 500, sol(10.), sol(borrowed_sol), usdc(borrowed_usdc))
-        .await;
+    user.assert_di_user_call(
+        options[0].created,
+        500,
+        sol(10.),
+        sol(borrowed_sol),
+        usdc(borrowed_usdc),
+    )
+    .await;
 
     // Check option volume
     admin.assert_di_option_volume(100, sol(10.)).await;
@@ -788,9 +813,16 @@ async fn test_sol_put_success() {
         .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
         .await;
 
+    let options = user.di_collect_my_options(100).await;
     // Check user state
-    user.assert_di_user_put(100, 500, usdc(150.), sol(borrowed_sol), usdc(borrowed_usdc))
-        .await;
+    user.assert_di_user_put(
+        options[0].created,
+        500,
+        usdc(150.),
+        sol(borrowed_sol),
+        usdc(borrowed_usdc),
+    )
+    .await;
 
     // Check option volume
     admin.assert_di_option_volume(100, usdc(150.)).await;

@@ -62,9 +62,16 @@ async fn test_btc_call_not_exercised() {
         .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
         .await;
 
+    let options = user.di_collect_my_options(100).await;
     // Check user state
-    user.assert_di_user_call(100, 500, btc(0.1), btc(borrowed_btc), usdc(borrowed_usdc))
-        .await;
+    user.assert_di_user_call(
+        options[0].created,
+        500,
+        btc(0.1),
+        btc(borrowed_btc),
+        usdc(borrowed_usdc),
+    )
+    .await;
 
     // Check option volume
     admin.assert_di_option_volume(100, btc(0.1)).await;
@@ -84,7 +91,12 @@ async fn test_btc_call_not_exercised() {
 
     // Settle user's option
     admin
-        .di_settle_with_invalid_user_mint_acc(&user.user.pubkey(), 100, false, usdc(0.))
+        .di_settle_with_invalid_user_mint_acc(
+            &user.user.pubkey(),
+            options[0].created,
+            false,
+            usdc(0.),
+        )
         .await
         .assert_ok();
 
@@ -160,9 +172,16 @@ async fn test_btc_call_exercised() {
         .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
         .await;
 
+    let options = user.di_collect_my_options(100).await;
     // Check user state
-    user.assert_di_user_call(100, 500, btc(0.1), btc(borrowed_btc), usdc(borrowed_usdc))
-        .await;
+    user.assert_di_user_call(
+        options[0].created,
+        500,
+        btc(0.1),
+        btc(borrowed_btc),
+        usdc(borrowed_usdc),
+    )
+    .await;
 
     // Check option volume
     admin.assert_di_option_volume(100, btc(0.1)).await;
@@ -179,7 +198,12 @@ async fn test_btc_call_exercised() {
 
     // Settle user's option
     admin
-        .di_settle_with_invalid_user_mint_acc(&user.user.pubkey(), 100, false, usdc(0.))
+        .di_settle_with_invalid_user_mint_acc(
+            &user.user.pubkey(),
+            options[0].created,
+            false,
+            usdc(0.),
+        )
         .await
         .assert_ok();
 
@@ -257,9 +281,16 @@ async fn test_btc_put_not_exercised() {
         .assert_liquidity(DexAsset::BTC, 1. - borrowed_btc)
         .await;
 
+    let options = user.di_collect_my_options(100).await;
     // Check user state
-    user.assert_di_user_put(100, 500, usdc(180.), btc(borrowed_btc), usdc(borrowed_usdc))
-        .await;
+    user.assert_di_user_put(
+        options[0].created,
+        500,
+        usdc(180.),
+        btc(borrowed_btc),
+        usdc(borrowed_usdc),
+    )
+    .await;
 
     // Check option volume
     admin.assert_di_option_volume(100, usdc(180.)).await;
@@ -279,7 +310,12 @@ async fn test_btc_put_not_exercised() {
 
     // Settle user's option
     admin
-        .di_settle_with_invalid_user_mint_acc(&user.user.pubkey(), 100, false, usdc(0.))
+        .di_settle_with_invalid_user_mint_acc(
+            &user.user.pubkey(),
+            options[0].created,
+            false,
+            usdc(0.),
+        )
         .await
         .assert_ok();
 
@@ -356,9 +392,16 @@ async fn test_btc_put_exercised() {
         .assert_liquidity(DexAsset::BTC, 1. - borrowed_btc)
         .await;
 
+    let options = user.di_collect_my_options(100).await;
     // Check user state
-    user.assert_di_user_put(100, 500, usdc(180.), btc(borrowed_btc), usdc(borrowed_usdc))
-        .await;
+    user.assert_di_user_put(
+        options[0].created,
+        500,
+        usdc(180.),
+        btc(borrowed_btc),
+        usdc(borrowed_usdc),
+    )
+    .await;
 
     // Check option volume
     admin.assert_di_option_volume(100, usdc(180.)).await;
@@ -375,7 +418,12 @@ async fn test_btc_put_exercised() {
 
     // Settle user's option
     admin
-        .di_settle_with_invalid_user_mint_acc(&user.user.pubkey(), 100, false, usdc(0.))
+        .di_settle_with_invalid_user_mint_acc(
+            &user.user.pubkey(),
+            options[0].created,
+            false,
+            usdc(0.),
+        )
         .await
         .assert_ok();
 

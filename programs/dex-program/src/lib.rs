@@ -250,8 +250,13 @@ pub mod dex_program {
         dual_invest::buy::handler(ctx, id, premium_rate, size)
     }
 
-    pub fn di_settle(ctx: Context<DiSettle>, id: u64, force: bool, settle_price: u64) -> DexResult {
-        dual_invest::settle::handler(ctx, id, force, settle_price)
+    pub fn di_settle(
+        ctx: Context<DiSettle>,
+        created: u64,
+        force: bool,
+        settle_price: u64,
+    ) -> DexResult {
+        dual_invest::settle::handler(ctx, created, force, settle_price)
     }
 
     pub fn di_withdraw_settled(ctx: Context<DiWithdrawSettled>, created: u64) -> DexResult {

@@ -36,6 +36,7 @@ pub struct DIOption {
     pub premium_rate: u16,
     pub is_call: bool,
     pub stopped: bool,
+    pub settled: bool,
     pub base_asset_index: u8,
     pub quote_asset_index: u8,
     reserved: [u8; 2],
@@ -66,6 +67,7 @@ impl DIOption {
         self.maximum_open_size = maximum_open_size;
         self.stop_before_expiry = stop_before_expiry;
         self.stopped = false;
+        self.settled = false;
         self.settle_price = 0;
         self.settle_size = 0;
         self.volume = 0;
@@ -232,6 +234,7 @@ impl<'a> DI<'a> {
         }
 
         option.data.stopped = true;
+        option.data.settled = true;
         option.data.settle_price = price;
 
         Ok(())
@@ -241,11 +244,12 @@ impl<'a> DI<'a> {
         let option = self.find_option(id)?;
 
         let date = get_timestamp()?;
-        if date < option.data.expiry_date {
-            return Err(error!(DexError::DIOptionNotExpired));
-        }
+        require!(
+            date >= option.data.expiry_date,
+            DexError::DIOptionNotExpired
+        );
+        require!(option.data.settled, DexError::DIOptionNotSettled);
 
-        option.data.stopped = true;
         option.data.settle_size += size;
 
         Ok(())
@@ -298,7 +302,7 @@ impl<'a> DI<'a> {
         return Err(error!(DexError::DIOptionNotFound));
     }
 
-    pub fn get_di_option(&self, id: u64) -> DexResult<DIOption> {
+    pub fn get_option(&self, id: u64) -> DexResult<DIOption> {
         Ok(self.find_option(id)?.data)
     }
 
