@@ -36,9 +36,11 @@ pub async fn setup(
     let user_wsol_acc = Keypair::new();
 
     let user_mint_acc = if *mint == spl_token::native_mint::id() {
-        create_token_account(context, payer, &user_wsol_acc, mint, &payer.pubkey(), 0)
-            .await
-            .unwrap();
+        if create_user_mint_acc {
+            create_token_account(context, payer, &user_wsol_acc, mint, &payer.pubkey(), 0)
+                .await
+                .unwrap();
+        }
         user_wsol_acc.pubkey()
     } else {
         let acc = get_associated_token_address(user, mint);
