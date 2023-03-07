@@ -39,7 +39,7 @@ pub struct DIOption {
     pub settled: bool,
     pub base_asset_index: u8,
     pub quote_asset_index: u8,
-    reserved: [u8; 2],
+    reserved: [u8; 17],
 }
 
 impl DIOption {

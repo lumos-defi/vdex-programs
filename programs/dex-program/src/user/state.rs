@@ -16,16 +16,16 @@ use std::mem::ManuallyDrop;
 // #[derive(Clone, Copy)]
 pub struct MetaInfo {
     pub magic: u32,
+    pub serial_number: u32,
     pub owner: Pubkey,
     pub delegate: Pubkey,
-    pub user_list_index: u32,
     pub vlp: UserStake,
-    pub serial_number: u32,
+    pub user_list_index: u32,
     pub order_slot_count: u8,
     pub position_slot_count: u8,
     pub di_option_slot_count: u8,
     pub asset_slot_count: u8,
-    reserved: [u8; 60],
+    reserved: [u8; 64],
 }
 
 #[repr(C)]
