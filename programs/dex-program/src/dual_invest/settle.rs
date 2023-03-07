@@ -271,12 +271,12 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
 
             if user_mint_acc.is_some() {
                 withdraw(&ctx, base_asset_seeds, withdrawable)?;
-            }
 
-            // If base mint is SOL,we can't create a temp WSOL account for the end user(we are settling, no user sign),
-            // so have to use the authority as a "replay" to transfer the native mint to user
-            if base_mint == token::spl_token::native_mint::id() {
-                relay_native_mint_to_user(&ctx, withdrawable)?;
+                // If base mint is SOL,we can't create a temp WSOL account for the end user(we are settling, no user sign),
+                // so have to use the authority as a "replay" to transfer the native mint to user
+                if base_mint == token::spl_token::native_mint::id() {
+                    relay_native_mint_to_user(&ctx, withdrawable)?;
+                }
             }
 
             (false, withdrawable, fee)
@@ -329,12 +329,12 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
 
             if user_mint_acc.is_some() {
                 withdraw(&ctx, base_asset_seeds, withdrawable)?;
-            }
 
-            // If base mint is SOL,we can't create a temp WSOL account for the end user(we are settling, no user sign),
-            // so have to use the authority as a "replay" to transfer the native mint to user
-            if base_mint == token::spl_token::native_mint::id() {
-                relay_native_mint_to_user(&ctx, withdrawable)?;
+                // If base mint is SOL,we can't create a temp WSOL account for the end user(we are settling, no user sign),
+                // so have to use the authority as a "replay" to transfer the native mint to user
+                if base_mint == token::spl_token::native_mint::id() {
+                    relay_native_mint_to_user(&ctx, withdrawable)?;
+                }
             }
 
             (true, withdrawable, fee)

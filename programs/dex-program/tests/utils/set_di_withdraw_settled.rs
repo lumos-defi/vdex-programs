@@ -10,7 +10,9 @@ use anchor_lang::prelude::Pubkey;
 use solana_program_test::ProgramTestContext;
 use spl_associated_token_account::get_associated_token_address;
 
-use super::compose_di_withdraw_settled_ix;
+use super::{
+    compose_di_withdraw_settled_ix, create_associated_token_account, create_token_account,
+};
 
 #[allow(clippy::too_many_arguments)]
 pub async fn setup(
@@ -24,7 +26,21 @@ pub async fn setup(
     program_signer: &Pubkey,
     created: u64,
 ) -> Result<(), TransportError> {
-    let user_mint_acc = get_associated_token_address(&payer.pubkey(), mint);
+    let user_wsol_acc = Keypair::new();
+
+    let user_mint_acc = if *mint == spl_token::native_mint::id() {
+        create_token_account(context, payer, &user_wsol_acc, mint, &payer.pubkey(), 0)
+            .await
+            .unwrap();
+        user_wsol_acc.pubkey()
+    } else {
+        let acc = get_associated_token_address(&payer.pubkey(), mint);
+        if let Ok(None) = context.banks_client.get_account(acc).await {
+            create_associated_token_account(context, payer, &payer.pubkey(), mint).await
+        }
+
+        acc
+    };
 
     let di_withdraw_settled_ix = compose_di_withdraw_settled_ix(
         program,
