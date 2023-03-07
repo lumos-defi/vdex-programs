@@ -36,7 +36,7 @@ pub struct CancelOrder<'info> {
     pub user_mint_acc: Box<Account<'info, TokenAccount>>,
 
     /// CHECK
-    #[account(mut, seeds = [dex.key().as_ref(), authority.key().as_ref()], bump)]
+    #[account(mut, seeds = [dex.key().as_ref(), authority.key().as_ref()], bump, owner = *program_id)]
     pub user_state: UncheckedAccount<'info>,
 
     #[account(mut)]

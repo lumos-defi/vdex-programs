@@ -25,7 +25,7 @@ pub struct LimitAsk<'info> {
     pub order_pool_entry_page: UncheckedAccount<'info>,
 
     /// CHECK
-    #[account(mut, seeds = [dex.key().as_ref(), authority.key().as_ref()], bump)]
+    #[account(mut, seeds = [dex.key().as_ref(), authority.key().as_ref()], bump, owner = *program_id)]
     pub user_state: UncheckedAccount<'info>,
 
     #[account(mut)]

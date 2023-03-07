@@ -54,7 +54,7 @@ pub struct Swap<'info> {
     pub event_queue: UncheckedAccount<'info>,
 
     /// CHECK
-    #[account(seeds = [dex.key().as_ref(), authority.key().as_ref()], bump)]
+    #[account(seeds = [dex.key().as_ref(), authority.key().as_ref()], bump, owner = *program_id)]
     pub user_state: UncheckedAccount<'info>,
 
     /// CHECK
