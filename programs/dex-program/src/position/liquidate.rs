@@ -22,7 +22,7 @@ pub struct LiquidatePosition<'info> {
     pub user: AccountInfo<'info>,
 
     /// CHECK
-    #[account(mut, seeds = [dex.key().as_ref(), user.key().as_ref()], bump)]
+    #[account(mut, seeds = [dex.key().as_ref(), user.key().as_ref()], bump, owner = *program_id)]
     pub user_state: UncheckedAccount<'info>,
 
     #[account(
