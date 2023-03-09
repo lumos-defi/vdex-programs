@@ -8,7 +8,7 @@ use crate::{
 
 #[derive(Accounts)]
 pub struct DiSetAdmin<'info> {
-    #[account(owner = *program_id, has_one = authority)]
+    #[account(owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
@@ -29,6 +29,12 @@ pub fn handler(ctx: Context<DiSetAdmin>) -> DexResult {
     );
 
     let di = DI::mount(&ctx.accounts.di_option, true)?;
+    require!(
+        di.borrow().meta.admin == ctx.accounts.authority.key()
+            || dex.authority == ctx.accounts.authority.key(),
+        DexError::InvalidDIAdmin
+    );
+
     di.borrow_mut().set_admin(ctx.accounts.admin.key());
 
     Ok(())
