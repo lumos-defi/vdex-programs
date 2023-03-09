@@ -49,6 +49,7 @@ async fn test_di_set_fee_rate() {
 async fn test_di_set_admin() {
     let dtc = DexTestContext::new().await;
     let user = &dtc.user_context[0];
+    let other = &dtc.user_context[1];
 
     dtc.di_set_admin(&user.user.pubkey()).await;
     user.assert_di_admin(&user.user.pubkey()).await;
@@ -57,6 +58,9 @@ async fn test_di_set_admin() {
     dtc.di_set_fee_rate(&user.user, 60).await.assert_ok();
     user.assert_di_fee_rate(60).await;
 
-    // Other can not set fee rate
-    dtc.di_set_fee_rate(&dtc.admin, 60).await.assert_err();
+    // dex admin can also set fee rate
+    dtc.di_set_fee_rate(&dtc.admin, 70).await.assert_ok();
+
+    // Other can not
+    dtc.di_set_fee_rate(&other.user, 80).await.assert_err();
 }

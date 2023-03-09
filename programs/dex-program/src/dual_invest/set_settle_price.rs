@@ -28,7 +28,8 @@ pub fn handler(ctx: Context<DiSetSettlePrice>, id: u64, price: u64) -> DexResult
 
     let di = DI::mount(&ctx.accounts.di_option, true)?;
     require!(
-        di.borrow().meta.admin == ctx.accounts.authority.key(),
+        di.borrow().meta.admin == ctx.accounts.authority.key()
+            || dex.authority.key() == ctx.accounts.authority.key(),
         DexError::InvalidDIAdmin
     );
 

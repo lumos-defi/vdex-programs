@@ -37,7 +37,8 @@ pub fn handler(ctx: Context<DiRemoveOption>, id: u64, force: bool) -> DexResult 
     let di = DI::mount(&ctx.accounts.di_option, true)?;
     if force {
         require!(
-            di.borrow().meta.admin == ctx.accounts.authority.key(),
+            di.borrow().meta.admin == ctx.accounts.authority.key()
+                || dex.authority.key() == ctx.accounts.authority.key(),
             DexError::InvalidDIAdmin
         );
     }
