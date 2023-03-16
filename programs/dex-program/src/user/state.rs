@@ -705,6 +705,30 @@ impl<'a> UserState<'a> {
     }
 
     #[cfg(feature = "client-support")]
+    pub fn collect_unsettled_di_options(&self) -> Vec<UserDIOption> {
+        let mut options: Vec<UserDIOption> = vec![];
+
+        for o in self.di_option_pool.into_iter() {
+            if !o.data.settled {
+                options.push(o.data);
+            }
+        }
+
+        options
+    }
+
+    #[cfg(feature = "client-support")]
+    pub fn collect_all_di_options(&self) -> Vec<UserDIOption> {
+        let mut options: Vec<UserDIOption> = vec![];
+
+        for o in self.di_option_pool.into_iter() {
+            options.push(o.data);
+        }
+
+        options
+    }
+
+    #[cfg(feature = "client-support")]
     pub fn di_read_created_option(&self, created: u64) -> DexResult<(u8, u64)> {
         let lookup = self
             .di_option_pool

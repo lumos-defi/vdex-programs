@@ -55,4 +55,12 @@ async fn test_close_associate_account_created_by_others() {
         .await;
 
     assert!(res.is_ok());
+
+    create_associated_token_account(context, &user.user, &user_pubkey, &ai.mint).await;
+
+    if let Ok(None) = context.banks_client.get_account(user_mint_acc).await {
+        assert!(false);
+    } else {
+        assert!(true);
+    }
 }
