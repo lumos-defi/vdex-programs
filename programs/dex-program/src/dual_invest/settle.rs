@@ -364,8 +364,12 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
     if user_mint_acc.is_some() {
         us.borrow_mut().di_remove_option(option_slot)?;
     } else {
-        us.borrow_mut()
-            .di_settle_option(option_slot, exercised, withdrawable)?;
+        us.borrow_mut().di_settle_option(
+            option_slot,
+            actual_settle_price,
+            exercised,
+            withdrawable,
+        )?;
     }
 
     // Save to event queue
