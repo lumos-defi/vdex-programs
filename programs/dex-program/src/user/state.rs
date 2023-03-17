@@ -163,6 +163,7 @@ pub struct UserDIOption {
     pub created: u64,
     pub expiry_date: i64,
     pub strike_price: u64,
+    pub settle_price: u64,
     pub size: u64,
     pub borrowed_base_funds: u64,
     pub borrowed_quote_funds: u64,
@@ -635,7 +636,13 @@ impl<'a> UserState<'a> {
         self.di_option_pool.remove(slot)
     }
 
-    pub fn di_settle_option(&mut self, slot: u8, exercised: bool, withdrawable: u64) -> DexResult {
+    pub fn di_settle_option(
+        &mut self,
+        slot: u8,
+        settle_price: u64,
+        exercised: bool,
+        withdrawable: u64,
+    ) -> DexResult {
         let option = self.di_option_pool.from_index(slot)?;
         if option.data.is_call {
             if exercised {
@@ -655,6 +662,7 @@ impl<'a> UserState<'a> {
             }
         }
 
+        option.data.settle_price = settle_price;
         option.data.exercised = exercised;
         option.data.settled = true;
 
