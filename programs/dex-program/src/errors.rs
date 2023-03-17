@@ -257,6 +257,9 @@ pub enum DexError {
     #[msg("Invalid strike price")]
     InvalidStrikePrice,
 
+    #[msg("Premium rate is zero")]
+    ZeroPremiumRate,
+
     #[msg("Invalid expiry date")]
     InvalidExpiryDate,
 
