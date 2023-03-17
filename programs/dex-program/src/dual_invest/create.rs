@@ -69,6 +69,8 @@ pub fn handler(
         require!(strike_price < price, DexError::InvalidStrikePrice);
     }
 
+    require!(premium_rate > 0, DexError::ZeroPremiumRate);
+
     // Check expiry date
     // TODO: need a gap between expiry date and now?
     let now = get_timestamp()?;

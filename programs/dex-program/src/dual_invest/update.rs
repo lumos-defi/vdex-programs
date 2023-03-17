@@ -31,6 +31,7 @@ pub fn handler(ctx: Context<DiUpdateOption>, id: u64, premium_rate: u16, stop: b
             || dex.authority.key() == ctx.accounts.authority.key(),
         DexError::InvalidDIAdmin
     );
+    require!(premium_rate > 0, DexError::ZeroPremiumRate);
 
     di.borrow_mut().update(id, premium_rate, stop)?;
 
