@@ -35,7 +35,7 @@ pub async fn setup(
 ) -> Result<(), TransportError> {
     let user_wsol_acc = Keypair::new();
 
-    let user_mint_acc = if *mint == spl_token::native_mint::id() {
+    let mut user_mint_acc = if *mint == spl_token::native_mint::id() {
         if create_user_mint_acc {
             create_token_account(context, payer, &user_wsol_acc, mint, &payer.pubkey(), 0)
                 .await
@@ -52,6 +52,10 @@ pub async fn setup(
 
         acc
     };
+
+    if !create_user_mint_acc {
+        user_mint_acc = Keypair::new().pubkey();
+    }
 
     let di_settle_ix = compose_di_settle_ix(
         program,
