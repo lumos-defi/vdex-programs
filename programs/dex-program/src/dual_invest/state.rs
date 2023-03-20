@@ -18,7 +18,7 @@ pub struct DIMeta {
     pub fee_rate: u16,
     pub stopped: bool,
     pub option_slot_count: u8,
-    reserved: [u8; 60],
+    reserved: [u8; 124],
 }
 
 #[repr(C)]
@@ -39,7 +39,7 @@ pub struct DIOption {
     pub settled: bool,
     pub base_asset_index: u8,
     pub quote_asset_index: u8,
-    reserved: [u8; 17],
+    reserved: [u8; 49],
 }
 
 impl DIOption {

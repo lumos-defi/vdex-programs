@@ -42,7 +42,7 @@ pub struct UserOrder {
     pub open: bool,
     pub asset: u8,
     pub market: u8,
-    padding: [u8; 4],
+    padding: [u8; 20],
 }
 
 impl UserOrder {
@@ -87,7 +87,7 @@ pub struct UserPosition {
     pub long: Position,
     pub short: Position,
     pub market: u8,
-    padding: [u8; 7],
+    padding: [u8; 23],
 }
 
 impl UserPosition {
@@ -173,7 +173,7 @@ pub struct UserDIOption {
     pub is_call: bool,
     pub exercised: bool,
     pub settled: bool,
-    padding: u8,
+    padding: [u8; 17],
 }
 
 impl UserDIOption {
@@ -207,7 +207,7 @@ impl UserDIOption {
 pub struct UserAsset {
     pub amount: u64,
     pub asset: u8, // asset index
-    padding: [u8; 7],
+    padding: [u8; 23],
 }
 
 pub struct UserState<'a> {
@@ -840,9 +840,9 @@ mod test {
     fn test_user_state_init() {
         let bump = Bump::new();
         let order_slot_count = 8u8;
-        let position_slot_count = 8u8;
+        let position_slot_count = 4u8;
         let di_option_slot_count = 8u8;
-        let asset_slot_count = 12u8;
+        let asset_slot_count = 8u8;
 
         let required_size = UserState::required_account_size(
             order_slot_count,

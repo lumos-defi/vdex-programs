@@ -17,7 +17,7 @@ pub struct StakingPool {
     pub reward_asset_index: u8,
     pub decimals: u8,
     pub nonce: u8,
-    pub padding: [u8; 5],
+    pub padding: [u8; 69],
 }
 
 impl StakingPool {
@@ -83,6 +83,7 @@ pub struct UserStake {
     pub staked: u64,
     pub reward_debt: u64,
     pub reward_accumulated: u64,
+    pub padding: [u8; 64],
 }
 
 impl UserStake {
