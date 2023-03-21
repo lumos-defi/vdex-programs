@@ -10,8 +10,8 @@ use crate::{
     user::state::*,
     utils::{SafeMath, ORDER_POOL_MAGIC_BYTE, USER_LIST_MAGIC_BYTE},
 };
-use anchor_lang::prelude::*;
-use anchor_spl::token::{self, TokenAccount, Transfer};
+use anchor_lang::{prelude::*, system_program};
+use anchor_spl::token::{self, CloseAccount, TokenAccount, Transfer};
 
 #[derive(Accounts)]
 pub struct LiquidatePosition<'info> {
@@ -25,11 +25,9 @@ pub struct LiquidatePosition<'info> {
     #[account(mut, seeds = [dex.key().as_ref(), user.key().as_ref()], bump, owner = *program_id)]
     pub user_state: UncheckedAccount<'info>,
 
-    #[account(
-        mut,
-        constraint = (user_mint_acc.owner == *user.key && user_mint_acc.mint == *market_mint.key)
-    )]
-    pub user_mint_acc: Box<Account<'info, TokenAccount>>,
+    /// CHECK
+    #[account(mut)]
+    pub user_mint_acc: UncheckedAccount<'info>,
 
     /// CHECK
     pub market_mint: AccountInfo<'info>,
@@ -66,6 +64,48 @@ pub struct LiquidatePosition<'info> {
     /// CHECK
     #[account(executable, constraint = (token_program.key == &token::ID))]
     pub token_program: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(executable, constraint = (system_program.key == &system_program::ID))]
+    pub system_program: AccountInfo<'info>,
+}
+
+fn withdraw(ctx: &Context<LiquidatePosition>, seeds: &[&[u8]; 3], amount: u64) -> DexResult {
+    let signer_seeds = &[&seeds[..]];
+
+    let cpi_accounts = Transfer {
+        from: ctx.accounts.market_mint_vault.to_account_info(),
+        to: ctx.accounts.user_mint_acc.to_account_info(),
+        authority: ctx.accounts.program_signer.to_account_info(),
+    };
+
+    let cpi_ctx = CpiContext::new_with_signer(
+        ctx.accounts.token_program.clone(),
+        cpi_accounts,
+        signer_seeds,
+    );
+
+    token::transfer(cpi_ctx, amount)?;
+    Ok(())
+}
+
+fn relay_native_mint_to_user(ctx: &Context<LiquidatePosition>, lamports: u64) -> DexResult {
+    let cpi_close = CloseAccount {
+        account: ctx.accounts.user_mint_acc.to_account_info(),
+        destination: ctx.accounts.authority.to_account_info(),
+        authority: ctx.accounts.authority.to_account_info(),
+    };
+
+    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_close);
+    token::close_account(cpi_ctx)?;
+
+    let cpi_sys_transfer = system_program::Transfer {
+        from: ctx.accounts.authority.to_account_info(),
+        to: ctx.accounts.user.to_account_info(),
+    };
+    let cpi_ctx = CpiContext::new(ctx.accounts.system_program.clone(), cpi_sys_transfer);
+
+    system_program::transfer(cpi_ctx, lamports)
 }
 
 // Layout of remaining accounts:
@@ -113,7 +153,10 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         );
     }
 
-    let (_, mai) = if long {
+    let user_mint_acc =
+        Account::<TokenAccount>::try_from_unchecked(&ctx.accounts.user_mint_acc).ok();
+
+    let (market_asset_index, mai) = if long {
         (mi.asset_index, &dex.assets[mi.asset_index as usize])
     } else {
         (
@@ -162,18 +205,31 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         return Err(error!(DexError::RequireNoLiquidation));
     }
 
-    if withdrawable > 0 {
-        let signer = &[&seeds[..]];
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.market_mint_vault.to_account_info(),
-            to: ctx.accounts.user_mint_acc.to_account_info(),
-            authority: ctx.accounts.program_signer.to_account_info(),
-        };
+    if user_mint_acc.is_some() {
+        if let Some(acc) = user_mint_acc {
+            if ctx.accounts.market_mint.key() == token::spl_token::native_mint::id() {
+                require!(
+                    acc.owner == ctx.accounts.authority.key()
+                        && acc.mint == ctx.accounts.market_mint.key(),
+                    DexError::InvalidUserMintAccount
+                );
+            } else {
+                require!(
+                    acc.owner == ctx.accounts.user.key()
+                        && acc.mint == ctx.accounts.market_mint.key(),
+                    DexError::InvalidUserMintAccount
+                );
+            }
+        }
 
-        // let cpi_program = ctx.accounts.token_program.clone();
-        let cpi_ctx =
-            CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_accounts, signer);
-        token::transfer(cpi_ctx, withdrawable)?;
+        withdraw(&ctx, seeds, withdrawable)?;
+
+        if ctx.accounts.market_mint.key() == token::spl_token::native_mint::id() {
+            relay_native_mint_to_user(&ctx, withdrawable)?;
+        }
+    } else {
+        us.borrow_mut()
+            .deposit_asset(market_asset_index, withdrawable)?;
     }
 
     // Cancel pending ask orders
