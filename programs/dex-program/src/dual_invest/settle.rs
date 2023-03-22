@@ -378,6 +378,8 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
 
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
     event_queue.settle_di_option(
+        option.id,
+        option.created,
         user_state_key,
         base_mint.to_bytes(),
         quote_mint.to_bytes(),
@@ -386,8 +388,10 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
         actual_settle_price,
         option.size,
         option.premium_rate,
+        withdrawable,
         fee,
         option.is_call,
+        exercised,
     )?;
 
     // Update user
