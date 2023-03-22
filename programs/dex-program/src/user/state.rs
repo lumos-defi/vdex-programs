@@ -581,6 +581,17 @@ impl<'a> UserState<'a> {
         Ok(position)
     }
 
+    #[cfg(feature = "client-support")]
+    pub fn has_position(&self) -> bool {
+        for position in self.position_pool.into_iter() {
+            if (position.data.long.size > 0) || (position.data.short.size > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     pub fn enter_staking_vlp(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
         self.meta.vlp.enter_staking(pool, amount)
     }
