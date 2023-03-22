@@ -84,13 +84,17 @@ pub struct DIOptionSettled {
     pub user_state: [u8; 32],
     pub base_mint: [u8; 32],
     pub quote_mint: [u8; 32],
+    pub option_id: u64,
+    pub created: u64,
     pub expiry_date: i64,
     pub strike_price: u64,
     pub settle_price: u64,
     pub size: u64,
     pub premium_rate: u16,
+    pub withdrawable: u64,
     pub fee: u64,
     pub is_call: bool,
+    pub exercised: bool,
 }
 
 impl PackedEvent for DIOptionSettled {
@@ -154,6 +158,8 @@ pub trait AppendEvent {
     #[allow(clippy::too_many_arguments)]
     fn settle_di_option(
         &mut self,
+        option_id: u64,
+        created: u64,
         user_state: [u8; 32],
         base_mint: [u8; 32],
         quote_mint: [u8; 32],
@@ -162,8 +168,10 @@ pub trait AppendEvent {
         settle_price: u64,
         size: u64,
         premium_rate: u16,
+        withdrawable: u64,
         fee: u64,
         is_call: bool,
+        exercised: bool,
     ) -> DexResult;
 
     #[allow(clippy::too_many_arguments)]
@@ -301,6 +309,8 @@ impl AppendEvent for EventQueue<'_> {
     #[allow(clippy::too_many_arguments)]
     fn settle_di_option(
         &mut self,
+        option_id: u64,
+        created: u64,
         user_state: [u8; 32],
         base_mint: [u8; 32],
         quote_mint: [u8; 32],
@@ -309,35 +319,45 @@ impl AppendEvent for EventQueue<'_> {
         settle_price: u64,
         size: u64,
         premium_rate: u16,
+        withdrawable: u64,
         fee: u64,
         is_call: bool,
+        exercised: bool,
     ) -> DexResult {
         let event = DIOptionSettled {
             user_state,
             base_mint,
             quote_mint,
+            option_id,
+            created,
             expiry_date,
             strike_price,
             settle_price,
             size,
             premium_rate,
+            withdrawable,
             fee,
             is_call,
+            exercised,
         };
 
         let event_seq = self.append(event)?;
         msg!(
-            "DI option settled: {:?} {:?} {:?} {} {} {} {} {} {} {} {}",
+            "DI option settled: {:?} {:?} {:?} {} {} {} {} {} {} {} {} {} {} {} {}",
             user_state,
             base_mint,
             quote_mint,
+            option_id,
+            created,
             expiry_date,
             strike_price,
             settle_price,
             size,
             premium_rate,
+            withdrawable,
             fee,
             is_call,
+            exercised,
             event_seq
         );
 
