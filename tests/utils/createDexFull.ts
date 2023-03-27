@@ -49,6 +49,7 @@ export async function createDexFull(authority: Keypair) {
   const eventQueue = Keypair.generate()
   const matchQueue = Keypair.generate()
   const userListEntryPage = Keypair.generate()
+  const diOption = Keypair.generate()
   const VLP_DECIMALS = 6
 
   const orderBook = Keypair.generate()
@@ -68,14 +69,16 @@ export async function createDexFull(authority: Keypair) {
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
       rewardMint: TokenInstructions.WRAPPED_SOL_MINT,
+      diOption: diOption.publicKey,
     })
     .preInstructions([
       await program.account.dex.createInstruction(dex),
       await createAccountInstruction(eventQueue, 128 * 1024),
       await createAccountInstruction(matchQueue, 128 * 1024),
       await createAccountInstruction(userListEntryPage, 128 * 1024),
+      await createAccountInstruction(diOption, 128 * 1024),
     ])
-    .signers([authority, dex, eventQueue, matchQueue, userListEntryPage])
+    .signers([authority, dex, eventQueue, matchQueue, userListEntryPage, diOption])
     .rpc()
 
   //Add BTC asset
@@ -92,7 +95,7 @@ export async function createDexFull(authority: Keypair) {
   )
 
   //pda
-  const [mintProgramSigner, mintNonce] = await PublicKey.findProgramAddress(
+  const [mintProgramSigner, mintNonce] = PublicKey.findProgramAddressSync(
     [assetMint.publicKey.toBuffer(), dex.publicKey.toBuffer()],
     program.programId
   )

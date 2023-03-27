@@ -5,10 +5,8 @@ export async function findAssociatedTokenAddress(
   walletAddress: PublicKey,
   tokenMintAddress: PublicKey
 ): Promise<PublicKey> {
-  return (
-    await PublicKey.findProgramAddress(
-      [walletAddress.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), tokenMintAddress.toBuffer()],
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    )
+  return PublicKey.findProgramAddressSync(
+    [walletAddress.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), tokenMintAddress.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID
   )[0]
 }

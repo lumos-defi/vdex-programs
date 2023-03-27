@@ -17,10 +17,12 @@ pub struct Dex {
     pub markets: [MarketInfo; 16],
     pub vlp_pool: StakingPool,
     pub authority: Pubkey,
+    pub delegate: Pubkey,
     pub event_queue: Pubkey,
     pub match_queue: Pubkey,
     pub usdc_mint: Pubkey,
     pub di_option: Pubkey,
+    pub feed_price: Pubkey,
     pub user_list_entry_page: Pubkey,
     pub user_list_remaining_pages: [Pubkey; 8],
     pub user_list_remaining_pages_number: u8,
@@ -1060,6 +1062,22 @@ impl GetOraclePrice for OracleInfo<'_, '_> {
 
         Ok((price, self.base_decimals))
     }
+}
+
+#[account(zero_copy)]
+pub struct FeedPrice {
+    pub magic: u64,
+    pub authority: Pubkey,
+    pub prices: [PriceInfo; 16],
+}
+
+#[zero_copy]
+pub struct PriceInfo {
+    pub asset_price: u64,
+    pub update_time: i64,
+    pub asset_index: u8,
+    pub valid: bool,
+    padding: [u8; 6],
 }
 
 #[cfg(test)]

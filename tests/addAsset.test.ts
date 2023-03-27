@@ -42,7 +42,7 @@ describe('Add Dex Asset', () => {
     assetMint = await createMint(authority.publicKey, ASSET_MINT_DECIMAL)
 
     //pda
-    ;[programSigner, nonce] = await PublicKey.findProgramAddress(
+    ;[programSigner, nonce] = PublicKey.findProgramAddressSync(
       [assetMint.toBuffer(), dex.publicKey.toBuffer()],
       program.programId
     )
@@ -168,7 +168,7 @@ describe('Add Dex Asset', () => {
 
     const solOracle = await createMockOracle(authority, SOL_ORACLE_PRICE, SOL_ORACLE_PRICE_EXPO)
 
-    ;[programSigner, nonce] = await PublicKey.findProgramAddress(
+    ;[programSigner, nonce] = PublicKey.findProgramAddressSync(
       [TokenInstructions.WRAPPED_SOL_MINT.toBuffer(), dex.publicKey.toBuffer()],
       program.programId
     )

@@ -286,6 +286,12 @@ pub enum DexError {
 
     #[msg("DI option not settled")]
     DIOptionNotSettled,
+
+    #[msg("Invalid admin or delegate")]
+    InvalidAdminOrDelegate,
+
+    #[msg("Account has already been initialized")]
+    AccountHasAlreadyBeenInitialized,
 }
 
 pub type DexResult<T = ()> = Result<T>;

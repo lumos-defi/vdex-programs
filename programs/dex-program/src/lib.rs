@@ -262,6 +262,10 @@ pub mod dex_program {
     pub fn di_withdraw_settled(ctx: Context<DiWithdrawSettled>, created: u64) -> DexResult {
         dual_invest::withdraw_settled::handler(ctx, created)
     }
+
+    pub fn init_feed_price(ctx: Context<InitFeedPrice>) -> DexResult {
+        dex::init_feed_price::handler(ctx)
+    }
 }
 
 #[derive(Accounts)]

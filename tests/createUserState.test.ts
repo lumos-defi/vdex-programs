@@ -13,19 +13,19 @@ describe('Test Create User State', () => {
       await airdrop(provider, alice.publicKey, 10000000000)
 
       //gen user order state with seeds
-      ;[userStatePublicKey] = await PublicKey.findProgramAddress(
+      ;[userStatePublicKey] = PublicKey.findProgramAddressSync(
         [dex.publicKey.toBuffer(), alice.publicKey.toBuffer()],
         program.programId
       )
     })
 
     it('should create same publickey with same buffer successfully', async () => {
-      const [publicKey1, nonce1] = await PublicKey.findProgramAddress(
+      const [publicKey1, nonce1] = PublicKey.findProgramAddressSync(
         [dex.publicKey.toBuffer(), alice.publicKey.toBuffer()],
         program.programId
       )
 
-      const [publicKey2, nonce2] = await PublicKey.findProgramAddress(
+      const [publicKey2, nonce2] = PublicKey.findProgramAddressSync(
         [dex.publicKey.toBuffer(), alice.publicKey.toBuffer()],
         program.programId
       )
@@ -37,8 +37,9 @@ describe('Test Create User State', () => {
     it('should create user state account successfully', async () => {
       const orderSlotCount = 32
       const positionSlotCount = 32
+      const assetSlotCount = 8
       await program.methods
-        .createUserState(orderSlotCount, positionSlotCount)
+        .createUserState(orderSlotCount, positionSlotCount, assetSlotCount)
         .accounts({
           userState: userStatePublicKey,
           dex: dex.publicKey,
