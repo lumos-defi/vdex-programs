@@ -7,23 +7,24 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct InitFeedPrice<'info> {
+pub struct InitPriceFeed<'info> {
     #[account(
         mut,
         has_one = authority,
+        owner = *program_id
     )]
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
     #[account(zero)]
-    pub feed_price: AccountLoader<'info, FeedPrice>,
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 
     /// CHECK
     #[account(mut)]
     pub authority: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<InitFeedPrice>) -> DexResult {
+pub fn handler(ctx: Context<InitPriceFeed>) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
 
     require!(
@@ -33,16 +34,16 @@ pub fn handler(ctx: Context<InitFeedPrice>) -> DexResult {
     );
 
     require!(
-        dex.feed_price == Pubkey::default(),
+        dex.price_feed == Pubkey::default(),
         DexError::AccountHasAlreadyBeenInitialized
     );
 
-    let feed_price = &mut ctx.accounts.feed_price.load_init()?;
+    let feed_price = &mut ctx.accounts.price_feed.load_init()?;
 
     feed_price.magic = FEED_PRICE_MAGIC_NUMBER;
     feed_price.authority = ctx.accounts.authority.key();
 
-    dex.feed_price = ctx.accounts.feed_price.key();
+    dex.price_feed = ctx.accounts.price_feed.key();
 
     Ok(())
 }

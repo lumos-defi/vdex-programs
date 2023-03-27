@@ -5,38 +5,41 @@ import { getProviderAndProgram } from './utils/getProvider'
 describe('Init Feed Price', () => {
   const { program } = getProviderAndProgram()
   let dex: Keypair
-  let feedPrice: Keypair
+  let priceFeed: Keypair
   let authority: Keypair
 
   beforeEach(async () => {
     authority = Keypair.generate()
-    feedPrice = Keypair.generate()
+    priceFeed = Keypair.generate()
     ;({ dex } = await createDex(authority))
   })
 
-  it('should init feed price account successfully', async () => {
+  it('should init price feed account successfully', async () => {
     await program.methods
-      .initFeedPrice()
+      .initPriceFeed()
       .accounts({
         dex: dex.publicKey,
-        feedPrice: feedPrice.publicKey,
+        priceFeed: priceFeed.publicKey,
         authority: authority.publicKey,
       })
-      .preInstructions([await program.account.feedPrice.createInstruction(feedPrice)])
-      .signers([authority, feedPrice])
+      .preInstructions([await program.account.priceFeed.createInstruction(priceFeed)])
+      .signers([authority, priceFeed])
       .rpc()
 
-    const feedPriceInfo = await program.account.feedPrice.fetch(feedPrice.publicKey)
+    const priceFeedInfo = await program.account.priceFeed.fetch(priceFeed.publicKey)
 
-    expect(feedPriceInfo).toMatchObject({
+    expect(priceFeedInfo).toMatchObject({
       magic: expect.toBNEqual(0x666a),
       authority: authority.publicKey,
       prices: expect.arrayContaining([
         expect.objectContaining({
-          assetPrice: expect.toBNEqual(0),
-          updateTime: expect.toBNEqual(0),
-          assetIndex: 0,
-          valid: false,
+          assetPrices: expect.arrayContaining([
+            expect.objectContaining({
+              price: expect.toBNEqual(0),
+              updateTime: expect.toBNEqual(0),
+            }),
+          ]),
+          lastUpdateTime: expect.toBNEqual(0),
         }),
       ]),
     })

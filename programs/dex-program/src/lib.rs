@@ -263,8 +263,12 @@ pub mod dex_program {
         dual_invest::withdraw_settled::handler(ctx, created)
     }
 
-    pub fn init_feed_price(ctx: Context<InitFeedPrice>) -> DexResult {
-        dex::init_feed_price::handler(ctx)
+    pub fn init_price_feed(ctx: Context<InitPriceFeed>) -> DexResult {
+        dex::init_price_feed::handler(ctx)
+    }
+
+    pub fn update_price_feed(ctx: Context<FeedPrice>, prices: [u64; 16]) -> DexResult {
+        dex::update_price_feed::handler(ctx, prices)
     }
 }
 

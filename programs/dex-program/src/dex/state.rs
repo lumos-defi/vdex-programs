@@ -22,7 +22,7 @@ pub struct Dex {
     pub match_queue: Pubkey,
     pub usdc_mint: Pubkey,
     pub di_option: Pubkey,
-    pub feed_price: Pubkey,
+    pub price_feed: Pubkey,
     pub user_list_entry_page: Pubkey,
     pub user_list_remaining_pages: [Pubkey; 8],
     pub user_list_remaining_pages_number: u8,
@@ -1065,7 +1065,7 @@ impl GetOraclePrice for OracleInfo<'_, '_> {
 }
 
 #[account(zero_copy)]
-pub struct FeedPrice {
+pub struct PriceFeed {
     pub magic: u64,
     pub authority: Pubkey,
     pub prices: [PriceInfo; 16],
@@ -1073,11 +1073,14 @@ pub struct FeedPrice {
 
 #[zero_copy]
 pub struct PriceInfo {
-    pub asset_price: u64,
+    pub asset_prices: [AssetPrice; 5],
+    pub last_update_time: i64,
+}
+
+#[zero_copy]
+pub struct AssetPrice {
+    pub price: u64,
     pub update_time: i64,
-    pub asset_index: u8,
-    pub valid: bool,
-    padding: [u8; 6],
 }
 
 #[cfg(test)]
