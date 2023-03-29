@@ -54,6 +54,7 @@ export async function createDexFull(authority: Keypair) {
 
   const orderBook = Keypair.generate()
   const orderPoolEntryPage = Keypair.generate()
+  const priceFeed = Keypair.generate()
 
   await airdrop(provider, authority.publicKey, 10000000000)
   const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
@@ -189,6 +190,18 @@ export async function createDexFull(authority: Keypair) {
     .signers([authority, orderBook, orderPoolEntryPage])
     .rpc()
 
+  //init price feed
+  await program.methods
+    .initPriceFeed()
+    .accounts({
+      dex: dex.publicKey,
+      priceFeed: priceFeed.publicKey,
+      authority: authority.publicKey,
+    })
+    .preInstructions([await program.account.priceFeed.createInstruction(priceFeed)])
+    .signers([authority, priceFeed])
+    .rpc()
+
   return {
     dex,
     assetMint,
@@ -205,5 +218,6 @@ export async function createDexFull(authority: Keypair) {
     orderPoolEntryPage,
     MOCK_ORACLE_PRICE: BTC_ORACLE_PRICE,
     ADD_LIQUIDITY_FEE_RATE,
+    priceFeed,
   }
 }

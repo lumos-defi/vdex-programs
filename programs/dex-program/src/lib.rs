@@ -267,7 +267,7 @@ pub mod dex_program {
         dex::init_price_feed::handler(ctx)
     }
 
-    pub fn update_price_feed(ctx: Context<FeedPrice>, prices: [u64; 16]) -> DexResult {
+    pub fn update_price_feed(ctx: Context<UpdatePriceFeed>, prices: [u64; 16]) -> DexResult {
         dex::update_price_feed::handler(ctx, prices)
     }
 }
