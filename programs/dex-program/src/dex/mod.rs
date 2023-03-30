@@ -8,7 +8,7 @@ pub mod init_price_feed;
 pub mod oracle;
 pub mod stake;
 pub mod state;
-pub mod update_price_feed;
+pub mod update_price;
 
 pub use add_asset::*;
 pub use add_market::*;
@@ -20,4 +20,4 @@ pub use init_price_feed::*;
 pub use oracle::*;
 pub use stake::*;
 pub use state::*;
-pub use update_price_feed::*;
+pub use update_price::*;

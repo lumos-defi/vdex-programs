@@ -3,7 +3,7 @@ import { getProviderAndProgram } from './utils/getProvider'
 import { createDexFull } from './utils/createDexFull'
 import { BN } from '@project-serum/anchor'
 
-describe('Update Feed Price', () => {
+describe('Update Price', () => {
   const { program } = getProviderAndProgram()
   let dex: Keypair
   let priceFeed: Keypair
@@ -15,11 +15,11 @@ describe('Update Feed Price', () => {
     ;({ dex, priceFeed } = await createDexFull(authority))
   })
 
-  it('should update price feed account successfully', async () => {
+  it('should update price account successfully', async () => {
     for (let i = 0; i <= 5; i++) {
       const prices = [new BN((i + 1) * 10_000_000_000), new BN((i + 1) * 100_000_000), ...new Array(14).fill(new BN(0))]
       await program.methods
-        .updatePriceFeed(prices)
+        .updatePrice(prices)
         .accounts({
           dex: dex.publicKey,
           priceFeed: priceFeed.publicKey,

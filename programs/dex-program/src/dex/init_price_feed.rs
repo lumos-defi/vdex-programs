@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{
     dex::state::*,
     errors::{DexError, DexResult},
-    utils::FEED_PRICE_MAGIC_NUMBER,
+    utils::PRICE_FEED_MAGIC_NUMBER,
 };
 
 #[derive(Accounts)]
@@ -38,10 +38,10 @@ pub fn handler(ctx: Context<InitPriceFeed>) -> DexResult {
         DexError::AccountHasAlreadyBeenInitialized
     );
 
-    let feed_price = &mut ctx.accounts.price_feed.load_init()?;
+    let price_feed = &mut ctx.accounts.price_feed.load_init()?;
 
-    feed_price.magic = FEED_PRICE_MAGIC_NUMBER;
-    feed_price.authority = ctx.accounts.authority.key();
+    price_feed.magic = PRICE_FEED_MAGIC_NUMBER;
+    price_feed.authority = ctx.accounts.authority.key();
 
     dex.price_feed = ctx.accounts.price_feed.key();
 
