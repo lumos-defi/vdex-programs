@@ -15,7 +15,7 @@ use anchor_client::{
 };
 use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
-    dex::{Dex, MockOracle},
+    dex::{Dex, MockOracle, PriceFeed},
     utils::USDC_POW_DECIMALS,
 };
 use solana_program_test::{BanksClient, ProgramTest, ProgramTestContext};
@@ -294,6 +294,17 @@ pub async fn get_dex_info(banks_client: &mut BanksClient, dex: Pubkey) -> RefCel
     RefCell::new(*dex_info)
 }
 
+pub async fn get_price_feed_info(
+    banks_client: &mut BanksClient,
+    price_feed: Pubkey,
+) -> RefCell<PriceFeed> {
+    let price_feed_account = banks_client.get_account(price_feed).await.unwrap().unwrap();
+
+    let data_ptr = price_feed_account.data.as_ptr();
+    let price_feed = unsafe { data_ptr.add(8).cast::<PriceFeed>().as_ref() }.unwrap();
+    RefCell::new(*price_feed)
+}
+
 pub async fn get_mock_oracle_price(context: &mut ProgramTestContext, oracle: Pubkey) -> u64 {
     let oracle_account = context
         .banks_client
@@ -352,4 +363,11 @@ pub fn assert_eq_with_dust(expect: u64, real: u64) {
     if difference.abs() > 1 {
         assert_eq!(expect, real);
     }
+}
+
+pub fn now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
 }

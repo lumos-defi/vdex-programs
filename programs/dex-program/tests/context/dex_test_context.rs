@@ -2,7 +2,7 @@ use std::{borrow::Borrow, cell::RefCell, rc::Rc};
 
 use crate::utils::{
     compose_add_asset_ix, compose_add_market_ixs, compose_di_set_admin_ix,
-    compose_di_set_fee_rate_ix, compose_init_dex_ixs,
+    compose_di_set_fee_rate_ix, compose_init_dex_ixs, compose_init_price_feed_ixs,
     constant::{
         INIT_ADD_SOL_AMOUNT, TEST_BTC_ADD_LIQUIDITY_FEE_RATE, TEST_BTC_ASSET_INDEX,
         TEST_BTC_BORROW_FEE_RATE, TEST_BTC_CHARGE_BORROW_FEE_INTERVAL, TEST_BTC_CLOSE_FEE_RATE,
@@ -83,6 +83,7 @@ impl DexTestContext {
 
         let dex = Keypair::new();
         let usdc_mint = Keypair::new();
+        let price_feed = Keypair::new();
 
         //oracle
         let usdc_mock_oracle = Keypair::new();
@@ -335,6 +336,18 @@ impl DexTestContext {
                 oracle_source,
                 asset_index,
                 significant_decimals,
+            )
+            .await;
+        }
+
+        //9.init price feed
+        {
+            init_price_feed(
+                &mut context.borrow_mut(),
+                &program,
+                &admin,
+                &dex,
+                &price_feed,
             )
             .await;
         }
@@ -652,6 +665,34 @@ pub async fn init_dex(
 
     let transaction = Transaction::new_signed_with_payer(
         &init_dex_ixs,
+        Some(&payer.pubkey()),
+        &signers,
+        context.last_blockhash,
+    );
+
+    context
+        .banks_client
+        .process_transaction(transaction)
+        .await
+        .unwrap();
+}
+
+pub async fn init_price_feed(
+    context: &mut ProgramTestContext,
+    program: &Program,
+    payer: &Keypair,
+    dex: &Keypair,
+    price_feed: &Keypair,
+) {
+    let init_price_feed_ix =
+        compose_init_price_feed_ixs(context, program, payer, &dex.pubkey(), &price_feed).await;
+
+    let mut signers: Vec<&Keypair> = vec![];
+    signers.push(payer);
+    signers.push(price_feed);
+
+    let transaction = Transaction::new_signed_with_payer(
+        &init_price_feed_ix,
         Some(&payer.pubkey()),
         &signers,
         context.last_blockhash,

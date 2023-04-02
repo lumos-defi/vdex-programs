@@ -6,12 +6,13 @@ use std::{
 
 use crate::utils::{
     assert_eq_with_dust, btc, convert_to_big_number, create_associated_token_account,
-    create_token_account, get_dex_info, get_keypair, get_program, get_token_balance, mint_tokens,
-    set_add_liquidity, set_ask, set_bid, set_cancel, set_cancel_all, set_close, set_crank,
-    set_di_buy, set_di_create, set_di_remove_option, set_di_set_settle_price, set_di_settle,
-    set_di_update_option, set_di_withdraw_settled, set_feed_mock_oracle, set_fill, set_market_swap,
-    set_open, set_remove_liquidity, set_user_state, set_withdraw_asset, transfer, usdc, DexAsset,
-    DexMarket, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
+    create_token_account, get_dex_info, get_keypair, get_price_feed_info, get_program,
+    get_token_balance, mint_tokens, set_add_liquidity, set_ask, set_bid, set_cancel,
+    set_cancel_all, set_close, set_crank, set_di_buy, set_di_create, set_di_remove_option,
+    set_di_set_settle_price, set_di_settle, set_di_update_option, set_di_withdraw_settled,
+    set_feed_mock_oracle, set_fill, set_market_swap, set_open, set_remove_liquidity,
+    set_update_price, set_user_state, set_withdraw_asset, transfer, usdc, DexAsset, DexMarket,
+    MAX_ASSET_COUNT, PRICE_FEED_DECIMALS, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{
@@ -33,14 +34,14 @@ use crate::utils::constant::TEST_VLP_DECIMALS;
 use crate::utils::TestResult;
 use dex_program::{
     collections::{OrderBook, SingleEvent, SingleEventQueue},
-    dex::{Dex, MockOracle},
+    dex::{Dex, MockOracle, PriceFeed},
     dual_invest::{DIOption, DI},
     errors::{DexError, DexResult},
     order::MatchEvent,
     user::UserState,
     utils::USDC_POW_DECIMALS,
 };
-use solana_program_test::ProgramTestContext;
+use solana_program_test::{BanksClient, ProgramTestContext};
 use spl_associated_token_account::get_associated_token_address;
 
 pub struct UserTestContext {
@@ -2185,5 +2186,121 @@ impl UserTestContext {
         } else {
             return Err(error!(DexError::DIOptionNotFound));
         }
+    }
+
+    pub async fn update_price(&self, prices: [f64; MAX_ASSET_COUNT]) {
+        let mut update_prices = [0; MAX_ASSET_COUNT];
+
+        for i in 0..prices.len() {
+            update_prices[i] = convert_to_big_number(prices[i], PRICE_FEED_DECIMALS);
+        }
+
+        set_update_price::setup(
+            &mut self.context.borrow_mut(),
+            &self.program,
+            &self.admin,
+            &self.dex,
+            &self.dex_info.borrow().price_feed,
+            update_prices,
+        )
+        .await
+        .unwrap();
+    }
+
+    pub async fn update_usdc_price(&self, price: f64) {
+        let mut prices = [0f64; MAX_ASSET_COUNT];
+        prices[DexAsset::USDC as usize] = price;
+
+        self.update_price(prices).await;
+    }
+
+    pub async fn update_eth_price(&self, price: f64) {
+        let mut prices = [0f64; MAX_ASSET_COUNT];
+        prices[DexAsset::ETH as usize] = price;
+
+        self.update_price(prices).await;
+    }
+
+    pub async fn update_sol_price(&self, price: f64) {
+        let mut prices = [0f64; MAX_ASSET_COUNT];
+        prices[DexAsset::SOL as usize] = price;
+
+        self.update_price(prices).await;
+    }
+
+    pub async fn update_btc_price(&self, price: f64) {
+        let mut prices = [0f64; MAX_ASSET_COUNT];
+        prices[DexAsset::BTC as usize] = price;
+
+        self.update_price(prices).await;
+    }
+
+    pub async fn assert_latest_price(&self, prices: [f64; MAX_ASSET_COUNT]) {
+        let price_feed_info = get_price_feed_info(
+            &mut self.context.borrow_mut().banks_client,
+            self.dex_info.borrow().price_feed,
+        )
+        .await;
+
+        let mut latest_prices = 0u64;
+
+        for i in 0..prices.len() {
+            let price_info = price_feed_info.borrow().prices[i];
+            let current_price = price_info.asset_prices[price_info.cursor as usize].price;
+
+            latest_prices = convert_to_big_number(prices[i], PRICE_FEED_DECIMALS);
+
+            assert_eq!(current_price, latest_prices);
+        }
+    }
+
+    pub async fn assert_valid_price_count(&self, price_counts: [u8; MAX_ASSET_COUNT]) {
+        let price_feed_info = get_price_feed_info(
+            &mut self.context.borrow_mut().banks_client,
+            self.dex_info.borrow().price_feed,
+        )
+        .await;
+
+        for i in 0..price_counts.len() {
+            let valid_count = price_feed_info.borrow().prices[i]
+                .asset_prices
+                .iter()
+                .filter(|&x| x.price > 0)
+                .count();
+
+            assert_eq!(valid_count as u8, price_counts[i]);
+        }
+    }
+
+    pub async fn assert_asset_price(&self, price: f64, asset_index: usize) {
+        let price_feed_info = get_price_feed_info(
+            &mut self.context.borrow_mut().banks_client,
+            self.dex_info.borrow().price_feed,
+        )
+        .await;
+
+        let price_info = price_feed_info.borrow().prices[asset_index];
+        let current_price = price_info.asset_prices[price_info.cursor as usize].price;
+
+        let latest_prices = convert_to_big_number(price, PRICE_FEED_DECIMALS);
+
+        assert_eq!(current_price, latest_prices);
+    }
+
+    pub async fn assert_usdc_price(&self, price: f64) {
+        self.assert_asset_price(price, DexAsset::USDC as usize)
+            .await;
+    }
+
+    pub async fn assert_btc_price(&self, price: f64) {
+        self.assert_asset_price(price, DexAsset::BTC as usize).await;
+    }
+
+    pub async fn assert_eth_price(&self, price: f64) {
+        self.assert_asset_price(price, DexAsset::ETH as usize).await;
+    }
+
+    pub async fn assert_sol_price(&self, price: f64) {
+        self.assert_asset_price(price, DexAsset::SOL as usize).await;
     }
 }

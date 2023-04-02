@@ -12,11 +12,12 @@ use dex_program::{
         AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClosePosition, Crank,
         CreateUserState, DiBuy, DiCreateOption, DiRemoveOption, DiSetAdmin, DiSetFeeRate,
         DiSetSettlePrice, DiSettle, DiUpdateOption, DiWithdrawSettled, FeedMockOraclePrice,
-        FillOrder, InitDex, InitMockOracle, LimitAsk, LimitBid, OpenPosition, RemoveLiquidity,
-        Swap, WithdrawAsset,
+        FillOrder, InitDex, InitMockOracle, InitPriceFeed, LimitAsk, LimitBid, OpenPosition,
+        RemoveLiquidity, Swap, UpdatePrice, WithdrawAsset,
     },
-    dex::Dex,
+    dex::{Dex, PriceFeed},
     dual_invest::DI,
+    utils::MAX_ASSET_COUNT,
 };
 use solana_program_test::ProgramTestContext;
 
@@ -1008,6 +1009,56 @@ pub async fn compose_withdraw_asset_ix(
             token_program: spl_token::id(),
         })
         .args(dex_program::instruction::WithdrawAsset { asset })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_init_price_feed_ixs(
+    context: &mut ProgramTestContext,
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    price_feed: &Keypair,
+) -> Vec<Instruction> {
+    let rent = context.banks_client.get_rent().await.unwrap();
+    let price_feed_account_size = 8 + mem::size_of::<PriceFeed>();
+
+    program
+        .request()
+        .instruction(system_instruction::create_account(
+            &payer.pubkey(),
+            &price_feed.pubkey(),
+            rent.minimum_balance(price_feed_account_size),
+            price_feed_account_size as u64,
+            &program.id(),
+        ))
+        .accounts(InitPriceFeed {
+            dex: *dex,
+            price_feed: price_feed.pubkey(),
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::InitPriceFeed {})
+        .instructions()
+        .unwrap()
+}
+
+pub async fn compose_update_price_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    price_feed: &Pubkey,
+    prices: [u64; MAX_ASSET_COUNT],
+) -> Instruction {
+    program
+        .request()
+        .accounts(UpdatePrice {
+            dex: *dex,
+            price_feed: *price_feed,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::UpdatePrice { prices })
         .instructions()
         .unwrap()
         .pop()
