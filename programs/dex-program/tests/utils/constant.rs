@@ -10,7 +10,10 @@ const CLOSE_FEE_RATE: u16 = 50; // 0.5%   (50 /  10000)
 const LIQUIDATE_FEE_RATE: u16 = 80; // 0.8%   (80 /  10000)
 
 pub const MAX_LEVERAGE: u32 = 30_000; // 30 (30_000 / 1_000);
-                                      //USDC ASSET
+pub const MAX_ASSET_COUNT: usize = 16;
+pub const PRICE_FEED_DECIMALS: u8 = 6;
+
+//USDC ASSET
 pub const TEST_USDC_SYMBOL: &str = "USDC";
 pub const TEST_USDC_DECIMALS: u8 = 6;
 pub const TEST_USDC_ORACLE_PRICE: f64 = 1.0;

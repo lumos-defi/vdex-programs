@@ -2,10 +2,16 @@ pub const NIL8: u8 = u8::MAX;
 pub const NIL16: u16 = u16::MAX;
 pub const NIL32: u32 = u32::MAX;
 
+pub const MAX_ASSET_COUNT: usize = 16;
+pub const MAX_MARKET_COUNT: usize = 16;
+pub const MAX_USER_LIST_REMAINING_PAGES_COUNT: usize = 8;
+pub const MAX_PRICE_COUNT: usize = 5;
+
 pub const DEX_MAGIC_NUMBER: u64 = 0x6666;
 pub const MOCK_ORACLE_MAGIC_NUMBER: u64 = 0x66667;
 pub const USER_STATE_MAGIC_NUMBER: u32 = 0x6668;
 pub const DI_ACCOUNT_MAGIC_NUMBER: u32 = 0x6669;
+pub const PRICE_FEED_MAGIC_NUMBER: u64 = 0x666A;
 pub const ORDER_POOL_MAGIC_BYTE: u8 = 0x30;
 pub const USER_LIST_MAGIC_BYTE: u8 = 0x31;
 

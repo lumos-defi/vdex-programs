@@ -4,7 +4,8 @@ use crate::{
     errors::{DexError, DexResult},
     utils::{
         swap, time::get_timestamp, value, ISafeAddSub, ISafeMath, SafeMath, BORROW_FEE_RATE_BASE,
-        FEE_RATE_BASE, FEE_RATE_DECIMALS, LEVERAGE_POW_DECIMALS, USD_POW_DECIMALS,
+        FEE_RATE_BASE, FEE_RATE_DECIMALS, LEVERAGE_POW_DECIMALS, MAX_ASSET_COUNT, MAX_MARKET_COUNT,
+        MAX_PRICE_COUNT, MAX_USER_LIST_REMAINING_PAGES_COUNT, USD_POW_DECIMALS,
     },
 };
 
@@ -13,16 +14,18 @@ use super::{get_oracle_price, StakingPool};
 #[account(zero_copy)]
 pub struct Dex {
     pub magic: u64,
-    pub assets: [AssetInfo; 16],
-    pub markets: [MarketInfo; 16],
+    pub assets: [AssetInfo; MAX_ASSET_COUNT],
+    pub markets: [MarketInfo; MAX_MARKET_COUNT],
     pub vlp_pool: StakingPool,
     pub authority: Pubkey,
+    pub delegate: Pubkey,
     pub event_queue: Pubkey,
     pub match_queue: Pubkey,
     pub usdc_mint: Pubkey,
     pub di_option: Pubkey,
+    pub price_feed: Pubkey,
     pub user_list_entry_page: Pubkey,
-    pub user_list_remaining_pages: [Pubkey; 8],
+    pub user_list_remaining_pages: [Pubkey; MAX_USER_LIST_REMAINING_PAGES_COUNT],
     pub user_list_remaining_pages_number: u8,
     pub assets_number: u8,
     pub markets_number: u8,
@@ -1060,6 +1063,27 @@ impl GetOraclePrice for OracleInfo<'_, '_> {
 
         Ok((price, self.base_decimals))
     }
+}
+
+#[account(zero_copy)]
+pub struct PriceFeed {
+    pub magic: u64,
+    pub authority: Pubkey,
+    pub last_update_time: i64,
+    pub prices: [PriceInfo; MAX_ASSET_COUNT],
+}
+
+#[zero_copy]
+pub struct PriceInfo {
+    pub asset_prices: [AssetPrice; MAX_PRICE_COUNT],
+    pub cursor: u8,
+    pub padding: [u8; 7],
+}
+
+#[zero_copy]
+pub struct AssetPrice {
+    pub price: u64,
+    pub update_time: i64,
 }
 
 #[cfg(test)]

@@ -49,10 +49,12 @@ export async function createDexFull(authority: Keypair) {
   const eventQueue = Keypair.generate()
   const matchQueue = Keypair.generate()
   const userListEntryPage = Keypair.generate()
+  const diOption = Keypair.generate()
   const VLP_DECIMALS = 6
 
   const orderBook = Keypair.generate()
   const orderPoolEntryPage = Keypair.generate()
+  const priceFeed = Keypair.generate()
 
   await airdrop(provider, authority.publicKey, 10000000000)
   const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
@@ -68,14 +70,16 @@ export async function createDexFull(authority: Keypair) {
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
       rewardMint: TokenInstructions.WRAPPED_SOL_MINT,
+      diOption: diOption.publicKey,
     })
     .preInstructions([
       await program.account.dex.createInstruction(dex),
       await createAccountInstruction(eventQueue, 128 * 1024),
       await createAccountInstruction(matchQueue, 128 * 1024),
       await createAccountInstruction(userListEntryPage, 128 * 1024),
+      await createAccountInstruction(diOption, 128 * 1024),
     ])
-    .signers([authority, dex, eventQueue, matchQueue, userListEntryPage])
+    .signers([authority, dex, eventQueue, matchQueue, userListEntryPage, diOption])
     .rpc()
 
   //Add BTC asset
@@ -92,7 +96,7 @@ export async function createDexFull(authority: Keypair) {
   )
 
   //pda
-  const [mintProgramSigner, mintNonce] = await PublicKey.findProgramAddress(
+  const [mintProgramSigner, mintNonce] = PublicKey.findProgramAddressSync(
     [assetMint.publicKey.toBuffer(), dex.publicKey.toBuffer()],
     program.programId
   )
@@ -186,6 +190,18 @@ export async function createDexFull(authority: Keypair) {
     .signers([authority, orderBook, orderPoolEntryPage])
     .rpc()
 
+  //init price feed
+  await program.methods
+    .initPriceFeed()
+    .accounts({
+      dex: dex.publicKey,
+      priceFeed: priceFeed.publicKey,
+      authority: authority.publicKey,
+    })
+    .preInstructions([await program.account.priceFeed.createInstruction(priceFeed)])
+    .signers([authority, priceFeed])
+    .rpc()
+
   return {
     dex,
     assetMint,
@@ -202,5 +218,6 @@ export async function createDexFull(authority: Keypair) {
     orderPoolEntryPage,
     MOCK_ORACLE_PRICE: BTC_ORACLE_PRICE,
     ADD_LIQUIDITY_FEE_RATE,
+    priceFeed,
   }
 }

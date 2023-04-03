@@ -14,6 +14,7 @@ describe('Init Dex', () => {
   let eventQueue: Keypair
   let matchQueue: Keypair
   let userListEntryPage: Keypair
+  let diOption: Keypair
 
   let usdcMint: PublicKey
   let rewardMint: PublicKey
@@ -23,6 +24,8 @@ describe('Init Dex', () => {
     eventQueue = Keypair.generate()
     matchQueue = Keypair.generate()
     userListEntryPage = Keypair.generate()
+    diOption = Keypair.generate()
+
     authority = Keypair.generate()
 
     await airdrop(provider, authority.publicKey, 100_000_000_000)
@@ -42,14 +45,16 @@ describe('Init Dex', () => {
         matchQueue: matchQueue.publicKey,
         userListEntryPage: userListEntryPage.publicKey,
         rewardMint: rewardMint,
+        diOption: diOption.publicKey,
       })
       .preInstructions([
         await program.account.dex.createInstruction(dex),
         await createAccountInstruction(eventQueue, 128 * 1024),
         await createAccountInstruction(matchQueue, 128 * 1024),
         await createAccountInstruction(userListEntryPage, 128 * 1024),
+        await createAccountInstruction(diOption, 128 * 1024),
       ])
-      .signers([authority, dex, eventQueue, matchQueue, userListEntryPage])
+      .signers([authority, dex, eventQueue, matchQueue, userListEntryPage, diOption])
       .rpc()
 
     const dexInfo = await program.account.dex.fetch(dex.publicKey)

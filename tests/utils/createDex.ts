@@ -10,6 +10,7 @@ export async function createDex(authority: Keypair) {
   const eventQueue = Keypair.generate()
   const matchQueue = Keypair.generate()
   const userListEntryPage = Keypair.generate()
+  const diOption = Keypair.generate()
   const rewardMint = TokenInstructions.WRAPPED_SOL_MINT
   const VLP_DECIMALS = 6
   const USDC_MINT_DECIMALS = 6
@@ -27,14 +28,16 @@ export async function createDex(authority: Keypair) {
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
       rewardMint,
+      diOption: diOption.publicKey,
     })
     .preInstructions([
       await program.account.dex.createInstruction(dex),
       await createAccountInstruction(eventQueue, 128 * 1024),
       await createAccountInstruction(matchQueue, 128 * 1024),
       await createAccountInstruction(userListEntryPage, 128 * 1024),
+      await createAccountInstruction(diOption, 128 * 1024),
     ])
-    .signers([authority, dex, eventQueue, matchQueue, userListEntryPage])
+    .signers([authority, dex, eventQueue, matchQueue, userListEntryPage, diOption])
     .rpc()
 
   return { dex }
