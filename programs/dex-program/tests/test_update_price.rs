@@ -233,7 +233,7 @@ async fn test_update_usdc_price_seven_round() {
 }
 
 #[tokio::test]
-async fn test_update_all_price_seven_round() {
+async fn test_update_every_price_seven_round() {
     let dtc = DexTestContext::new().await;
     let alice = &dtc.user_context[0];
     let mut counts = [0u8; MAX_ASSET_COUNT];
@@ -312,7 +312,7 @@ async fn test_update_all_price_seven_round() {
 }
 
 #[tokio::test]
-async fn test_update_all_price_seven_round1() {
+async fn test_update_all_price_seven_round() {
     let dtc = DexTestContext::new().await;
     let alice = &dtc.user_context[0];
 
