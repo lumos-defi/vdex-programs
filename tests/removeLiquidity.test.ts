@@ -35,6 +35,7 @@ describe('Test Remove Liquidity', () => {
   let aliceUserState: PublicKey
   let bobUserState: PublicKey
   let eventQueue: Keypair
+  let priceFeed: Keypair
 
   beforeEach(async () => {
     authority = Keypair.generate()
@@ -42,7 +43,9 @@ describe('Test Remove Liquidity', () => {
     bob = Keypair.generate()
 
     await airdrop(provider, bob.publicKey, SOL_MINT_AMOUNT)
-    ;({ dex, assetMint, assetVault, solVault, mintProgramSigner, eventQueue } = await createDexFull(authority))
+    ;({ dex, assetMint, assetVault, solVault, mintProgramSigner, eventQueue, priceFeed } = await createDexFull(
+      authority
+    ))
 
     //create alice asset associatedTokenAccount
     aliceMintAcc = await assetMint.createAssociatedTokenAccount(alice.publicKey)
@@ -75,6 +78,7 @@ describe('Test Remove Liquidity', () => {
         eventQueue: eventQueue.publicKey,
         authority: bob.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
+        priceFeed: priceFeed.publicKey,
       })
       .remainingAccounts(oracleAccounts)
       .signers([bob])
@@ -92,6 +96,7 @@ describe('Test Remove Liquidity', () => {
         eventQueue: eventQueue.publicKey,
         authority: alice.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
+        priceFeed: priceFeed.publicKey,
       })
       .remainingAccounts(oracleAccounts)
       .signers([alice])
@@ -111,6 +116,7 @@ describe('Test Remove Liquidity', () => {
         userState: aliceUserState,
         eventQueue: eventQueue.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
+        priceFeed: priceFeed.publicKey,
       })
       .remainingAccounts(oracleAccounts)
       .signers([alice])

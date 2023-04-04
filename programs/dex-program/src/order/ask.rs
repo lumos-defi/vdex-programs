@@ -1,6 +1,6 @@
 use crate::{
     collections::{MountMode, OrderBook, OrderSide, PagedList},
-    dex::{get_oracle_price, Dex},
+    dex::{get_price, Dex, PriceFeed},
     errors::{DexError, DexResult},
     order::Order,
     user::state::*,
@@ -30,6 +30,10 @@ pub struct LimitAsk<'info> {
 
     #[account(mut)]
     pub authority: Signer<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 /// Layout of remaining accounts:
@@ -73,8 +77,14 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
     };
     require!(ai.valid, DexError::InvalidMarketIndex);
 
+    let price_feed = &ctx.accounts.price_feed.load()?;
     // Check price
-    let market_price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
+    let market_price = get_price(
+        mi.asset_index,
+        mi.oracle_source,
+        &ctx.accounts.oracle,
+        price_feed,
+    )?;
     require!(market_price != price, DexError::PriceEQMarketPrice);
 
     let side = if market_price > price {

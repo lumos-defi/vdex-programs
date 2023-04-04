@@ -2,7 +2,7 @@ use crate::{
     collections::{EventQueue, MountMode, PagedList},
     dex::{
         event::{AppendEvent, PositionAct},
-        get_oracle_price, Dex, UserListItem,
+        get_price, Dex, PriceFeed, UserListItem,
     },
     errors::{DexError, DexResult},
     position::update_user_serial_number,
@@ -51,6 +51,10 @@ pub struct ClosePosition<'info> {
     /// CHECK
     #[account(executable, constraint = (token_program.key == &token::ID))]
     pub token_program: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 // Layout of remaining accounts:
@@ -98,8 +102,15 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
         ctx.accounts.dex.to_account_info().key.as_ref(),
         &[ai.nonce],
     ];
+
+    let price_feed = &ctx.accounts.price_feed.load()?;
     // Get oracle price
-    let price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
+    let price = get_price(
+        mi.asset_index,
+        mi.oracle_source,
+        &ctx.accounts.oracle,
+        price_feed,
+    )?;
 
     let mfr = mi.get_fee_rates(ai.borrow_fee_rate);
 

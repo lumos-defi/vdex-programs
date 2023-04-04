@@ -21,13 +21,14 @@ describe('Test Add Liquidity', () => {
   let alice: Keypair
   let userState: PublicKey
   let eventQueue: Keypair
+  let priceFeed: Keypair
 
   beforeEach(async () => {
     authority = Keypair.generate()
     alice = Keypair.generate()
 
     await airdrop(provider, alice.publicKey, MINT_AMOUNT)
-    ;({ dex, solVault, eventQueue } = await createDexFull(authority))
+    ;({ dex, solVault, eventQueue, priceFeed } = await createDexFull(authority))
 
     oracleAccounts = await getOracleAccounts(dex.publicKey)
     userState = await createUserState(alice, dex)
@@ -51,6 +52,7 @@ describe('Test Add Liquidity', () => {
         eventQueue: eventQueue.publicKey,
         authority: alice.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
+        priceFeed: priceFeed.publicKey,
       })
       .remainingAccounts(oracleAccounts)
       .signers([alice])

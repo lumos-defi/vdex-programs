@@ -9,6 +9,7 @@ use crate::utils::constant::{USDC_DECIMALS, USDC_POW_DECIMALS};
 use crate::utils::SafeMath;
 
 use super::MockOracle;
+use super::PriceFeed;
 
 #[derive(Copy, Clone, TryFromPrimitive)]
 #[repr(u8)]
@@ -98,6 +99,31 @@ pub fn set_mock_price(account: &AccountInfo, price: u64) -> DexResult {
     oracle_price.expo = USDC_DECIMALS;
 
     Ok(())
+}
+
+pub fn get_feed_price(asset_index: u8, price_feed: &PriceFeed) -> DexResult<u64> {
+    let cursor = price_feed.prices[asset_index as usize].cursor;
+    let asset_price = price_feed.prices[asset_index as usize].asset_prices[cursor as usize];
+
+    Ok(asset_price.price)
+}
+
+pub fn get_price(
+    asset_index: u8,
+    oracle_source: u8,
+    oracle_account: &AccountInfo,
+    price_feed: &PriceFeed,
+) -> DexResult<u64> {
+    let oracle_price = get_oracle_price(oracle_source, oracle_account)?;
+    let feed_price = get_feed_price(asset_index, price_feed)?;
+
+    let price = if feed_price == 0 {
+        oracle_price
+    } else {
+        feed_price
+    };
+
+    Ok(price)
 }
 
 #[cfg(test)]

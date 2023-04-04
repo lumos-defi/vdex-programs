@@ -27,6 +27,7 @@ pub async fn setup(
     out_vault: &Pubkey,
     out_vault_program_signer: &Pubkey,
     event_queue: &Pubkey,
+    price_feed: &Pubkey,
     amount: u64,
 ) -> Result<(), TransportError> {
     let user_wsol_acc = Keypair::new();
@@ -79,6 +80,7 @@ pub async fn setup(
         out_vault_program_signer,
         &user_out_mint_acc,
         event_queue,
+        price_feed,
         amount,
     )
     .await;

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
+    dex::get_price,
     errors::{DexError, DexResult},
     utils::{
         swap, time::get_timestamp, value, ISafeAddSub, ISafeMath, SafeMath, BORROW_FEE_RATE_BASE,
@@ -113,7 +114,7 @@ impl Dex {
         Ok((index, &self.assets[index as usize]))
     }
 
-    fn aum(&self, oracles: &[AccountInfo]) -> DexResult<i64> {
+    fn aum(&self, oracles: &[AccountInfo], price_feed: &PriceFeed) -> DexResult<i64> {
         let mut aum = 0u64;
 
         let mut oracle_offset = 0;
@@ -131,7 +132,12 @@ impl Dex {
                 DexError::InvalidOracle
             );
 
-            let price = get_oracle_price(ai.oracle_source, &oracles[oracle_offset])?;
+            let price = get_price(
+                i as u8,
+                ai.oracle_source,
+                &oracles[oracle_offset],
+                price_feed,
+            )?;
 
             let amount = ai
                 .liquidity_amount
@@ -162,7 +168,12 @@ impl Dex {
                 DexError::InvalidOracle
             );
 
-            let price = get_oracle_price(mi.oracle_source, &oracles[oracle_offset])?;
+            let price = get_price(
+                mi.asset_index,
+                mi.oracle_source,
+                &oracles[oracle_offset],
+                price_feed,
+            )?;
             pnl = pnl.i_safe_add(mi.un_pnl(price)?)?;
 
             oracle_offset += 1;
@@ -190,10 +201,11 @@ impl Dex {
         amount: u64,
         reward_asset_debt: u64,
         oracles: &[AccountInfo],
+        price_feed: &PriceFeed,
     ) -> DexResult<(u64, u64)> {
         require!(amount > 0, DexError::InvalidAmount);
 
-        let aum = self.aum(oracles)?;
+        let aum = self.aum(oracles, price_feed)?;
         require!(aum >= 0, DexError::AUMBelowZero);
         let (vlp_supply, vlp_decimals, reward_asset_index) = self.vlp_info()?;
 
@@ -228,7 +240,7 @@ impl Dex {
         );
 
         // vlp_amount = asset_value * vlp_supply / aum
-        let price = get_oracle_price(ai.oracle_source, &oracles[oracle_index])?;
+        let price = get_price(index, ai.oracle_source, &oracles[oracle_index], price_feed)?;
         let asset_value = value(added, price, ai.decimals)?;
 
         let vlp_amount = if aum == 0 {
@@ -247,10 +259,11 @@ impl Dex {
         index: u8,
         amount: u64,
         oracles: &[AccountInfo],
+        price_feed: &PriceFeed,
     ) -> DexResult<(u64, u64)> {
         require!(amount > 0, DexError::InvalidAmount);
 
-        let aum = self.aum(oracles)?;
+        let aum = self.aum(oracles, price_feed)?;
         require!(aum >= 0, DexError::AUMBelowZero);
 
         let (vlp_supply, vlp_decimals, _) = self.vlp_info()?;
@@ -263,7 +276,7 @@ impl Dex {
             DexError::InvalidOracle
         );
 
-        let asset_price = get_oracle_price(ai.oracle_source, &oracles[oracle_index])?;
+        let asset_price = get_price(index, ai.oracle_source, &oracles[oracle_index], price_feed)?;
         // vlp_price= aum / vlp_supply
         let vlp_price = (aum as u64)
             .safe_mul(10u64.pow(vlp_decimals.into()))?
@@ -434,6 +447,7 @@ impl Dex {
         amount: u64,
         charge: bool,
         oracles: &[&AccountInfo],
+        price_feed: &PriceFeed,
     ) -> DexResult<(u64, u64)> {
         // TODO: check minimum amount?
 
@@ -448,8 +462,8 @@ impl Dex {
             DexError::InvalidOracle
         );
 
-        let in_price = get_oracle_price(aii.oracle_source, &oracles[0])?;
-        let out_price = get_oracle_price(aoi.oracle_source, &oracles[1])?;
+        let in_price = get_price(ain, aii.oracle_source, &oracles[0], price_feed)?;
+        let out_price = get_price(aout, aoi.oracle_source, &oracles[1], price_feed)?;
 
         let fee = if charge {
             amount
@@ -468,6 +482,7 @@ impl Dex {
         &mut self,
         reward_asset: usize,
         oracles: &[AccountInfo],
+        price_feed: &PriceFeed,
     ) -> DexResult<(u64, u64)> {
         let rai = self.asset_as_ref(reward_asset as u8)?;
         let reward_oracle_index = self.to_oracle_index(reward_asset as u8)?;
@@ -517,6 +532,7 @@ impl Dex {
                 ai.fee_amount,
                 false,
                 &swap_oracles,
+                price_feed,
             )?;
 
             self.assets[i].liquidity_amount = self.assets[i]
@@ -549,14 +565,18 @@ impl Dex {
         ))
     }
 
-    pub fn collect_rewards(&mut self, oracles: &[AccountInfo]) -> DexResult<u64> {
+    pub fn collect_rewards(
+        &mut self,
+        oracles: &[AccountInfo],
+        price_feed: &PriceFeed,
+    ) -> DexResult<u64> {
         let index = self.vlp_pool.reward_asset_index;
         require!(
             index < self.assets_number && self.assets[index as usize].valid,
             DexError::InvalidRewardAsset
         );
 
-        let (debt, rewards) = self.collect_fees(index as usize, oracles)?;
+        let (debt, rewards) = self.collect_fees(index as usize, oracles, price_feed)?;
         if rewards == 0 {
             return Ok(debt);
         }
@@ -1108,6 +1128,11 @@ mod test {
     }
     impl Default for MarketInfo {
         fn default() -> MarketInfo {
+            unsafe { std::mem::zeroed() }
+        }
+    }
+    impl Default for PriceFeed {
+        fn default() -> PriceFeed {
             unsafe { std::mem::zeroed() }
         }
     }
@@ -1962,20 +1987,25 @@ mod test {
 
         let oracles: Vec<&AccountInfo> = vec![&usdc_oracle, &btc_oracle];
 
+        let mut price_feed = PriceFeed::default();
         set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
         set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
 
         // Invalid asset index
-        dex.swap(1, 2, usdc(0.1), false, &oracles).assert_err();
-        dex.swap(1, 1, usdc(0.1), false, &oracles).assert_err();
+        dex.swap(1, 2, usdc(0.1), false, &oracles, &price_feed)
+            .assert_err();
+        dex.swap(1, 1, usdc(0.1), false, &oracles, &price_feed)
+            .assert_err();
 
         // Invalid amount
-        dex.swap(1, 0, usdc(0.), false, &oracles).assert_err();
+        dex.swap(1, 0, usdc(0.), false, &oracles, &price_feed)
+            .assert_err();
 
         // Invalid oracle
-        dex.swap(1, 0, usdc(0.1), false, &oracles).assert_ok();
+        dex.swap(1, 0, usdc(0.1), false, &oracles, &price_feed)
+            .assert_ok();
         let wrong_oracles: Vec<&AccountInfo> = vec![&usdc_oracle, &dummy_oracle];
-        dex.swap(1, 0, usdc(0.1), false, &wrong_oracles)
+        dex.swap(1, 0, usdc(0.1), false, &wrong_oracles, &price_feed)
             .assert_err();
     }
 
@@ -1990,17 +2020,22 @@ mod test {
         dex.add_asset(USDC_DECIMALS, usdc_oracle.key());
 
         let oracles: Vec<&AccountInfo> = vec![&btc_oracle, &usdc_oracle];
+        let mut price_feed = PriceFeed::default();
 
         set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
         set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
 
-        let (out, fee) = dex.swap(0, 1, btc(1.0), false, &oracles).assert_unwrap();
+        let (out, fee) = dex
+            .swap(0, 1, btc(1.0), false, &oracles, &price_feed)
+            .assert_unwrap();
 
         assert_eq!(out, usdc(20000.));
         assert_eq!(fee, 0);
 
         let oracles: Vec<&AccountInfo> = vec![&usdc_oracle, &btc_oracle];
-        let (out, fee) = dex.swap(1, 0, usdc(0.1), false, &oracles).assert_unwrap();
+        let (out, fee) = dex
+            .swap(1, 0, usdc(0.1), false, &oracles, &price_feed)
+            .assert_unwrap();
 
         assert_eq!(out, btc(0.000005));
         assert_eq!(fee, 0);
@@ -2023,8 +2058,9 @@ mod test {
         set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
 
         let oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle];
+        let mut price_feed = PriceFeed::default();
 
-        dex.collect_fees(2, &oracles).assert_ok();
+        dex.collect_fees(2, &oracles, &price_feed).assert_ok();
 
         dex.assert_asset_fee(0, 0);
         dex.assert_asset_fee(1, 0);
@@ -2040,7 +2076,7 @@ mod test {
         dex.mock_asset_fee(1, usdc(100.));
         dex.mock_asset_fee(2, sol(3.));
 
-        dex.collect_fees(2, &oracles).assert_ok();
+        dex.collect_fees(2, &oracles, &price_feed).assert_ok();
         dex.assert_asset_fee(0, 0);
         dex.assert_asset_fee(1, 0);
         dex.assert_asset_fee(2, sol(10.0 + 5.0 + 3.0));
@@ -2075,8 +2111,9 @@ mod test {
         set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
 
         let mut oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle, btc_oracle2];
+        let mut price_feed = PriceFeed::default();
 
-        let aum = dex.aum(&oracles).assert_unwrap();
+        let aum = dex.aum(&oracles, &price_feed).assert_unwrap();
         assert_eq!(aum, 0);
 
         // Add liquidity
@@ -2084,7 +2121,7 @@ mod test {
         dex.mock_asset_liquidity(2, usdc(500.));
         dex.mock_asset_liquidity(3, sol(30.));
 
-        let aum = dex.aum(&oracles).assert_unwrap();
+        let aum = dex.aum(&oracles, &price_feed).assert_unwrap();
         let mut liquidity = usdc_i(800.0 + 500. + 600.0);
         assert_eq!(aum, liquidity);
 
@@ -2093,7 +2130,7 @@ mod test {
         dex.mock_asset_borrowed(2, usdc(110.));
         dex.mock_asset_borrowed(3, sol(3.));
 
-        let aum = dex.aum(&oracles).assert_unwrap();
+        let aum = dex.aum(&oracles, &price_feed).assert_unwrap();
         let mut borrowed = usdc_i(100.0 + 110.0 + 60.0);
         assert_eq!(aum, liquidity + borrowed);
 
@@ -2109,7 +2146,7 @@ mod test {
         borrowed += usdc_i(200.0);
         let long_un_pnl = usdc_i(20.0);
 
-        let aum = dex.aum(&oracles).assert_unwrap();
+        let aum = dex.aum(&oracles, &price_feed).assert_unwrap();
         assert_eq!(aum, liquidity + collateral + borrowed - long_un_pnl);
 
         // Mock global short
@@ -2122,16 +2159,16 @@ mod test {
         borrowed += usdc_i(200.0);
         let short_un_pnl = -usdc_i(10.0);
 
-        let aum = dex.aum(&oracles).assert_unwrap();
+        let aum = dex.aum(&oracles, &price_feed).assert_unwrap();
         assert_eq!(
             aum,
             liquidity + collateral + borrowed - long_un_pnl - short_un_pnl
         );
 
         // Test invalid oracles
-        dex.aum(&vec![]).assert_err();
+        dex.aum(&vec![], &price_feed).assert_err();
         oracles.pop();
-        dex.aum(&oracles).assert_err()
+        dex.aum(&oracles, &price_feed).assert_err()
     }
 
     const VLP_DECIMALS: u8 = 8;
@@ -2165,10 +2202,11 @@ mod test {
         set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
 
         let oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle, btc_oracle2];
+        let mut price_feed = PriceFeed::default();
 
         // Add 1000 SOL, add liquidity fee rate = 0.1%
         let (vlp_amount, fee) = dex
-            .add_liquidity(3, sol(1000.), 0, &oracles)
+            .add_liquidity(3, sol(1000.), 0, &oracles, &price_feed)
             .assert_unwrap();
 
         // vlp_amount = 19980_00000000
@@ -2179,7 +2217,7 @@ mod test {
 
         // Add another 1000 SOL
         let (vlp_amount, fee) = dex
-            .add_liquidity(3, sol(1000.), 0, &oracles)
+            .add_liquidity(3, sol(1000.), 0, &oracles, &price_feed)
             .assert_unwrap();
 
         // vlp_amount = 19980_00000000
@@ -2193,7 +2231,7 @@ mod test {
 
         // Remove liquidity, remove liquidity fee rate = 0.1%
         let (withdraw, fee) = dex
-            .remove_liquidity(3, vlp(1000.), &oracles)
+            .remove_liquidity(3, vlp(1000.), &oracles, &price_feed)
             .assert_unwrap();
 
         assert_eq!(fee, sol(0.05));
@@ -2206,14 +2244,16 @@ mod test {
         );
 
         // Add 1 BTC
-        let (vlp_amount, fee) = dex.add_liquidity(1, btc(1.), 0, &oracles).assert_unwrap();
+        let (vlp_amount, fee) = dex
+            .add_liquidity(1, btc(1.), 0, &oracles, &price_feed)
+            .assert_unwrap();
         assert_eq!(vlp_amount, vlp((1.0 - 0.001) * 20000.0));
         assert_eq!(fee, btc(0.001));
         dex.vlp_pool.increase_staking(vlp_amount).assert_ok();
 
         // Add 10000 usdc
         let (vlp_amount, fee) = dex
-            .add_liquidity(2, usdc(10000.), 0, &oracles)
+            .add_liquidity(2, usdc(10000.), 0, &oracles, &price_feed)
             .assert_unwrap();
         assert_eq!(vlp_amount, vlp((10000.0 - 10.) * 1.0));
         assert_eq!(fee, usdc(10.));

@@ -2,7 +2,7 @@ use crate::{
     collections::{EventQueue, MountMode, PagedList, SingleEvent, SingleEventQueue},
     dex::{
         event::{AppendEvent, PositionAct},
-        AssetInfo, Dex, Position, UserListItem,
+        AssetInfo, Dex, Position, PriceFeed, UserListItem,
     },
     errors::{DexError, DexResult},
     order::MatchEvent,
@@ -81,6 +81,10 @@ pub struct Crank<'info> {
     /// CHECK
     #[account(executable, constraint = (system_program.key == &system_program::ID))]
     pub system_program: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 fn refund_in_mint(
@@ -246,6 +250,8 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
     let user_mint_acc =
         Account::<TokenAccount>::try_from_unchecked(&ctx.accounts.user_mint_acc).ok();
 
+    let price_feed = &ctx.accounts.price_feed.load()?;
+
     if order.open {
         require_neq!(order.size, 0u64, DexError::InvalidAmount);
 
@@ -269,8 +275,14 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
                 &ctx.accounts.in_mint_oracle,
                 &ctx.accounts.market_mint_oracle,
             ];
-            let (out, fee) =
-                dex.swap(order.asset, market_asset_index, order.size, true, &oracles)?;
+            let (out, fee) = dex.swap(
+                order.asset,
+                market_asset_index,
+                order.size,
+                true,
+                &oracles,
+                price_feed,
+            )?;
 
             (true, out, fee)
         };

@@ -3,7 +3,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     collections::EventQueue,
-    dex::{event::AppendEvent, Dex},
+    dex::{event::AppendEvent, Dex, PriceFeed},
     errors::DexError,
     errors::DexResult,
     utils::SafeMath,
@@ -61,6 +61,10 @@ pub struct Swap<'info> {
     pub authority: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 pub fn handler(ctx: Context<Swap>, amount: u64) -> DexResult {
@@ -93,7 +97,8 @@ pub fn handler(ctx: Context<Swap>, amount: u64) -> DexResult {
     let signer = &[&seeds[..]];
 
     let oracles = &vec![&ctx.accounts.in_mint_oracle, &ctx.accounts.out_mint_oracle];
-    let (out, fee) = dex.swap(ain, aout, amount, true, &oracles)?;
+    let price_feed = &ctx.accounts.price_feed.load()?;
+    let (out, fee) = dex.swap(ain, aout, amount, true, &oracles, price_feed)?;
 
     dex.swap_in(ain, amount.safe_sub(fee)?, fee)?;
     dex.swap_out(aout, out)?;

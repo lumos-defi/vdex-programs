@@ -73,7 +73,8 @@ impl DexTestContext {
     //6. add BTC market to dex
     //7. add ETH market to dex
     //8. add SOL market to dex
-    //9. init users
+    //9. init price feed
+    //10. init users
     pub async fn new() -> DexTestContext {
         let context = get_context().await;
         let program = get_program().await;

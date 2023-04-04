@@ -3,7 +3,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     collections::EventQueue,
-    dex::{event::AppendEvent, Dex},
+    dex::{event::AppendEvent, Dex, PriceFeed},
     errors::DexError,
     errors::DexResult,
     user::UserState,
@@ -39,6 +39,10 @@ pub struct AddLiquidity<'info> {
     pub authority: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 // Remaining accounts layout:
@@ -77,11 +81,19 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
     let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
     token::transfer(cpi_ctx, amount)?;
 
-    // Update rewards
-    let reward_asset_debt = dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len])?;
+    let price_feed = &ctx.accounts.price_feed.load()?;
 
-    let (vlp_amount, fee) =
-        dex.add_liquidity(index, amount, reward_asset_debt, &ctx.remaining_accounts)?;
+    // Update rewards
+    let reward_asset_debt =
+        dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len], price_feed)?;
+
+    let (vlp_amount, fee) = dex.add_liquidity(
+        index,
+        amount,
+        reward_asset_debt,
+        &ctx.remaining_accounts,
+        price_feed,
+    )?;
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     us.borrow_mut()

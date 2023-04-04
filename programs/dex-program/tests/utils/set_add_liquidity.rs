@@ -22,6 +22,7 @@ pub async fn setup(
     vault: &Pubkey,
     event_queue: &Pubkey,
     user_state: &Pubkey,
+    price_feed: &Pubkey,
     amount: u64,
     remaining_accounts: Vec<AccountMeta>,
 ) -> Result<(), TransportError> {
@@ -45,6 +46,7 @@ pub async fn setup(
         &user_mint_acc,
         event_queue,
         &user_state,
+        &price_feed,
         amount,
         remaining_accounts,
     )

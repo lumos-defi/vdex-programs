@@ -33,6 +33,7 @@ pub async fn setup(
     match_queue: &Pubkey,
     event_queue: &Pubkey,
     user_list_entry_page: &Pubkey,
+    price_feed: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     create_user_mint_acc: bool,
 ) -> Result<(), TransportError> {
@@ -83,6 +84,7 @@ pub async fn setup(
         match_queue,
         event_queue,
         user_list_entry_page,
+        price_feed,
         remaining_accounts,
     )
     .await;
