@@ -63,6 +63,11 @@ pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> De
     );
 
     require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
+    require!(
         dex.di_option == ctx.accounts.di_option.key(),
         DexError::InvalidDIOptionAccount
     );

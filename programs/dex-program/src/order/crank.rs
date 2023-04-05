@@ -195,6 +195,11 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         DexError::InvalidRemainingAccounts
     );
 
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     let mut match_queue =
         SingleEventQueue::<MatchEvent>::mount(&mut ctx.accounts.match_queue, true)
             .map_err(|_| DexError::FailedMountMatchQueue)?;

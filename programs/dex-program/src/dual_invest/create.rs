@@ -45,6 +45,11 @@ pub fn handler(
         DexError::InvalidDIOptionAccount
     );
 
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     let di = DI::mount(&ctx.accounts.di_option, true)?;
     require!(
         di.borrow().meta.admin == ctx.accounts.authority.key()

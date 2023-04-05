@@ -42,6 +42,11 @@ pub fn handler(ctx: Context<LimitAsk>, market: u8, long: bool, price: u64, size:
     let dex = &ctx.accounts.dex.load()?;
     require!(market < dex.markets_number, DexError::InvalidMarketIndex);
 
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     let mi = &dex.markets[market as usize];
     require!(
         mi.valid

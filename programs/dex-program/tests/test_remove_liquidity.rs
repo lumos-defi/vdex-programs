@@ -89,3 +89,25 @@ async fn test_remove_liquidity_withdraw_sol() {
 
     alice.assert_vlp_total(INIT_VLP_AMOUNT).await;
 }
+
+#[tokio::test]
+async fn test_remove_liquidity_withdraw_sol_use_price_feed() {
+    let dtc = DexTestContext::new().await;
+    let alice = &dtc.user_context[0];
+
+    alice.feed_sol_price(100.0).await;
+    alice.update_sol_price(20.0).await;
+    alice.add_liquidity_with_sol(1.0).await;
+
+    //0.1% add liquidity fee
+    alice.assert_vlp(199.8).await;
+    alice.assert_vlp_total(INIT_VLP_AMOUNT + 199.8).await;
+
+    //0.1% remove liquidity fee
+    alice.remove_liquidity_withdraw_sol(199.8).await;
+
+    alice.assert_vlp(0.0).await;
+    //(1.0-1.0*0.1%)-(1.0-1.0*0.1%)*0.1%=0.998001
+
+    alice.assert_vlp_total(INIT_VLP_AMOUNT).await;
+}

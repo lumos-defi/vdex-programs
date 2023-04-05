@@ -73,6 +73,11 @@ pub fn handler(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
         DexError::InvalidEventQueue
     );
 
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     let (index, ai) = dex.find_asset_by_mint(ctx.accounts.mint.key())?;
     require!(
         ai.vault == ctx.accounts.vault.key()

@@ -80,6 +80,12 @@ pub fn handler(
     leverage: u32,
 ) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
+
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     require!(
         market < dex.markets_number
             && dex.event_queue == ctx.accounts.event_queue.key()

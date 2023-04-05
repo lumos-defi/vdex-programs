@@ -69,6 +69,11 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
     );
 
     require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
+    require!(
         dex.user_list_remaining_pages_number as usize == ctx.remaining_accounts.len(),
         DexError::InvalidRemainingAccounts
     );

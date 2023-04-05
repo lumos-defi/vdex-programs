@@ -45,6 +45,11 @@ pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
         DexError::InvalidMatchQueue
     );
 
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     let mi = &dex.markets[market as usize];
     require!(
         mi.valid

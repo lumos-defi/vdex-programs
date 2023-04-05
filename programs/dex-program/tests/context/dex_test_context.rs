@@ -75,6 +75,7 @@ impl DexTestContext {
     //8. add SOL market to dex
     //9. init price feed
     //10. init users
+    //11. init reward asset
     pub async fn new() -> DexTestContext {
         let context = get_context().await;
         let program = get_program().await;
@@ -355,13 +356,14 @@ impl DexTestContext {
 
         let dex_info = get_dex_info(&mut context.borrow_mut().banks_client, dex.pubkey()).await;
 
+        //10.init price feed
         let mut users: Vec<UserTestContext> = vec![];
         for _ in 0..5 {
             let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
             users.push(user);
         }
 
-        //init reward asset
+        //11.init reward asset
         {
             let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
             user.add_liquidity_with_sol(INIT_ADD_SOL_AMOUNT).await;

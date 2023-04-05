@@ -70,6 +70,11 @@ pub struct Swap<'info> {
 pub fn handler(ctx: Context<Swap>, amount: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
 
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     let (ain, aii) = dex.find_asset_by_mint(ctx.accounts.in_mint.key())?;
     require!(
         aii.mint == ctx.accounts.in_mint.key()

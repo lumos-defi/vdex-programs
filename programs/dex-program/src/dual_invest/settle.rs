@@ -148,7 +148,12 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
     );
     require!(
         dex.event_queue == ctx.accounts.event_queue.key(),
-        DexError::InvalidUserListEntryPage
+        DexError::InvalidEventQueue
+    );
+
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
     );
 
     require!(

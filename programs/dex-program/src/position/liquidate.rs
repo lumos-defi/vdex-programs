@@ -117,6 +117,12 @@ fn relay_native_mint_to_user(ctx: &Context<LiquidatePosition>, lamports: u64) ->
 //  offset m + 1 ~ n: user list remaining pages
 pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
+
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     require!(
         (market < dex.markets.len() as u8)
             && dex.event_queue == ctx.accounts.event_queue.key()
