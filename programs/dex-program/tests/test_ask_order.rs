@@ -16,7 +16,7 @@ async fn test_ask_long_total_size() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
         .await;
     user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
@@ -65,7 +65,7 @@ async fn test_ask_long_partial_size() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
         .await;
     user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
@@ -137,7 +137,7 @@ async fn test_ask_short_total_size() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Alice open long
     alice.mint_usdc(2000.).await;
@@ -182,7 +182,63 @@ async fn test_ask_short_partial_size() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
+
+    // Alice open long
+    alice.mint_usdc(2000.).await;
+
+    alice
+        .assert_open(DexAsset::USDC, DexMarket::BTC, false, 2000., 10 * 1000)
+        .await;
+    alice.assert_usdc_balance(0.).await;
+
+    let expected_open_fee = 58.252427;
+    let expected_collateral = 2000. - expected_open_fee;
+    let expected_size = collateral_to_size(expected_collateral, 10., 20000., 9);
+    let expect_borrow = expected_collateral * 10.;
+
+    alice
+        .assert_position(
+            DexMarket::BTC,
+            false,
+            20000.,
+            expected_size,
+            expected_collateral,
+            expect_borrow,
+            0.,
+        )
+        .await;
+
+    let position_size = alice.get_position_size(DexMarket::BTC, false).await;
+    // Place ask order partially
+    alice.assert_ask(DexMarket::BTC, false, 18000., 0.5).await;
+    alice
+        .assert_ask_order(DexMarket::BTC, false, 18000., btc(0.5))
+        .await;
+
+    alice
+        .assert_ask(DexMarket::BTC, false, 17000., u64::MAX as f64)
+        .await;
+    alice
+        .assert_ask_order(DexMarket::BTC, false, 17000., position_size - btc(0.5))
+        .await;
+
+    alice
+        .assert_ask_fail(DexMarket::BTC, false, 17000., 0.000001)
+        .await;
+}
+
+#[tokio::test]
+async fn test_ask_short_partial_size_use_price_feed() {
+    let dtc = DexTestContext::new().await;
+    let user = &dtc.user_context[0];
+    let alice = &dtc.user_context[1];
+
+    alice.feed_usdc_price(1.0).await;
+    alice.feed_btc_price(20000.).await;
+    // Prepare liquidity & price
+    user.add_liquidity_with_usdc(100000.).await;
+    user.mock_btc_price(20001.).await;
 
     // Alice open long
     alice.mint_usdc(2000.).await;

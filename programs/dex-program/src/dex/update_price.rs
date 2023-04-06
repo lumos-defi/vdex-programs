@@ -28,6 +28,11 @@ pub fn handler(ctx: Context<UpdatePrice>, prices: [u64; MAX_ASSET_COUNT]) -> Dex
         DexError::InvalidAdminOrDelegate
     );
 
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     let now = get_timestamp()?;
 
     for i in 0..prices.len() {

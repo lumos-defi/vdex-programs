@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    dex::{get_oracle_price, Dex},
+    dex::{get_price, Dex, PriceFeed},
     dual_invest::DI,
     errors::{DexError, DexResult},
     utils::get_timestamp,
@@ -20,6 +20,10 @@ pub struct DiCreateOption<'info> {
     pub base_asset_oracle: AccountInfo<'info>,
 
     pub authority: Signer<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 pub fn handler(
@@ -41,6 +45,11 @@ pub fn handler(
         DexError::InvalidDIOptionAccount
     );
 
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     let di = DI::mount(&ctx.accounts.di_option, true)?;
     require!(
         di.borrow().meta.admin == ctx.accounts.authority.key()
@@ -60,8 +69,14 @@ pub fn handler(
         DexError::InvalidOracle
     );
 
+    let price_feed = &ctx.accounts.price_feed.load()?;
     // Check strike price
-    let price = get_oracle_price(base_ai.oracle_source, &ctx.accounts.base_asset_oracle)?;
+    let price = get_price(
+        base_asset_index,
+        base_ai.oracle_source,
+        &ctx.accounts.base_asset_oracle,
+        price_feed,
+    )?;
     // TODO: need a gap between strike price and market price ?
     if is_call {
         require!(strike_price > price, DexError::InvalidStrikePrice);

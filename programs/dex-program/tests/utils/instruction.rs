@@ -295,6 +295,7 @@ pub async fn compose_add_liquidity_ix(
     user_mint_acc: &Pubkey,
     event_queue: &Pubkey,
     user_state: &Pubkey,
+    price_feed: &Pubkey,
     amount: u64,
     remaining_accounts: Vec<AccountMeta>,
 ) -> Instruction {
@@ -309,6 +310,7 @@ pub async fn compose_add_liquidity_ix(
             authority: payer.pubkey(),
             token_program: spl_token::id(),
             user_state: *user_state,
+            price_feed: *price_feed,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::AddLiquidity { amount })
@@ -330,6 +332,7 @@ pub async fn compose_remove_liquidity_ix(
     user_mint_acc: &Pubkey,
     event_queue: &Pubkey,
     user_state: &Pubkey,
+    price_feed: &Pubkey,
     amount: u64,
     remaining_accounts: Vec<AccountMeta>,
 ) -> Instruction {
@@ -345,6 +348,7 @@ pub async fn compose_remove_liquidity_ix(
             authority: payer.pubkey(),
             token_program: spl_token::id(),
             user_state: *user_state,
+            price_feed: *price_feed,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::RemoveLiquidity { vlp_amount: amount })
@@ -371,6 +375,7 @@ pub async fn compose_open_market_position_ix(
     user_state: &Pubkey,
     event_queue: &Pubkey,
     user_list_entry_page: &Pubkey,
+    price_feed: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     market: u8,
     long: bool,
@@ -394,6 +399,7 @@ pub async fn compose_open_market_position_ix(
             event_queue: *event_queue,
             user_list_entry_page: *user_list_entry_page,
             token_program: spl_token::id(),
+            price_feed: *price_feed,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::OpenPosition {
@@ -419,6 +425,7 @@ pub async fn compose_close_market_position_ix(
     user_state: &Pubkey,
     event_queue: &Pubkey,
     user_list_entry_page: &Pubkey,
+    price_feed: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     market: u8,
     long: bool,
@@ -437,6 +444,7 @@ pub async fn compose_close_market_position_ix(
             event_queue: *event_queue,
             user_list_entry_page: *user_list_entry_page,
             token_program: spl_token::id(),
+            price_feed: *price_feed,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::ClosePosition { market, long, size })
@@ -460,6 +468,7 @@ pub async fn compose_bid_ix(
     order_pool_entry_page: &Pubkey,
     user_mint_acc: &Pubkey,
     user_state: &Pubkey,
+    price_feed: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     market: u8,
     long: bool,
@@ -483,6 +492,7 @@ pub async fn compose_bid_ix(
             user_state: *user_state,
             authority: payer.pubkey(),
             token_program: spl_token::id(),
+            price_feed: *price_feed,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::LimitBid {
@@ -506,6 +516,7 @@ pub async fn compose_ask_ix(
     order_book: &Pubkey,
     order_pool_entry_page: &Pubkey,
     user_state: &Pubkey,
+    price_feed: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     market: u8,
     long: bool,
@@ -521,6 +532,7 @@ pub async fn compose_ask_ix(
             order_pool_entry_page: *order_pool_entry_page,
             user_state: *user_state,
             authority: payer.pubkey(),
+            price_feed: *price_feed,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::LimitAsk {
@@ -543,6 +555,7 @@ pub async fn compose_fill_ix(
     match_queue: &Pubkey,
     order_book: &Pubkey,
     order_pool_entry_page: &Pubkey,
+    price_feed: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     market: u8,
 ) -> Instruction {
@@ -555,6 +568,7 @@ pub async fn compose_fill_ix(
             order_book: *order_book,
             order_pool_entry_page: *order_pool_entry_page,
             authority: payer.pubkey(),
+            price_feed: *price_feed,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::FillOrder { market })
@@ -582,6 +596,7 @@ pub async fn compose_crank_ix(
     match_queue: &Pubkey,
     event_queue: &Pubkey,
     user_list_entry_page: &Pubkey,
+    price_feed: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
 ) -> Instruction {
     program
@@ -605,6 +620,7 @@ pub async fn compose_crank_ix(
             authority: payer.pubkey(),
             token_program: spl_token::id(),
             system_program: system_program::id(),
+            price_feed: *price_feed,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::Crank {})
@@ -686,6 +702,7 @@ pub async fn compose_market_swap_ix(
     out_vault_program_signer: &Pubkey,
     user_out_mint_acc: &Pubkey,
     event_queue: &Pubkey,
+    price_feed: &Pubkey,
     amount: u64,
 ) -> Instruction {
     program
@@ -705,6 +722,7 @@ pub async fn compose_market_swap_ix(
             user_state: *user_state,
             authority: payer.pubkey(),
             token_program: spl_token::id(),
+            price_feed: *price_feed,
         })
         .args(dex_program::instruction::Swap { amount })
         .instructions()
@@ -762,6 +780,7 @@ pub async fn compose_di_create_option_ix(
     dex: &Pubkey,
     di_option: &Pubkey,
     base_asset_oracle: &Pubkey,
+    price_feed: &Pubkey,
     id: u64,
     is_call: bool,
     base_asset_index: u8,
@@ -780,6 +799,7 @@ pub async fn compose_di_create_option_ix(
             di_option: *di_option,
             base_asset_oracle: *base_asset_oracle,
             authority: payer.pubkey(),
+            price_feed: *price_feed,
         })
         .args(dex_program::instruction::DiCreateOption {
             id,
@@ -882,6 +902,7 @@ pub async fn compose_di_buy_ix(
     user_mint_acc: &Pubkey,
     user_state: &Pubkey,
     user_list_entry_page: &Pubkey,
+    price_feed: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     id: u64,
     premium_rate: u16,
@@ -899,6 +920,7 @@ pub async fn compose_di_buy_ix(
             user_list_entry_page: *user_list_entry_page,
             authority: payer.pubkey(),
             token_program: spl_token::id(),
+            price_feed: *price_feed,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::DiBuy {
@@ -925,6 +947,7 @@ pub async fn compose_di_settle_ix(
     asset_program_signer: &Pubkey,
     event_queue: &Pubkey,
     user_list_entry_page: &Pubkey,
+    price_feed: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     created: u64,
     force: bool,
@@ -946,6 +969,7 @@ pub async fn compose_di_settle_ix(
             authority: payer.pubkey(),
             token_program: spl_token::id(),
             system_program: system_program::id(),
+            price_feed: *price_feed,
         })
         .accounts(remaining_accounts)
         .args(dex_program::instruction::DiSettle {

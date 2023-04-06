@@ -1,4 +1,5 @@
 use std::{
+    borrow::Borrow,
     cell::RefCell,
     ops::{Div, Mul},
     rc::Rc,
@@ -177,21 +178,21 @@ impl UserTestContext {
             .unwrap()
     }
 
-    pub async fn feed_btc_price(&self, price: f64) {
+    pub async fn mock_btc_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::BTC as u8, price)
             .await;
         // self.feed_asset_mock_oracle_price(self.asset_index("BTC"), price)
         //     .await
     }
 
-    pub async fn feed_eth_price(&self, price: f64) {
+    pub async fn mock_eth_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::ETH as u8, price)
             .await;
         // self.feed_asset_mock_oracle_price(self.asset_index("ETH"), price)
         //     .await
     }
 
-    pub async fn feed_sol_price(&self, price: f64) {
+    pub async fn mock_sol_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::SOL as u8, price)
             .await;
         // self.feed_asset_mock_oracle_price(self.asset_index("SOL"), price)
@@ -371,6 +372,7 @@ impl UserTestContext {
             &asset_info.vault,
             &self.dex_info.borrow().event_queue,
             &self.user_state,
+            &self.dex_info.borrow().price_feed,
             deposit_amount,
             remaining_accounts,
         )
@@ -428,6 +430,7 @@ impl UserTestContext {
             &user_state,
             &di.event_queue,
             &di.user_list_entry_page,
+            &self.dex_info.borrow().price_feed,
             remaining_accounts,
             market as u8,
             long,
@@ -502,6 +505,7 @@ impl UserTestContext {
             &user_state,
             &di.event_queue,
             &di.user_list_entry_page,
+            &self.dex_info.borrow().price_feed,
             remaining_accounts,
             market as u8,
             long,
@@ -551,6 +555,7 @@ impl UserTestContext {
             &asset_info.program_signer,
             &self.dex_info.borrow().event_queue,
             &self.user_state,
+            &self.dex_info.borrow().price_feed,
             withdraw_vlp_amount,
             remaining_accounts,
         )
@@ -897,6 +902,7 @@ impl UserTestContext {
             &di.match_queue,
             &di.event_queue,
             &di.user_list_entry_page,
+            &self.dex_info.borrow().price_feed,
             remaining_accounts,
             create_user_mint_acc,
         )
@@ -924,6 +930,7 @@ impl UserTestContext {
             &di.match_queue,
             &mi.order_book,
             &mi.order_pool_entry_page,
+            &self.dex_info.borrow().price_feed,
             remaining_accounts,
             market as u8,
         )
@@ -955,6 +962,7 @@ impl UserTestContext {
             &mi.order_book,
             &mi.order_pool_entry_page,
             &self.user_state,
+            &self.dex_info.borrow().price_feed,
             remaining_accounts,
             market as u8,
             long,
@@ -1018,6 +1026,7 @@ impl UserTestContext {
             &order_book,
             &order_pool_entry_page,
             &user_state,
+            &self.dex_info.borrow().price_feed,
             remaining_accounts,
             market as u8,
             long,
@@ -1421,6 +1430,7 @@ impl UserTestContext {
             &aio.vault,
             &aio.program_signer,
             &self.dex_info.borrow().event_queue,
+            &self.dex_info.borrow().price_feed,
             convert_to_big_number(amount, aii.decimals),
         )
         .await
@@ -1446,6 +1456,7 @@ impl UserTestContext {
             &aio.vault,
             &aio.program_signer,
             &self.dex_info.borrow().event_queue,
+            &self.dex_info.borrow().price_feed,
             convert_to_big_number(amount, aii.decimals),
         )
         .await
@@ -1506,6 +1517,7 @@ impl UserTestContext {
             &self.dex,
             &self.dex_info.borrow().di_option,
             &bai.oracle,
+            &self.dex_info.borrow().price_feed,
             id,
             is_call,
             base_asset as u8,
@@ -1756,6 +1768,7 @@ impl UserTestContext {
             &in_mint_info.vault,
             &user_state,
             &self.dex_info.borrow().user_list_entry_page,
+            &self.dex_info.borrow().price_feed,
             remaining_accounts,
             id,
             premium_rate,
@@ -1791,6 +1804,7 @@ impl UserTestContext {
             &in_mint_info.vault,
             &user_state,
             &self.dex_info.borrow().user_list_entry_page,
+            &self.dex_info.borrow().price_feed,
             remaining_accounts,
             id,
             premium_rate,
@@ -1871,6 +1885,7 @@ impl UserTestContext {
             &asset_program_signer,
             &self.dex_info.borrow().event_queue,
             &self.dex_info.borrow().user_list_entry_page,
+            &self.dex_info.borrow().price_feed,
             remaining_accounts,
             created,
             force,
@@ -1953,6 +1968,7 @@ impl UserTestContext {
             &asset_program_signer,
             &self.dex_info.borrow().event_queue,
             &self.dex_info.borrow().user_list_entry_page,
+            &self.dex_info.borrow().price_feed,
             remaining_accounts,
             created,
             force,
@@ -2207,28 +2223,28 @@ impl UserTestContext {
         .unwrap();
     }
 
-    pub async fn update_usdc_price(&self, price: f64) {
+    pub async fn feed_usdc_price(&self, price: f64) {
         let mut prices = [0f64; MAX_ASSET_COUNT];
         prices[DexAsset::USDC as usize] = price;
 
         self.update_price(prices).await;
     }
 
-    pub async fn update_eth_price(&self, price: f64) {
+    pub async fn feed_eth_price(&self, price: f64) {
         let mut prices = [0f64; MAX_ASSET_COUNT];
         prices[DexAsset::ETH as usize] = price;
 
         self.update_price(prices).await;
     }
 
-    pub async fn update_sol_price(&self, price: f64) {
+    pub async fn feed_sol_price(&self, price: f64) {
         let mut prices = [0f64; MAX_ASSET_COUNT];
         prices[DexAsset::SOL as usize] = price;
 
         self.update_price(prices).await;
     }
 
-    pub async fn update_btc_price(&self, price: f64) {
+    pub async fn feed_btc_price(&self, price: f64) {
         let mut prices = [0f64; MAX_ASSET_COUNT];
         prices[DexAsset::BTC as usize] = price;
 

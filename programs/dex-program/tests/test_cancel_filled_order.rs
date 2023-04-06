@@ -17,9 +17,9 @@ async fn test_cannot_cancel_filled_bid_order() {
     let bob = &dtc.user_context[2];
 
     // Prepare liquidity & price
-    user.feed_btc_price(20000.).await;
-    user.feed_eth_price(2000.).await;
-    user.feed_sol_price(20.).await;
+    user.mock_btc_price(20000.).await;
+    user.mock_eth_price(2000.).await;
+    user.mock_sol_price(20.).await;
 
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;
@@ -62,7 +62,7 @@ async fn test_cannot_cancel_filled_bid_order() {
     user.assert_no_match_event().await;
 
     // Market price change @ 19000
-    user.feed_btc_price(19000.).await;
+    user.mock_btc_price(19000.).await;
     user.fill(DexMarket::BTC).await;
 
     let event = user.read_match_event().await;
@@ -84,7 +84,7 @@ async fn test_cannot_cancel_filled_ask_order() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::USDC, minus_add_fee(100000.))
         .await;
     user.assert_fee(DexAsset::USDC, add_fee(100000.)).await;
@@ -136,7 +136,7 @@ async fn test_cannot_cancel_filled_ask_order() {
         .await;
 
     // Market price change @ 21000
-    user.feed_btc_price(21000.).await;
+    user.mock_btc_price(21000.).await;
     user.fill(DexMarket::BTC).await;
 
     // ALice can not cancel order @21000

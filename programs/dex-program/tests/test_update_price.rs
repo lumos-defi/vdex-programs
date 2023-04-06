@@ -106,13 +106,13 @@ async fn test_update_usdc_price_two_round_in_two_second() {
     let mut counts = [0u8; MAX_ASSET_COUNT];
     counts[0] = 2;
 
-    alice.update_usdc_price(1.01).await;
+    alice.feed_usdc_price(1.01).await;
 
     let mut now = now();
     now += 1;
     dtc.advance_clock(now).await;
 
-    alice.update_usdc_price(1.02).await;
+    alice.feed_usdc_price(1.02).await;
 
     alice.assert_usdc_price(1.02).await;
     alice.assert_valid_price_count(counts).await;
@@ -125,13 +125,13 @@ async fn test_update_btc_price_two_round_in_two_second() {
     let mut counts = [0u8; MAX_ASSET_COUNT];
     counts[1] = 2;
 
-    alice.update_btc_price(20_001.01).await;
+    alice.feed_btc_price(20_001.01).await;
 
     let mut now = now();
     now += 1;
     dtc.advance_clock(now).await;
 
-    alice.update_btc_price(20_001.02).await;
+    alice.feed_btc_price(20_001.02).await;
 
     alice.assert_btc_price(20_001.02).await;
     alice.assert_valid_price_count(counts).await;
@@ -144,13 +144,13 @@ async fn test_update_eth_price_two_round_in_two_second() {
     let mut counts = [0u8; MAX_ASSET_COUNT];
     counts[2] = 2;
 
-    alice.update_eth_price(2_001.01).await;
+    alice.feed_eth_price(2_001.01).await;
 
     let mut now = now();
     now += 1;
     dtc.advance_clock(now).await;
 
-    alice.update_eth_price(2_001.02).await;
+    alice.feed_eth_price(2_001.02).await;
 
     alice.assert_eth_price(2_001.02).await;
     alice.assert_valid_price_count(counts).await;
@@ -163,13 +163,13 @@ async fn test_update_sol_price_two_round_in_two_second() {
     let mut counts = [0u8; MAX_ASSET_COUNT];
     counts[3] = 2;
 
-    alice.update_sol_price(21.01).await;
+    alice.feed_sol_price(21.01).await;
 
     let mut now = now();
     now += 1;
     dtc.advance_clock(now).await;
 
-    alice.update_sol_price(21.02).await;
+    alice.feed_sol_price(21.02).await;
 
     alice.assert_sol_price(21.02).await;
     alice.assert_valid_price_count(counts).await;
@@ -183,7 +183,7 @@ async fn test_update_usdc_price_seven_round() {
     counts[0] = 5;
 
     //round 1
-    alice.update_usdc_price(1.01).await;
+    alice.feed_usdc_price(1.01).await;
     alice.assert_usdc_price(1.01).await;
 
     let mut now = now();
@@ -191,42 +191,42 @@ async fn test_update_usdc_price_seven_round() {
     dtc.advance_clock(now).await;
 
     //round 2
-    alice.update_usdc_price(1.02).await;
+    alice.feed_usdc_price(1.02).await;
     alice.assert_usdc_price(1.02).await;
 
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 3
-    alice.update_usdc_price(1.03).await;
+    alice.feed_usdc_price(1.03).await;
     alice.assert_usdc_price(1.03).await;
 
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 4
-    alice.update_usdc_price(1.04).await;
+    alice.feed_usdc_price(1.04).await;
     alice.assert_usdc_price(1.04).await;
 
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 5
-    alice.update_usdc_price(1.05).await;
+    alice.feed_usdc_price(1.05).await;
     alice.assert_usdc_price(1.05).await;
 
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 6
-    alice.update_usdc_price(1.06).await;
+    alice.feed_usdc_price(1.06).await;
     alice.assert_usdc_price(1.06).await;
 
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 7
-    alice.update_usdc_price(1.07).await;
+    alice.feed_usdc_price(1.07).await;
     alice.assert_usdc_price(1.07).await;
 
     alice.assert_valid_price_count(counts).await;
@@ -243,65 +243,65 @@ async fn test_update_every_price_seven_round() {
     counts[3] = 5;
 
     //round 1
-    alice.update_usdc_price(1.01).await;
-    alice.update_btc_price(20_001.01).await;
-    alice.update_eth_price(2_001.01).await;
-    alice.update_sol_price(21.01).await;
+    alice.feed_usdc_price(1.01).await;
+    alice.feed_btc_price(20_001.01).await;
+    alice.feed_eth_price(2_001.01).await;
+    alice.feed_sol_price(21.01).await;
 
     let mut now = now();
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 2
-    alice.update_usdc_price(1.02).await;
-    alice.update_btc_price(20_001.02).await;
-    alice.update_eth_price(2_001.02).await;
-    alice.update_sol_price(21.02).await;
+    alice.feed_usdc_price(1.02).await;
+    alice.feed_btc_price(20_001.02).await;
+    alice.feed_eth_price(2_001.02).await;
+    alice.feed_sol_price(21.02).await;
 
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 3
-    alice.update_usdc_price(1.03).await;
-    alice.update_btc_price(20_001.03).await;
-    alice.update_eth_price(2_001.03).await;
-    alice.update_sol_price(21.03).await;
+    alice.feed_usdc_price(1.03).await;
+    alice.feed_btc_price(20_001.03).await;
+    alice.feed_eth_price(2_001.03).await;
+    alice.feed_sol_price(21.03).await;
 
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 4
-    alice.update_usdc_price(1.04).await;
-    alice.update_btc_price(20_001.04).await;
-    alice.update_eth_price(2_001.04).await;
-    alice.update_sol_price(21.04).await;
+    alice.feed_usdc_price(1.04).await;
+    alice.feed_btc_price(20_001.04).await;
+    alice.feed_eth_price(2_001.04).await;
+    alice.feed_sol_price(21.04).await;
 
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 5
-    alice.update_usdc_price(1.05).await;
-    alice.update_btc_price(20_001.05).await;
-    alice.update_eth_price(2_001.05).await;
-    alice.update_sol_price(21.05).await;
+    alice.feed_usdc_price(1.05).await;
+    alice.feed_btc_price(20_001.05).await;
+    alice.feed_eth_price(2_001.05).await;
+    alice.feed_sol_price(21.05).await;
 
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 6
-    alice.update_usdc_price(1.06).await;
-    alice.update_btc_price(20_001.06).await;
-    alice.update_eth_price(2_001.06).await;
-    alice.update_sol_price(21.06).await;
+    alice.feed_usdc_price(1.06).await;
+    alice.feed_btc_price(20_001.06).await;
+    alice.feed_eth_price(2_001.06).await;
+    alice.feed_sol_price(21.06).await;
 
     now += 2;
     dtc.advance_clock(now).await;
 
     //round 7
-    alice.update_usdc_price(1.07).await;
-    alice.update_btc_price(20_001.07).await;
-    alice.update_eth_price(2_001.07).await;
-    alice.update_sol_price(21.07).await;
+    alice.feed_usdc_price(1.07).await;
+    alice.feed_btc_price(20_001.07).await;
+    alice.feed_eth_price(2_001.07).await;
+    alice.feed_sol_price(21.07).await;
 
     alice.assert_usdc_price(1.07).await;
     alice.assert_btc_price(20_001.07).await;

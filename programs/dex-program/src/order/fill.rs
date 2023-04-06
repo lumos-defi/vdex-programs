@@ -1,6 +1,6 @@
 use crate::{
     collections::{MountMode, OrderBook, OrderSide, OrderType, PagedList, SingleEventQueue},
-    dex::{get_oracle_price, Dex},
+    dex::{get_price, Dex, PriceFeed},
     errors::{DexError, DexResult},
     order::{AppendSingleEvent, MatchEvent, Order},
     utils::{MAX_FILLED_PER_INSTRUCTION, ORDER_POOL_MAGIC_BYTE},
@@ -29,6 +29,10 @@ pub struct FillOrder<'info> {
 
     #[account(mut)]
     pub authority: Signer<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 /// Layout of remaining accounts:
@@ -39,6 +43,11 @@ pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
     require!(
         dex.match_queue == ctx.accounts.match_queue.key(),
         DexError::InvalidMatchQueue
+    );
+
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
     );
 
     let mi = &dex.markets[market as usize];
@@ -78,7 +87,14 @@ pub fn handler(ctx: Context<FillOrder>, market: u8) -> DexResult {
     let mut match_queue =
         SingleEventQueue::<MatchEvent>::mount(&mut ctx.accounts.match_queue, true)?;
 
-    let market_price = get_oracle_price(mi.oracle_source, &ctx.accounts.oracle)?;
+    let price_feed = &ctx.accounts.price_feed.load()?;
+
+    let market_price = get_price(
+        mi.asset_index,
+        mi.oracle_source,
+        &ctx.accounts.oracle,
+        price_feed,
+    )?;
 
     let mut filled_bid_orders = 0u32;
     loop {

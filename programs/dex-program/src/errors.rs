@@ -292,6 +292,12 @@ pub enum DexError {
 
     #[msg("Account has already been initialized")]
     AccountHasAlreadyBeenInitialized,
+
+    #[msg("Failed load price feed account")]
+    FailedLoadPriceFeed,
+
+    #[msg("Invalid price feed")]
+    InvalidPriceFeed,
 }
 
 pub type DexResult<T = ()> = Result<T>;

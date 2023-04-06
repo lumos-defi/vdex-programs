@@ -28,6 +28,7 @@ describe('Init Feed Price', () => {
 
     const priceFeedInfo = await program.account.priceFeed.fetch(priceFeed.publicKey)
 
+    console.log(priceFeedInfo, priceFeedInfo.prices[0], priceFeedInfo.prices[0].assetPrices[0])
     expect(priceFeedInfo).toMatchObject({
       magic: expect.toBNEqual(0x666a),
       authority: authority.publicKey,
@@ -39,9 +40,10 @@ describe('Init Feed Price', () => {
               updateTime: expect.toBNEqual(0),
             }),
           ]),
-          lastUpdateTime: expect.toBNEqual(0),
+          cursor: 0,
         }),
       ]),
+      lastUpdateTime: expect.toBNEqual(0),
     })
   })
 })

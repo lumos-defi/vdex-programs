@@ -16,7 +16,7 @@ async fn test_open_btc_long_fail_minimum() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
         .await;
     user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
@@ -48,7 +48,7 @@ async fn test_open_btc_short_fail_minimum() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::USDC, minus_add_fee(100000.))
         .await;
     user.assert_fee(DexAsset::USDC, add_fee(100000.)).await;

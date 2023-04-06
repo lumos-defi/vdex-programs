@@ -1,6 +1,6 @@
 use crate::{
     collections::{MountMode, OrderBook, OrderSide, PagedList},
-    dex::{get_oracle_price, Dex, Position},
+    dex::{get_price, Dex, Position, PriceFeed},
     errors::{DexError, DexResult},
     order::Order,
     user::state::*,
@@ -57,6 +57,10 @@ pub struct LimitBid<'info> {
     /// CHECK
     #[account(executable, constraint = (token_program.key == &token::ID))]
     pub token_program: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 /// Layout of remaining accounts:
@@ -72,6 +76,11 @@ pub fn handler(
 ) -> DexResult {
     let dex = &ctx.accounts.dex.load()?;
     require!(market < dex.markets_number, DexError::InvalidMarketIndex);
+
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
 
     let mi = &dex.markets[market as usize];
     require!(
@@ -134,6 +143,7 @@ pub fn handler(
     );
 
     let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
+    let price_feed = &ctx.accounts.price_feed.load()?;
 
     let actual_amount = if ai.mint == mai.mint {
         amount
@@ -143,13 +153,27 @@ pub fn handler(
             &ctx.accounts.in_mint_oracle,
             &ctx.accounts.market_mint_oracle,
         ];
-        let (out, _) = dex.swap(asset, market_asset_index, amount, true, &oracles)?;
+        let (out, _) = dex.swap(
+            asset,
+            market_asset_index,
+            amount,
+            true,
+            &oracles,
+            price_feed,
+        )?;
         out
     };
 
     let (collateral, borrow) =
         Position::collateral_and_borrow(long, price, actual_amount, leverage, &mfr)?;
-    let market_mint_price = get_oracle_price(mai.oracle_source, &ctx.accounts.market_mint_oracle)?;
+
+    let market_mint_price = get_price(
+        market_asset_index,
+        mai.oracle_source,
+        &ctx.accounts.market_mint_oracle,
+        price_feed,
+    )?;
+
     require!(
         value(collateral, market_mint_price, mai.decimals)? >= mi.minimum_collateral,
         DexError::CollateralTooSmall
@@ -174,7 +198,12 @@ pub fn handler(
     token::transfer(cpi_ctx, amount)?;
 
     // Check price
-    let market_price = get_oracle_price(mi.oracle_source, &ctx.accounts.market_oracle)?;
+    let market_price = get_price(
+        mi.asset_index,
+        mi.oracle_source,
+        &ctx.accounts.market_oracle,
+        price_feed,
+    )?;
     if long {
         require!(market_price > price, DexError::PriceGTMarketPrice)
     } else {

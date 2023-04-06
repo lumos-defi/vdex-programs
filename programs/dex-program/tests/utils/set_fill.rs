@@ -21,6 +21,7 @@ pub async fn setup(
     match_queue: &Pubkey,
     order_book: &Pubkey,
     order_pool_entry_page: &Pubkey,
+    price_feed: &Pubkey,
     remaining_accounts: Vec<AccountMeta>,
     market: u8,
 ) -> Result<(), TransportError> {
@@ -32,6 +33,7 @@ pub async fn setup(
         match_queue,
         order_book,
         order_pool_entry_page,
+        price_feed,
         remaining_accounts,
         market,
     )

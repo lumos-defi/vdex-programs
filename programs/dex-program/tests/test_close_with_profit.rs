@@ -16,7 +16,7 @@ async fn test_close_btc_long_with_profit() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
         .await;
     user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
@@ -57,7 +57,7 @@ async fn test_close_btc_long_with_profit() {
         .await;
 
     // Close the position @21000, borrow fee rate = 0 (close right after open)
-    user.feed_btc_price(21000.).await;
+    user.mock_btc_price(21000.).await;
 
     alice
         .assert_close(DexMarket::BTC, true, expected_size)
@@ -96,7 +96,7 @@ async fn test_close_btc_short_with_profit() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::USDC, minus_add_fee(100000.))
         .await;
     user.assert_fee(DexAsset::USDC, add_fee(100000.)).await;
@@ -139,7 +139,7 @@ async fn test_close_btc_short_with_profit() {
         .await;
 
     // Close the position @ 19000, borrow fee rate = 0 (close right after open)
-    user.feed_btc_price(19000.).await;
+    user.mock_btc_price(19000.).await;
 
     alice
         .assert_close(DexMarket::BTC, false, expected_size)

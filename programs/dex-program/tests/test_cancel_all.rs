@@ -15,9 +15,9 @@ async fn test_cancel_bid_orders() {
     let alice = &dtc.user_context[1];
 
     // Prepare liquidity & price
-    user.feed_btc_price(20000.).await;
-    user.feed_eth_price(2000.).await;
-    user.feed_sol_price(20.).await;
+    user.mock_btc_price(20000.).await;
+    user.mock_eth_price(2000.).await;
+    user.mock_sol_price(20.).await;
 
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;
@@ -70,8 +70,8 @@ async fn test_cancel_bid_and_ask_orders() {
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_usdc(100000.).await;
     user.add_liquidity_with_eth(100.).await;
-    user.feed_btc_price(20000.).await;
-    user.feed_eth_price(2000.).await;
+    user.mock_btc_price(20000.).await;
+    user.mock_eth_price(2000.).await;
 
     // Alice open long
     alice.mint_btc(0.1).await;

@@ -2,7 +2,7 @@ use crate::{
     collections::{EventQueue, MountMode, OrderBook, PagedList},
     dex::{
         event::{AppendEvent, PositionAct},
-        get_oracle_price, Dex, UserListItem,
+        get_price, Dex, PriceFeed, UserListItem,
     },
     errors::{DexError, DexResult},
     order::{select_side, Order},
@@ -68,6 +68,10 @@ pub struct LiquidatePosition<'info> {
     /// CHECK
     #[account(executable, constraint = (system_program.key == &system_program::ID))]
     pub system_program: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 fn withdraw(ctx: &Context<LiquidatePosition>, seeds: &[&[u8]; 3], amount: u64) -> DexResult {
@@ -113,6 +117,12 @@ fn relay_native_mint_to_user(ctx: &Context<LiquidatePosition>, lamports: u64) ->
 //  offset m + 1 ~ n: user list remaining pages
 pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
+
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     require!(
         (market < dex.markets.len() as u8)
             && dex.event_queue == ctx.accounts.event_queue.key()
@@ -178,8 +188,15 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         ctx.accounts.dex.to_account_info().key.as_ref(),
         &[mai.nonce],
     ];
+
+    let price_feed = &ctx.accounts.price_feed.load()?;
     // Get oracle price
-    let price = get_oracle_price(mi.oracle_source, &ctx.accounts.market_oracle)?;
+    let price = get_price(
+        mi.asset_index,
+        mi.oracle_source,
+        &ctx.accounts.market_oracle,
+        price_feed,
+    )?;
 
     let mfr = mi.get_fee_rates(mai.borrow_fee_rate);
 

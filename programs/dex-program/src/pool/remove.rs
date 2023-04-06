@@ -43,6 +43,10 @@ pub struct RemoveLiquidity<'info> {
     /// CHECK
     #[account(executable, constraint = (token_program.key == &token::ID))]
     pub token_program: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 // Remaining accounts layout:
@@ -69,6 +73,11 @@ pub fn handler(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
         DexError::InvalidEventQueue
     );
 
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     let (index, ai) = dex.find_asset_by_mint(ctx.accounts.mint.key())?;
     require!(
         ai.vault == ctx.accounts.vault.key()
@@ -85,8 +94,14 @@ pub fn handler(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
     let actual_vlp_amount = us.borrow().withdrawable_vlp_amount(vlp_amount);
 
-    let (withdraw, fee) =
-        dex.remove_liquidity(index, actual_vlp_amount, &ctx.remaining_accounts)?;
+    let price_feed = &ctx.accounts.price_feed.load()?;
+
+    let (withdraw, fee) = dex.remove_liquidity(
+        index,
+        actual_vlp_amount,
+        &ctx.remaining_accounts,
+        price_feed,
+    )?;
 
     if withdraw > 0 {
         // Withdraw assets
@@ -105,7 +120,7 @@ pub fn handler(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
     }
 
     // Update rewards
-    dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len])?;
+    dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len], price_feed)?;
 
     us.borrow_mut()
         .leave_staking_vlp(&mut dex.vlp_pool, actual_vlp_amount)?;

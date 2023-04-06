@@ -1,6 +1,6 @@
 use crate::{
     collections::{EventQueue, MountMode, PagedList},
-    dex::{event::AppendEvent, get_oracle_price, AssetInfo, Dex, UserListItem},
+    dex::{event::AppendEvent, get_price, AssetInfo, Dex, PriceFeed, UserListItem},
     dual_invest::DI,
     errors::{DexError, DexResult},
     position::update_user_serial_number,
@@ -61,6 +61,10 @@ pub struct DiSettle<'info> {
     /// CHECK
     #[account(executable, constraint = (system_program.key == &system_program::ID))]
     pub system_program: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 fn validate_accounts(
@@ -144,7 +148,12 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
     );
     require!(
         dex.event_queue == ctx.accounts.event_queue.key(),
-        DexError::InvalidUserListEntryPage
+        DexError::InvalidEventQueue
+    );
+
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
     );
 
     require!(
@@ -202,14 +211,19 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
     );
 
     let fee_rate = di.borrow().meta.fee_rate as u64;
+    let price_feed = &ctx.accounts.price_feed.load()?;
 
     let (exercised, withdrawable, fee) = if option.is_call {
         if actual_settle_price >= option.strike_price {
             // Call option, exercised, swap base asset to quote asset, return quote asset + premium to user
             validate_accounts(&ctx, &user_mint_acc, false, quote_ai)?;
 
-            let quote_asset_price =
-                get_oracle_price(quote_ai.oracle_source, &ctx.accounts.quote_asset_oracle)?;
+            let quote_asset_price = get_price(
+                option.quote_asset_index,
+                quote_ai.oracle_source,
+                &ctx.accounts.quote_asset_oracle,
+                price_feed,
+            )?;
 
             let swapped_quote_asset = swap(
                 option.size,
@@ -286,8 +300,12 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
             // Put option, exercised, swap quote asset to base asset, return base asset + premium to user
             validate_accounts(&ctx, &user_mint_acc, true, base_ai)?;
 
-            let quote_asset_price =
-                get_oracle_price(quote_ai.oracle_source, &ctx.accounts.quote_asset_oracle)?;
+            let quote_asset_price = get_price(
+                option.quote_asset_index,
+                quote_ai.oracle_source,
+                &ctx.accounts.quote_asset_oracle,
+                price_feed,
+            )?;
 
             let swapped_base_asset = swap(
                 option.size,

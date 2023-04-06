@@ -3,7 +3,7 @@ use anchor_spl::token::{self, TokenAccount, Transfer};
 
 use crate::{
     collections::{MountMode, PagedList},
-    dex::{get_oracle_price, Dex, UserListItem},
+    dex::{get_price, Dex, PriceFeed, UserListItem},
     dual_invest::DI,
     errors::{DexError, DexResult},
     position::update_user_serial_number,
@@ -47,6 +47,10 @@ pub struct DiBuy<'info> {
     /// CHECK
     #[account(mut, constraint= user_list_entry_page.owner == program_id)]
     pub user_list_entry_page: UncheckedAccount<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 // Layout of remaining accounts:
@@ -56,6 +60,11 @@ pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> De
     require!(
         dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
         DexError::InvalidUserListEntryPage
+    );
+
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
     );
 
     require!(
@@ -104,9 +113,15 @@ pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> De
         DexError::InvalidVault
     );
 
+    let price_feed = &ctx.accounts.price_feed.load()?;
     // Check price
     // TODO: need a gap between strike price and market price ?
-    let price = get_oracle_price(base_ai.oracle_source, &ctx.accounts.base_asset_oracle)?;
+    let price = get_price(
+        option.base_asset_index,
+        base_ai.oracle_source,
+        &ctx.accounts.base_asset_oracle,
+        price_feed,
+    )?;
 
     if option.is_call {
         require!(option.strike_price > price, DexError::InvalidStrikePrice);

@@ -2,7 +2,7 @@ use crate::{
     collections::{EventQueue, MountMode, PagedList},
     dex::{
         event::{AppendEvent, PositionAct},
-        get_oracle_price, Dex, UserListItem,
+        get_price, Dex, PriceFeed, UserListItem,
     },
     errors::{DexError, DexResult},
     position::update_user_serial_number,
@@ -64,6 +64,10 @@ pub struct OpenPosition<'info> {
     /// CHECK
     #[account(executable, constraint = (token_program.key == &token::ID))]
     pub token_program: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 // Layout of remaining accounts:
@@ -76,6 +80,12 @@ pub fn handler(
     leverage: u32,
 ) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
+
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
+    );
+
     require!(
         market < dex.markets_number
             && dex.event_queue == ctx.accounts.event_queue.key()
@@ -118,9 +128,20 @@ pub fn handler(
         DexError::InvalidMarketIndex
     );
 
+    let price_feed = &ctx.accounts.price_feed.load()?;
     // Get market price
-    let price = get_oracle_price(mi.oracle_source, &ctx.accounts.market_oracle)?;
-    let market_mint_price = get_oracle_price(mai.oracle_source, &ctx.accounts.market_mint_oracle)?;
+    let price = get_price(
+        mi.asset_index,
+        mi.oracle_source,
+        &ctx.accounts.market_oracle,
+        price_feed,
+    )?;
+    let market_mint_price = get_price(
+        market_asset_index,
+        mai.oracle_source,
+        &ctx.accounts.market_mint_oracle,
+        price_feed,
+    )?;
     let market_mint_decimals = mai.decimals;
     let minimum_collateral = mi.minimum_collateral;
 
@@ -171,6 +192,7 @@ pub fn handler(
             amount,
             true,
             &oracles,
+            price_feed,
         )?;
 
         dex.swap_in(input_asset_index, amount.safe_sub(fee)?, fee)?;
