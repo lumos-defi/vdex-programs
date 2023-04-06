@@ -27,9 +27,9 @@ async fn test_anyone_can_remove_all_settled_option() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
@@ -79,9 +79,9 @@ async fn test_can_not_remove_unsettled_option_without_force() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
@@ -120,9 +120,9 @@ async fn test_admin_can_force_to_remove_unsettled_option() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;

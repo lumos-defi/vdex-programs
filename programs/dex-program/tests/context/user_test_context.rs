@@ -178,21 +178,21 @@ impl UserTestContext {
             .unwrap()
     }
 
-    pub async fn feed_btc_price(&self, price: f64) {
+    pub async fn mock_btc_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::BTC as u8, price)
             .await;
         // self.feed_asset_mock_oracle_price(self.asset_index("BTC"), price)
         //     .await
     }
 
-    pub async fn feed_eth_price(&self, price: f64) {
+    pub async fn mock_eth_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::ETH as u8, price)
             .await;
         // self.feed_asset_mock_oracle_price(self.asset_index("ETH"), price)
         //     .await
     }
 
-    pub async fn feed_sol_price(&self, price: f64) {
+    pub async fn mock_sol_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::SOL as u8, price)
             .await;
         // self.feed_asset_mock_oracle_price(self.asset_index("SOL"), price)
@@ -2223,28 +2223,28 @@ impl UserTestContext {
         .unwrap();
     }
 
-    pub async fn update_usdc_price(&self, price: f64) {
+    pub async fn feed_usdc_price(&self, price: f64) {
         let mut prices = [0f64; MAX_ASSET_COUNT];
         prices[DexAsset::USDC as usize] = price;
 
         self.update_price(prices).await;
     }
 
-    pub async fn update_eth_price(&self, price: f64) {
+    pub async fn feed_eth_price(&self, price: f64) {
         let mut prices = [0f64; MAX_ASSET_COUNT];
         prices[DexAsset::ETH as usize] = price;
 
         self.update_price(prices).await;
     }
 
-    pub async fn update_sol_price(&self, price: f64) {
+    pub async fn feed_sol_price(&self, price: f64) {
         let mut prices = [0f64; MAX_ASSET_COUNT];
         prices[DexAsset::SOL as usize] = price;
 
         self.update_price(prices).await;
     }
 
-    pub async fn update_btc_price(&self, price: f64) {
+    pub async fn feed_btc_price(&self, price: f64) {
         let mut prices = [0f64; MAX_ASSET_COUNT];
         prices[DexAsset::BTC as usize] = price;
 

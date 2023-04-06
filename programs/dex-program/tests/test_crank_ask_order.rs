@@ -17,7 +17,7 @@ async fn test_crank_ask_long_with_loss() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
         .await;
     user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
@@ -67,7 +67,7 @@ async fn test_crank_ask_long_with_loss() {
         .await;
 
     // Market price change @ 19000
-    user.feed_btc_price(19000.).await;
+    user.mock_btc_price(19000.).await;
     user.fill(DexMarket::BTC).await;
 
     // Crank the filled order
@@ -113,7 +113,7 @@ async fn test_crank_ask_short_with_loss() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::USDC, minus_add_fee(100000.))
         .await;
     user.assert_fee(DexAsset::USDC, add_fee(100000.)).await;
@@ -165,7 +165,7 @@ async fn test_crank_ask_short_with_loss() {
         .await;
 
     // Market price change @ 21000
-    user.feed_btc_price(21000.).await;
+    user.mock_btc_price(21000.).await;
     user.fill(DexMarket::BTC).await;
 
     // Crank the filled order
@@ -208,7 +208,7 @@ async fn test_crank_ask_long_with_profit() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
         .await;
     user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
@@ -258,7 +258,7 @@ async fn test_crank_ask_long_with_profit() {
         .await;
 
     // Market price change @ 21000
-    user.feed_btc_price(21000.).await;
+    user.mock_btc_price(21000.).await;
     user.fill(DexMarket::BTC).await;
 
     // Crank the filled order
@@ -303,7 +303,7 @@ async fn test_crank_ask_short_with_profit() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::USDC, minus_add_fee(100000.))
         .await;
     user.assert_fee(DexAsset::USDC, add_fee(100000.)).await;
@@ -355,7 +355,7 @@ async fn test_crank_ask_short_with_profit() {
         .await;
 
     // Market price change @ 19000
-    user.feed_btc_price(19000.).await;
+    user.mock_btc_price(19000.).await;
     user.fill(DexMarket::BTC).await;
 
     // Crank the filled order

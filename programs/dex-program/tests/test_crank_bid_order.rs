@@ -19,9 +19,9 @@ async fn test_crank_bid_long_no_swap() {
     let alice = &dtc.user_context[1];
 
     // Prepare liquidity & price
-    user.feed_btc_price(21000.).await;
-    user.feed_eth_price(2000.).await;
-    user.feed_sol_price(20.).await;
+    user.mock_btc_price(21000.).await;
+    user.mock_eth_price(2000.).await;
+    user.mock_sol_price(20.).await;
 
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;
@@ -58,7 +58,7 @@ async fn test_crank_bid_long_no_swap() {
         .await;
 
     // Market price change @ 20000
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.fill(DexMarket::BTC).await;
 
     let event = user.read_match_event().await;
@@ -101,9 +101,9 @@ async fn test_crank_bid_long_with_eth() {
     let alice = &dtc.user_context[1];
 
     // Prepare liquidity & price
-    user.feed_btc_price(21000.).await;
-    user.feed_eth_price(2000.).await;
-    user.feed_sol_price(20.).await;
+    user.mock_btc_price(21000.).await;
+    user.mock_eth_price(2000.).await;
+    user.mock_sol_price(20.).await;
 
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;
@@ -156,7 +156,7 @@ async fn test_crank_bid_long_with_eth() {
         .await;
 
     // Market price change @ 20000
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.fill(DexMarket::BTC).await;
 
     let event = user.read_match_event().await;
@@ -214,9 +214,9 @@ async fn test_crank_bid_long_with_usdc() {
     let bob = &dtc.user_context[2];
 
     // Prepare liquidity & price
-    user.feed_btc_price(21000.).await;
-    user.feed_eth_price(2000.).await;
-    user.feed_sol_price(20.).await;
+    user.mock_btc_price(21000.).await;
+    user.mock_eth_price(2000.).await;
+    user.mock_sol_price(20.).await;
 
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;
@@ -269,7 +269,7 @@ async fn test_crank_bid_long_with_usdc() {
         .await;
 
     // Market price change @ 20000
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.fill(DexMarket::BTC).await;
 
     let event = user.read_match_event().await;
@@ -329,9 +329,9 @@ async fn test_crank_bid_long_with_sol() {
     let alice = &dtc.user_context[1];
 
     // Prepare liquidity & price
-    user.feed_btc_price(21000.).await;
-    user.feed_eth_price(2000.).await;
-    user.feed_sol_price(20.).await;
+    user.mock_btc_price(21000.).await;
+    user.mock_eth_price(2000.).await;
+    user.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     user.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -372,7 +372,7 @@ async fn test_crank_bid_long_with_sol() {
         .await;
 
     // Market price change @ 20000
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.fill(DexMarket::BTC).await;
 
     let event = user.read_match_event().await;
@@ -434,7 +434,7 @@ async fn test_crank_bid_short_no_swap() {
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(18000.).await;
+    user.mock_btc_price(18000.).await;
 
     // Alice bids short with usdc
     alice.mint_usdc(2000.).await;
@@ -463,7 +463,7 @@ async fn test_crank_bid_short_no_swap() {
         .await;
 
     // Market price change @ 20000
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.fill(DexMarket::BTC).await;
 
     let event = user.read_match_event().await;
@@ -507,9 +507,9 @@ async fn test_crank_bid_short_with_eth() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(18000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(18000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -554,7 +554,7 @@ async fn test_crank_bid_short_with_eth() {
         .await;
 
     // Market price change @ 20000
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.fill(DexMarket::BTC).await;
 
     let event = user.read_match_event().await;
@@ -619,9 +619,9 @@ async fn test_crank_bid_short_with_btc() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(18000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(18000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -667,7 +667,7 @@ async fn test_crank_bid_short_with_btc() {
         .await;
 
     // Market price change @ 20000
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.fill(DexMarket::BTC).await;
 
     let event = user.read_match_event().await;
@@ -728,9 +728,9 @@ async fn test_crank_bid_short_with_sol() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(18000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(18000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -769,7 +769,7 @@ async fn test_crank_bid_short_with_sol() {
         .await;
 
     // Market price change @ 20000
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.fill(DexMarket::BTC).await;
 
     let event = user.read_match_event().await;

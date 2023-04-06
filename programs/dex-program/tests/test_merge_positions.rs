@@ -16,7 +16,7 @@ async fn test_merge_long() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Alice open #1
     alice.mint_btc(0.1).await;
@@ -64,7 +64,7 @@ async fn test_merge_long() {
         )
         .await;
 
-    user.feed_btc_price(21000.).await;
+    user.mock_btc_price(21000.).await;
 
     // Alice open #3
     alice.mint_btc(0.3).await;
@@ -98,7 +98,7 @@ async fn test_merge_short() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(1000000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Alice open #1
     alice.mint_usdc(2000.).await;
@@ -148,7 +148,7 @@ async fn test_merge_short() {
         )
         .await;
 
-    user.feed_btc_price(22000.).await;
+    user.mock_btc_price(22000.).await;
 
     // Alice open #3
     alice.mint_usdc(6000.).await;

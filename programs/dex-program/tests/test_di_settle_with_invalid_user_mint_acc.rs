@@ -27,9 +27,9 @@ async fn test_btc_call_not_exercised() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
@@ -135,9 +135,9 @@ async fn test_btc_call_exercised() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
@@ -244,9 +244,9 @@ async fn test_btc_put_not_exercised() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.).await;
     market.add_liquidity_with_eth(10.).await;
@@ -355,9 +355,9 @@ async fn test_btc_put_exercised() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.).await;
     market.add_liquidity_with_eth(10.).await;
@@ -466,9 +466,9 @@ async fn test_sol_call_not_exercised() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
@@ -565,9 +565,9 @@ async fn test_sol_call_exercised() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
@@ -660,9 +660,9 @@ async fn test_sol_put_not_exercised() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
@@ -757,9 +757,9 @@ async fn test_sol_put_exercised() {
     dtc.di_set_admin(&admin.user.pubkey()).await;
 
     // Prepare liquidity
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;

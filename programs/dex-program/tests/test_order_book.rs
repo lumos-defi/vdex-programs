@@ -15,9 +15,9 @@ async fn test_bid_max_ask_min() {
     let alice = &dtc.user_context[1];
 
     // Prepare liquidity & price
-    user.feed_btc_price(20000.).await;
-    user.feed_eth_price(2000.).await;
-    user.feed_sol_price(20.).await;
+    user.mock_btc_price(20000.).await;
+    user.mock_eth_price(2000.).await;
+    user.mock_sol_price(20.).await;
 
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;

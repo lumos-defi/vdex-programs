@@ -15,9 +15,9 @@ async fn test_btc_to_usdc() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -71,9 +71,9 @@ async fn test_btc_to_eth() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -127,9 +127,9 @@ async fn test_btc_to_sol() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -181,9 +181,9 @@ async fn test_usdc_to_btc() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -242,9 +242,9 @@ async fn test_usdc_to_eth() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -303,9 +303,9 @@ async fn test_usdc_to_sol() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -355,9 +355,9 @@ async fn test_sol_to_usdc() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -404,9 +404,9 @@ async fn test_sol_to_btc() {
     let alice = &dtc.user_context[1];
     let market = &dtc.user_context[2];
 
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;

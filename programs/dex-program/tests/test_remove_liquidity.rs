@@ -95,8 +95,8 @@ async fn test_remove_liquidity_withdraw_sol_use_price_feed() {
     let dtc = DexTestContext::new().await;
     let alice = &dtc.user_context[0];
 
-    alice.feed_sol_price(100.0).await;
-    alice.update_sol_price(20.0).await;
+    alice.mock_sol_price(100.0).await;
+    alice.feed_sol_price(20.0).await;
     alice.add_liquidity_with_sol(1.0).await;
 
     //0.1% add liquidity fee

@@ -16,7 +16,7 @@ async fn test_cancel_ask_long() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
         .await;
     user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
@@ -127,7 +127,7 @@ async fn test_cancel_ask_short() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Alice open short
     alice.mint_usdc(2000.).await;

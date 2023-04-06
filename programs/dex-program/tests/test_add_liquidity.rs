@@ -74,9 +74,9 @@ async fn test_add_multiple_liquidity() {
     let joe = &dtc.user_context[2];
     let market = &dtc.user_context[3];
 
-    market.feed_btc_price(20000.).await;
-    market.feed_eth_price(2000.).await;
-    market.feed_sol_price(20.).await;
+    market.mock_btc_price(20000.).await;
+    market.mock_eth_price(2000.).await;
+    market.mock_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;
@@ -127,7 +127,7 @@ async fn test_add_liquidity_with_usdc_use_feed_price() {
     let alice = &dtc.user_context[0];
 
     //use price feed
-    alice.update_usdc_price(1.1).await;
+    alice.feed_usdc_price(1.1).await;
     alice.add_liquidity_with_usdc(10_000.0).await;
 
     //0.1% add liquidity fee
@@ -141,7 +141,7 @@ async fn test_add_liquidity_with_btc_use_feed_price() {
     let dtc = DexTestContext::new().await;
     let alice = &dtc.user_context[0];
 
-    alice.update_btc_price(20_000.0).await;
+    alice.feed_btc_price(20_000.0).await;
     alice.add_liquidity_with_btc(10.0).await;
     alice
         .assert_liquidity(utils::DexAsset::BTC, minus_add_fee(10.0))
@@ -162,15 +162,15 @@ async fn test_add_multiple_liquidity_use_price_feed() {
     let market = &dtc.user_context[3];
 
     //feed mock oracle price
-    market.feed_btc_price(20001.).await;
-    market.feed_eth_price(2001.).await;
-    market.feed_sol_price(21.).await;
+    market.mock_btc_price(20001.).await;
+    market.mock_eth_price(2001.).await;
+    market.mock_sol_price(21.).await;
 
     //update price feed
-    alice.update_usdc_price(1.).await;
-    alice.update_btc_price(20000.).await;
-    alice.update_eth_price(2000.).await;
-    alice.update_sol_price(20.).await;
+    alice.feed_usdc_price(1.).await;
+    alice.feed_btc_price(20000.).await;
+    alice.feed_eth_price(2000.).await;
+    alice.feed_sol_price(20.).await;
 
     // Assert SOL (added when creating dex)
     market.assert_liquidity(DexAsset::SOL, 999.).await;

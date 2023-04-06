@@ -15,9 +15,9 @@ async fn test_bid_long_and_short() {
     let alice = &dtc.user_context[1];
 
     // Prepare liquidity & price
-    user.feed_btc_price(20000.).await;
-    user.feed_eth_price(2000.).await;
-    user.feed_sol_price(20.).await;
+    user.mock_btc_price(20000.).await;
+    user.mock_eth_price(2000.).await;
+    user.mock_sol_price(20.).await;
 
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;
@@ -87,9 +87,9 @@ async fn test_bid_fail_of_price() {
     let alice = &dtc.user_context[1];
 
     // Prepare liquidity & price
-    user.feed_btc_price(20000.).await;
-    user.feed_eth_price(2000.).await;
-    user.feed_sol_price(20.).await;
+    user.mock_btc_price(20000.).await;
+    user.mock_eth_price(2000.).await;
+    user.mock_sol_price(20.).await;
 
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;
@@ -124,14 +124,14 @@ async fn test_bid_fail_of_price_use_price_feed() {
     let alice = &dtc.user_context[1];
 
     // Prepare liquidity & price
-    user.feed_btc_price(20001.).await;
-    user.feed_eth_price(2001.).await;
-    user.feed_sol_price(21.).await;
+    user.mock_btc_price(20001.).await;
+    user.mock_eth_price(2001.).await;
+    user.mock_sol_price(21.).await;
 
-    user.update_usdc_price(1.).await;
-    user.update_btc_price(20000.).await;
-    user.update_eth_price(2000.).await;
-    user.update_sol_price(20.).await;
+    user.feed_usdc_price(1.).await;
+    user.feed_btc_price(20000.).await;
+    user.feed_eth_price(2000.).await;
+    user.feed_sol_price(20.).await;
 
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;

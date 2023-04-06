@@ -16,7 +16,7 @@ async fn test_ask_long_total_size() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
         .await;
     user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
@@ -65,7 +65,7 @@ async fn test_ask_long_partial_size() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
     user.assert_liquidity(DexAsset::BTC, minus_add_fee(10.))
         .await;
     user.assert_fee(DexAsset::BTC, add_fee(10.)).await;
@@ -137,7 +137,7 @@ async fn test_ask_short_total_size() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Alice open long
     alice.mint_usdc(2000.).await;
@@ -182,7 +182,7 @@ async fn test_ask_short_partial_size() {
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Alice open long
     alice.mint_usdc(2000.).await;
@@ -234,11 +234,11 @@ async fn test_ask_short_partial_size_use_price_feed() {
     let user = &dtc.user_context[0];
     let alice = &dtc.user_context[1];
 
-    alice.update_usdc_price(1.0).await;
-    alice.update_btc_price(20000.).await;
+    alice.feed_usdc_price(1.0).await;
+    alice.feed_btc_price(20000.).await;
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20001.).await;
+    user.mock_btc_price(20001.).await;
 
     // Alice open long
     alice.mint_usdc(2000.).await;

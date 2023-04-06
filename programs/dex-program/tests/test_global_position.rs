@@ -17,7 +17,7 @@ async fn test_global_long_same_price() {
     let mike = &dtc.user_context[3];
 
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Open positions
     alice.mint_btc(0.1).await;
@@ -65,7 +65,7 @@ async fn test_global_long_different_price() {
     let mike = &dtc.user_context[3];
 
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Open positions
     alice.mint_btc(0.1).await;
@@ -73,7 +73,7 @@ async fn test_global_long_different_price() {
         .assert_open(DexAsset::BTC, DexMarket::BTC, true, 0.1, 10 * 1000)
         .await;
 
-    user.feed_btc_price(22000.).await;
+    user.mock_btc_price(22000.).await;
     bob.mint_btc(0.1).await;
     bob.assert_open(DexAsset::BTC, DexMarket::BTC, true, 0.1, 10 * 1000)
         .await;
@@ -85,7 +85,7 @@ async fn test_global_long_different_price() {
     user.assert_global_long(DexMarket::BTC, 21000., expected_size * 2.0)
         .await;
 
-    user.feed_btc_price(23000.).await;
+    user.mock_btc_price(23000.).await;
     mike.mint_btc(0.2).await;
     mike.assert_open(DexAsset::BTC, DexMarket::BTC, true, 0.2, 10 * 1000)
         .await;
@@ -115,7 +115,7 @@ async fn test_global_short_same_price() {
     let mike = &dtc.user_context[3];
 
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Open positions
     alice.mint_usdc(2000.).await;
@@ -163,7 +163,7 @@ async fn test_global_short_different_price() {
     let mike = &dtc.user_context[3];
 
     user.add_liquidity_with_usdc(100000.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Open positions
     alice.mint_usdc(2000.).await;
@@ -174,7 +174,7 @@ async fn test_global_short_different_price() {
     let expected_collateral = 2000. - expected_open_fee;
     let alice_size = collateral_to_size(expected_collateral, 10., 20000., 9);
 
-    user.feed_btc_price(22000.).await;
+    user.mock_btc_price(22000.).await;
     bob.mint_usdc(2000.).await;
     bob.assert_open(DexAsset::USDC, DexMarket::BTC, false, 2000., 10 * 1000)
         .await;
@@ -185,7 +185,7 @@ async fn test_global_short_different_price() {
     user.assert_global_short(DexMarket::BTC, merge_price, alice_size + bob_size)
         .await;
 
-    user.feed_btc_price(24000.).await;
+    user.mock_btc_price(24000.).await;
     mike.mint_usdc(2000.).await;
     mike.assert_open(DexAsset::USDC, DexMarket::BTC, false, 2000., 10 * 1000)
         .await;

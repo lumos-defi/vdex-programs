@@ -17,9 +17,9 @@ async fn test_fill_bid_order() {
     let bob = &dtc.user_context[2];
 
     // Prepare liquidity & price
-    user.feed_btc_price(20000.).await;
-    user.feed_eth_price(2000.).await;
-    user.feed_sol_price(20.).await;
+    user.mock_btc_price(20000.).await;
+    user.mock_eth_price(2000.).await;
+    user.mock_sol_price(20.).await;
 
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;
@@ -62,7 +62,7 @@ async fn test_fill_bid_order() {
     user.assert_no_match_event().await;
 
     // Market price change @ 19000
-    user.feed_btc_price(19000.).await;
+    user.mock_btc_price(19000.).await;
     user.fill(DexMarket::BTC).await;
 
     let event = user.read_match_event().await;
@@ -73,14 +73,14 @@ async fn test_fill_bid_order() {
         .await;
 
     // Market price change @ 22500
-    user.feed_btc_price(22500.).await;
+    user.mock_btc_price(22500.).await;
     user.fill(DexMarket::BTC).await;
 
     user.assert_order_book_bid_max_ask_min(DexMarket::BTC, 18000., 23000.)
         .await;
 
     // Market price change @ 18000
-    user.feed_btc_price(18000.).await;
+    user.mock_btc_price(18000.).await;
     user.fill(DexMarket::BTC).await;
 
     user.assert_order_book_bid_max_ask_min(DexMarket::BTC, 0., 23000.)
@@ -97,7 +97,7 @@ async fn test_fill_ask_order() {
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
     user.add_liquidity_with_btc(10.).await;
-    user.feed_btc_price(20000.).await;
+    user.mock_btc_price(20000.).await;
 
     // Alice open long
     alice.mint_btc(0.1).await;
@@ -121,21 +121,21 @@ async fn test_fill_ask_order() {
         .await;
 
     // Market price change @ 22500
-    user.feed_btc_price(22500.).await;
+    user.mock_btc_price(22500.).await;
     user.fill(DexMarket::BTC).await;
 
     user.assert_order_book_bid_max_ask_min(DexMarket::BTC, 18000., 23000.)
         .await;
 
     // Market price change @ 18000
-    user.feed_btc_price(18000.).await;
+    user.mock_btc_price(18000.).await;
     user.fill(DexMarket::BTC).await;
 
     user.assert_order_book_bid_max_ask_min(DexMarket::BTC, 17000., 23000.)
         .await;
 
     // Market price change @ 17000
-    user.feed_btc_price(17000.).await;
+    user.mock_btc_price(17000.).await;
     user.fill(DexMarket::BTC).await;
 
     user.assert_order_book_bid_max_ask_min(DexMarket::BTC, 0., 23000.)
