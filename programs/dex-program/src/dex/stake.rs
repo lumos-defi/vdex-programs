@@ -161,8 +161,13 @@ impl UserStake {
         Ok(())
     }
 
-    pub fn leave_staking(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
-        require!(amount > 0, DexError::InvalidAmount);
+    pub fn leave_staking(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult<u64> {
+        let actual_amount = if amount > self.staked {
+            self.staked
+        } else {
+            amount
+        };
+        require!(actual_amount > 0, DexError::InvalidAmount);
 
         let pending_reward = (self
             .staked
@@ -186,8 +191,8 @@ impl UserStake {
             pool.withdraw_es_vdx(pending_es_vdx)?;
         }
 
-        pool.decrease_staking(amount)?;
-        self.staked = self.staked.safe_sub(amount)?;
+        pool.decrease_staking(actual_amount)?;
+        self.staked = self.staked.safe_sub(actual_amount)?;
 
         self.reward_debt = self
             .staked
@@ -199,10 +204,10 @@ impl UserStake {
             .safe_mul(pool.accumulate_es_vdx_per_share)?
             .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64;
 
-        Ok(())
+        Ok(actual_amount)
     }
 
-    pub fn withdraw_reward(&mut self, pool: &mut StakingPool) -> DexResult<u64> {
+    pub fn withdraw_reward(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult<u64> {
         let pending = (self
             .staked
             .safe_mul(pool.accumulate_reward_per_share)?
@@ -210,9 +215,11 @@ impl UserStake {
             .safe_sub(self.reward_debt)?;
 
         pool.withdraw_reward(pending)?;
-        let withdrawable = self.reward_accumulated.safe_add(pending)?;
+        self.reward_accumulated = self.reward_accumulated.safe_add(pending)?;
 
-        self.reward_accumulated = 0;
+        let withdrawable = amount.min(self.reward_accumulated);
+
+        self.reward_accumulated = self.reward_accumulated.safe_sub(withdrawable)?;
         self.reward_debt = self
             .staked
             .safe_mul(pool.accumulate_reward_per_share)?
@@ -460,7 +467,7 @@ mod test {
 
         // Withdraw rewards
         let withdrawable_reward = users[user_total as usize - 1]
-            .withdraw_reward(&mut pool)
+            .withdraw_reward(&mut pool, u64::MAX)
             .assert_unwrap();
         assert_eq!(pending_reward, withdrawable_reward);
         assert_eq!(

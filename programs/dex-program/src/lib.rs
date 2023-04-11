@@ -282,6 +282,10 @@ pub mod dex_program {
     pub fn redeem_vdx(ctx: Context<RedeemVdx>, amount: u64) -> DexResult {
         user::redeem_vdx::handler(ctx, amount)
     }
+
+    pub fn claim_rewards(ctx: Context<ClaimRewards>, amount: u64) -> DexResult {
+        user::claim_rewards::handler(ctx, amount)
+    }
 }
 
 #[derive(Accounts)]

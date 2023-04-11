@@ -442,6 +442,7 @@ impl<'a> UserState<'a> {
         basic.owner = owner;
         basic.vlp.init();
         basic.vdx.init();
+        basic.es_vdx.init();
 
         let us = Self::mount(account, false)?;
         us.borrow().order_pool.initialize()?;
@@ -778,7 +779,7 @@ impl<'a> UserState<'a> {
         self.meta.vlp.enter_staking(pool, amount)
     }
 
-    pub fn leave_staking_vlp(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
+    pub fn leave_staking_vlp(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult<u64> {
         self.meta.vlp.leave_staking(pool, amount)
     }
 
@@ -786,19 +787,38 @@ impl<'a> UserState<'a> {
         self.meta.vlp.staked.min(amount)
     }
 
-    pub fn compound_es_vdx(&mut self, dex: &mut Dex) -> DexResult {
+    pub fn stake_and_compound_vdx(&mut self, dex: &mut Dex, vdx_staked: u64) -> DexResult {
         let amount_of_vlp_pool = self.meta.vlp.withdraw_es_vdx(&mut dex.vlp_pool)?;
         let amount_of_vdx_pool = self.meta.vdx.withdraw_es_vdx(&mut dex.vdx_pool)?;
 
-        let vested = self
+        let vdx_vested = self
             .meta
             .es_vdx
-            .roll(amount_of_vlp_pool + amount_of_vdx_pool)?;
+            .roll(amount_of_vlp_pool.safe_add(amount_of_vdx_pool)?)?;
 
         // Stake vdx
-        self.meta.vdx.enter_staking(&mut dex.vdx_pool, vested)?;
+        self.meta
+            .vdx
+            .enter_staking(&mut dex.vdx_pool, vdx_vested.safe_add(vdx_staked)?)?;
 
         Ok(())
+    }
+
+    pub fn redeem_vdx(&mut self, dex: &mut Dex, amount: u64) -> DexResult<u64> {
+        self.stake_and_compound_vdx(dex, 0)?;
+        self.meta.vdx.leave_staking(&mut dex.vdx_pool, amount)
+    }
+
+    pub fn claim_rewards(&mut self, dex: &mut Dex, amount: u64) -> DexResult<u64> {
+        self.stake_and_compound_vdx(dex, 0)?;
+
+        let amount_from_vdx_pool = self.meta.vdx.withdraw_reward(&mut dex.vdx_pool, amount)?;
+        let amount_from_vlp_pool = self
+            .meta
+            .vlp
+            .withdraw_reward(&mut dex.vlp_pool, amount.safe_sub(amount_from_vdx_pool)?)?;
+
+        amount_from_vdx_pool.safe_add(amount_from_vlp_pool)
     }
 
     pub fn di_new_option(
