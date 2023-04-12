@@ -2032,7 +2032,7 @@ mod test {
 
         let oracles: Vec<&AccountInfo> = vec![&usdc_oracle, &btc_oracle];
 
-        let mut price_feed = PriceFeed::default();
+        let price_feed = PriceFeed::default();
         set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
         set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
 
@@ -2065,7 +2065,7 @@ mod test {
         dex.add_asset(USDC_DECIMALS, usdc_oracle.key());
 
         let oracles: Vec<&AccountInfo> = vec![&btc_oracle, &usdc_oracle];
-        let mut price_feed = PriceFeed::default();
+        let price_feed = PriceFeed::default();
 
         set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
         set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
@@ -2103,7 +2103,7 @@ mod test {
         set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
 
         let oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle];
-        let mut price_feed = PriceFeed::default();
+        let price_feed = PriceFeed::default();
 
         dex.collect_fees(2, &oracles, &price_feed).assert_ok();
 
@@ -2156,7 +2156,7 @@ mod test {
         set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
 
         let mut oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle, btc_oracle2];
-        let mut price_feed = PriceFeed::default();
+        let price_feed = PriceFeed::default();
 
         let aum = dex.aum(&oracles, &price_feed).assert_unwrap();
         assert_eq!(aum, 0);
@@ -2247,7 +2247,7 @@ mod test {
         set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
 
         let oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle, btc_oracle2];
-        let mut price_feed = PriceFeed::default();
+        let price_feed = PriceFeed::default();
 
         // Add 1000 SOL, add liquidity fee rate = 0.1%
         let (vlp_amount, fee) = dex

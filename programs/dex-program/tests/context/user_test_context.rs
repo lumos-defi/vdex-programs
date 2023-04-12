@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     cell::RefCell,
     ops::{Div, Mul},
     rc::Rc,
@@ -35,14 +34,14 @@ use crate::utils::constant::TEST_VLP_DECIMALS;
 use crate::utils::TestResult;
 use dex_program::{
     collections::{OrderBook, SingleEvent, SingleEventQueue},
-    dex::{Dex, MockOracle, PriceFeed},
+    dex::{Dex, MockOracle},
     dual_invest::{DIOption, DI},
     errors::{DexError, DexResult},
     order::MatchEvent,
     user::UserState,
     utils::USDC_POW_DECIMALS,
 };
-use solana_program_test::{BanksClient, ProgramTestContext};
+use solana_program_test::ProgramTestContext;
 use spl_associated_token_account::get_associated_token_address;
 
 pub struct UserTestContext {
@@ -700,10 +699,12 @@ impl UserTestContext {
         );
     }
 
-    pub async fn assert_vlp_rewards(&self, amount: f64) {
+    pub async fn assert_rewards(&self, amount: f64) {
         let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
-        let reward_total = di.borrow().vlp_pool.reward_total;
+        let reward_for_vlp = di.borrow().vlp_pool.reward_total;
+        let reward_for_vdx = di.borrow().vdx_pool.reward_total;
 
+        let reward_total = reward_for_vlp + reward_for_vdx;
         assert_eq_with_dust(
             reward_total,
             convert_to_big_number(amount.into(), TEST_SOL_DECIMALS),
@@ -2258,13 +2259,11 @@ impl UserTestContext {
         )
         .await;
 
-        let mut latest_prices = 0u64;
-
         for i in 0..prices.len() {
             let price_info = price_feed_info.borrow().prices[i];
             let current_price = price_info.asset_prices[price_info.cursor as usize].price;
 
-            latest_prices = convert_to_big_number(prices[i], PRICE_FEED_DECIMALS);
+            let latest_prices = convert_to_big_number(prices[i], PRICE_FEED_DECIMALS);
 
             assert_eq!(current_price, latest_prices);
         }
