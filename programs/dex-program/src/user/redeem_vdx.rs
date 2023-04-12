@@ -1,7 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
 
-use crate::{dex::Dex, errors::DexError, errors::DexResult, user::UserState};
+use crate::{
+    dex::{Dex, PriceFeed},
+    errors::DexError,
+    errors::DexResult,
+    user::UserState,
+};
 
 #[derive(Accounts)]
 pub struct RedeemVdx<'info> {
@@ -30,6 +35,10 @@ pub struct RedeemVdx<'info> {
     pub event_queue: UncheckedAccount<'info>,
 
     /// CHECK
+    #[account(owner = *program_id)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
+
+    /// CHECK
     pub authority: Signer<'info>,
 
     /// CHECK
@@ -49,6 +58,11 @@ pub fn handler(ctx: Context<RedeemVdx>, amount: u64) -> DexResult {
     require!(
         assets_oracles_len == ctx.remaining_accounts.len(),
         DexError::InvalidRemainingAccounts
+    );
+
+    require!(
+        dex.price_feed == ctx.accounts.price_feed.key(),
+        DexError::InvalidPriceFeed
     );
 
     let mut i = 0usize;
@@ -73,8 +87,10 @@ pub fn handler(ctx: Context<RedeemVdx>, amount: u64) -> DexResult {
         DexError::InvalidProgramSigner
     );
 
+    let price_feed = &ctx.accounts.price_feed.load()?;
+
     let reward_asset_debt =
-        dex.update_staking_pool(&ctx.remaining_accounts[0..assets_oracles_len])?;
+        dex.update_staking_pool(&ctx.remaining_accounts[0..assets_oracles_len], price_feed)?;
     require!(reward_asset_debt == 0, DexError::InsufficientSolLiquidity);
 
     let redeemable = us.borrow_mut().redeem_vdx(&mut dex, amount)?;
