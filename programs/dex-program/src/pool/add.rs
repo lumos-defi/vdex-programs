@@ -90,7 +90,7 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
 
     // Update rewards
     let reward_asset_debt =
-        dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len], price_feed)?;
+        dex.update_staking_pool(&ctx.remaining_accounts[0..assets_oracles_len], price_feed)?;
 
     let (vlp_amount, fee) = dex.add_liquidity(
         index,

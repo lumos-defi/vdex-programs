@@ -143,6 +143,9 @@ pub enum DexError {
     #[msg("Insufficient liquidity")]
     InsufficientLiquidity,
 
+    #[msg("Insufficient SOL liquidity")]
+    InsufficientSolLiquidity,
+
     #[msg("Insufficient borrow")]
     InsufficientBorrow,
 

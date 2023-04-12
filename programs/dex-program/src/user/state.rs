@@ -5,7 +5,10 @@ use crate::dex::{state::*, StakingPool, UserStake};
 use crate::dual_invest::DIOption;
 use crate::errors::{DexError, DexResult};
 
-use crate::utils::{time::get_timestamp, SafeMath, NIL32, USER_STATE_MAGIC_NUMBER};
+use crate::utils::VESTING_PERIOD;
+use crate::utils::{
+    time::get_timestamp, SafeMath, NIL32, SECONDS_PER_DAY, USER_STATE_MAGIC_NUMBER,
+};
 use anchor_lang::prelude::*;
 use std::mem;
 
@@ -13,19 +16,197 @@ use std::mem;
 use std::mem::ManuallyDrop;
 
 #[repr(C)]
-// #[derive(Clone, Copy)]
 pub struct MetaInfo {
     pub magic: u32,
     pub serial_number: u32,
     pub owner: Pubkey,
     pub delegate: Pubkey,
     pub vlp: UserStake,
+    pub vdx: UserStake,
+    pub es_vdx: VestingMint,
     pub user_list_index: u32,
     pub order_slot_count: u8,
     pub position_slot_count: u8,
     pub di_option_slot_count: u8,
     pub asset_slot_count: u8,
     reserved: [u8; 64],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct VestingMint {
+    pub amounts: [u64; VESTING_PERIOD as usize],
+    pub last_day: i64,
+    #[cfg(test)]
+    pub mock_time: i64,
+    pub first_day_offset: u16,
+    pub last_day_offset: u16,
+    padding: [u8; 4],
+}
+
+impl VestingMint {
+    pub fn init(&mut self) {
+        for i in 0..self.amounts.len() {
+            self.amounts[i] = 0;
+        }
+
+        self.first_day_offset = 0xffff;
+        self.last_day_offset = 0xffff;
+        self.last_day = -1;
+    }
+
+    fn restart_append(&mut self, append: u64, today: i64) {
+        self.amounts[0] = append;
+        self.last_day = today;
+        self.first_day_offset = 0;
+        self.last_day_offset = 0;
+    }
+
+    fn vest(&self, offset: u16, days: u16) -> DexResult<u64> {
+        Ok(self.amounts[offset as usize]
+            .safe_mul(days as u64)?
+            .safe_div(VESTING_PERIOD as u128)? as u64)
+    }
+
+    #[cfg(test)]
+    fn init_time(&mut self) {
+        self.mock_time = get_timestamp().unwrap();
+    }
+
+    #[cfg(test)]
+    fn advance_time(&mut self, delta: i64) {
+        self.mock_time += delta;
+    }
+
+    pub fn roll(&mut self, append: u64) -> DexResult<u64> {
+        #[cfg(not(test))]
+        let today = get_timestamp()? / SECONDS_PER_DAY;
+
+        #[cfg(test)]
+        let today = self.mock_time / SECONDS_PER_DAY;
+
+        if self.last_day == -1 {
+            self.restart_append(append, today);
+
+            return Ok(0);
+        }
+
+        if today == self.last_day {
+            self.amounts[self.last_day_offset as usize] =
+                self.amounts[self.last_day_offset as usize].safe_add(append)?;
+
+            return Ok(0);
+        }
+
+        let mut vested = 0;
+
+        let passed_days = (today - self.last_day) as u16;
+        if passed_days >= VESTING_PERIOD {
+            let mut offset = self.first_day_offset;
+            loop {
+                let remained_days = VESTING_PERIOD
+                    - if offset <= self.last_day_offset {
+                        self.last_day_offset - offset
+                    } else {
+                        VESTING_PERIOD - offset + self.last_day_offset
+                    };
+
+                let vested_of_day = self.vest(offset, remained_days)?;
+                vested = vested.safe_add(vested_of_day)?;
+
+                if offset == self.last_day_offset {
+                    break;
+                }
+                offset = (offset + 1) % VESTING_PERIOD;
+            }
+
+            self.restart_append(append, today);
+
+            return Ok(vested);
+        }
+
+        let today_offset = (self.last_day_offset + passed_days) % VESTING_PERIOD;
+        // println!(
+        //     "passed days {},last day {}, first day offset {},  last day offset {}",
+        //     passed_days, self.last_day, self.first_day_offset, self.last_day_offset
+        // );
+
+        if self.last_day_offset >= self.first_day_offset {
+            if today_offset > self.last_day_offset || today_offset <= self.first_day_offset {
+                for offset in self.first_day_offset..=self.last_day_offset {
+                    let vested_of_day = self.vest(offset, passed_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+                }
+
+                if today_offset == self.first_day_offset {
+                    self.first_day_offset = (today_offset + 1) % VESTING_PERIOD;
+                }
+            } else {
+                for offset in self.first_day_offset..=today_offset {
+                    let remained_days = VESTING_PERIOD - (self.last_day_offset - offset);
+
+                    let vested_of_day = self.vest(offset, remained_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+
+                    self.amounts[offset as usize] = 0;
+                }
+
+                for offset in (today_offset + 1)..=self.last_day_offset {
+                    let vested_of_day = self.vest(offset, passed_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+                }
+
+                self.first_day_offset = (today_offset + 1) % VESTING_PERIOD;
+            }
+        } else {
+            if today_offset > self.last_day_offset && today_offset < self.first_day_offset {
+                let mut offset = self.first_day_offset;
+                loop {
+                    let vested_of_day = self.vest(offset, passed_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+
+                    if offset == self.last_day_offset {
+                        break;
+                    }
+                    offset = (offset + 1) % VESTING_PERIOD;
+                }
+            } else {
+                let mut offset = self.first_day_offset;
+                loop {
+                    let remained_days = offset - self.last_day_offset;
+
+                    let vested_of_day = self.vest(offset, remained_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+
+                    self.amounts[offset as usize] = 0;
+
+                    if offset == today_offset {
+                        break;
+                    }
+                    offset = (offset + 1) % VESTING_PERIOD;
+                }
+
+                self.first_day_offset = (today_offset + 1) % VESTING_PERIOD;
+
+                offset = (today_offset + 1) % VESTING_PERIOD;
+                loop {
+                    let vested_of_day = self.vest(offset, passed_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+
+                    if offset == self.last_day_offset {
+                        break;
+                    }
+                    offset = (offset + 1) % VESTING_PERIOD;
+                }
+            }
+        }
+
+        self.last_day = today;
+        self.last_day_offset = today_offset;
+        self.amounts[today_offset as usize] = append;
+
+        Ok(vested)
+    }
 }
 
 #[repr(C)]
@@ -259,13 +440,15 @@ impl<'a> UserState<'a> {
         basic.user_list_index = NIL32;
         basic.serial_number = 0;
         basic.owner = owner;
+        basic.vlp.init();
+        basic.vdx.init();
+        basic.es_vdx.init();
 
-        let user_state = Self::mount(account, false)?;
-
-        user_state.borrow().order_pool.initialize()?;
-        user_state.borrow().position_pool.initialize()?;
-        user_state.borrow().di_option_pool.initialize()?;
-        user_state.borrow().asset_pool.initialize()?;
+        let us = Self::mount(account, false)?;
+        us.borrow().order_pool.initialize()?;
+        us.borrow().position_pool.initialize()?;
+        us.borrow().di_option_pool.initialize()?;
+        us.borrow().asset_pool.initialize()?;
 
         Ok(())
     }
@@ -596,12 +779,46 @@ impl<'a> UserState<'a> {
         self.meta.vlp.enter_staking(pool, amount)
     }
 
-    pub fn leave_staking_vlp(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
+    pub fn leave_staking_vlp(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult<u64> {
         self.meta.vlp.leave_staking(pool, amount)
     }
 
     pub fn withdrawable_vlp_amount(&self, amount: u64) -> u64 {
         self.meta.vlp.staked.min(amount)
+    }
+
+    pub fn stake_and_compound_vdx(&mut self, dex: &mut Dex, vdx_staked: u64) -> DexResult {
+        let amount_of_vlp_pool = self.meta.vlp.withdraw_es_vdx(&mut dex.vlp_pool)?;
+        let amount_of_vdx_pool = self.meta.vdx.withdraw_es_vdx(&mut dex.vdx_pool)?;
+
+        let vdx_vested = self
+            .meta
+            .es_vdx
+            .roll(amount_of_vlp_pool.safe_add(amount_of_vdx_pool)?)?;
+
+        // Stake vdx
+        self.meta
+            .vdx
+            .enter_staking(&mut dex.vdx_pool, vdx_vested.safe_add(vdx_staked)?)?;
+
+        Ok(())
+    }
+
+    pub fn redeem_vdx(&mut self, dex: &mut Dex, amount: u64) -> DexResult<u64> {
+        self.stake_and_compound_vdx(dex, 0)?;
+        self.meta.vdx.leave_staking(&mut dex.vdx_pool, amount)
+    }
+
+    pub fn claim_rewards(&mut self, dex: &mut Dex, amount: u64) -> DexResult<u64> {
+        self.stake_and_compound_vdx(dex, 0)?;
+
+        let amount_from_vdx_pool = self.meta.vdx.withdraw_reward(&mut dex.vdx_pool, amount)?;
+        let amount_from_vlp_pool = self
+            .meta
+            .vlp
+            .withdraw_reward(&mut dex.vlp_pool, amount.safe_sub(amount_from_vdx_pool)?)?;
+
+        amount_from_vdx_pool.safe_add(amount_from_vlp_pool)
     }
 
     pub fn di_new_option(
@@ -1635,5 +1852,279 @@ mod test {
         us.borrow()
             .require_liquidate(0, false, usdc(15000.), &mfr)
             .assert_err();
+    }
+
+    impl Default for VestingMint {
+        fn default() -> VestingMint {
+            unsafe { std::mem::zeroed() }
+        }
+    }
+
+    impl VestingMint {
+        fn init_test(&mut self) {
+            self.init();
+            self.init_time();
+        }
+
+        fn assert_roll(&mut self, after_days: i64, roll_in: u64, expect_vested: u64) {
+            self.advance_time(after_days);
+            let vested = self.roll(roll_in).assert_unwrap();
+            assert_eq!(vested, expect_vested);
+        }
+    }
+
+    const DAY: i64 = 3600 * 24;
+
+    #[test]
+    fn test_vest_1() {
+        //
+        // Test vesting 360 usdc in 360 days,each day we have 1 usdc vested.
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+        vest.roll(usdc(360.)).assert_ok();
+
+        for _ in 0..VESTING_PERIOD {
+            vest.assert_roll(DAY, 0, usdc(1.0));
+        }
+    }
+
+    #[test]
+    fn test_vest_2() {
+        //
+        // Test vesting 360 usdc after 360 days,we have all usdc vested.
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+        vest.roll(usdc(360.)).assert_ok();
+
+        vest.assert_roll(DAY * VESTING_PERIOD as i64, 0, usdc(360.0));
+    }
+
+    #[test]
+    fn test_vest_3() {
+        //
+        // Test vesting 360 usdc after 360 + 1 days,we have maximum 360 usdc vested.
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+        vest.roll(usdc(360.)).assert_ok();
+
+        vest.assert_roll(DAY * (VESTING_PERIOD + 1) as i64, 0, usdc(360.0));
+    }
+
+    #[test]
+    fn test_vest_4() {
+        //
+        // Test vesting 360 usdc after 360 + 10000 days,we have maximum 360 usdc vested.
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+        vest.roll(usdc(360.)).assert_ok();
+
+        vest.assert_roll(DAY * (VESTING_PERIOD + 10000) as i64, 0, usdc(360.0));
+    }
+
+    #[test]
+    fn test_vest_5() {
+        //
+        // Test vesting 360 usdc:
+        //  1. roll after 10 days -- 10 usdc is vested
+        //  2. roll after 360 days -- the rest 350 usdc is vested
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+        vest.roll(usdc(360.)).assert_ok();
+
+        vest.assert_roll(DAY * 10, 0, usdc(10.0));
+        vest.assert_roll(DAY * VESTING_PERIOD as i64, 0, usdc(350.0));
+
+        // Check state
+        assert_eq!(vest.first_day_offset, 0);
+        assert_eq!(vest.last_day_offset, 0);
+    }
+
+    #[test]
+    fn test_vest_6() {
+        //
+        //  1. Roll in 360 usdc in the first day
+        //  2. Roll in 180 usdc after 60 days
+        //
+        //  We will have (120 + 60) usdc after another 120 days
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+        vest.roll(usdc(360.)).assert_ok();
+
+        vest.assert_roll(DAY * 60, usdc(180.), usdc(60.0));
+        vest.assert_roll(DAY * 120, 0, usdc(180.0));
+
+        // Check state
+        assert_eq!(vest.first_day_offset, 0);
+        assert_eq!(vest.last_day_offset, 180);
+    }
+
+    #[test]
+    fn test_vest_7() {
+        //
+        //  1. Roll in 360 usdc in the first day
+        //  2. Roll in 180 usdc after 60 days
+        //
+        //  We will have (300 + 150) usdc after another 300 days
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+        vest.roll(usdc(360.)).assert_ok();
+
+        vest.assert_roll(DAY * 60, usdc(180.), usdc(60.0));
+        vest.assert_roll(DAY * 300, 0, usdc(450.0));
+
+        // Check state
+        assert_eq!(vest.first_day_offset, 1);
+        assert_eq!(vest.last_day_offset, 0);
+    }
+
+    #[test]
+    fn test_vest_8() {
+        //
+        //  1. Roll in 360 usdc in the first day
+        //  2. Roll in 180 usdc after 60 days
+        //
+        //  We will have (300 + 160) usdc after another 320 days
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+        vest.roll(usdc(360.)).assert_ok();
+
+        vest.assert_roll(DAY * 60, usdc(180.), usdc(60.0));
+        vest.assert_roll(DAY * 320, 0, usdc(460.0));
+
+        // Check state
+        assert_eq!(vest.first_day_offset, 21);
+        assert_eq!(vest.last_day_offset, 20);
+    }
+
+    #[test]
+    fn test_vest_9() {
+        //
+        //  1. Roll in 360 usdc in the first day
+        //  2. Roll in 180 usdc after 60 days
+        //
+        //  T1. We will have (300 + 160) usdc after another 320 days
+        //  T2. We will have 20 usdc after another 40 days
+        let mut vest = VestingMint::default();
+        vest.init_test();
+        vest.roll(usdc(360.)).assert_ok();
+
+        vest.assert_roll(DAY * 60, usdc(180.), usdc(60.0));
+        vest.assert_roll(DAY * 320, 0, usdc(460.0));
+
+        // Check state
+        assert_eq!(vest.first_day_offset, 21);
+        assert_eq!(vest.last_day_offset, 20);
+
+        vest.assert_roll(DAY * 40, 0, usdc(20.0));
+
+        // Check state
+        assert_eq!(vest.first_day_offset, 61);
+        assert_eq!(vest.last_day_offset, 60);
+    }
+
+    #[test]
+    fn test_vest_10() {
+        //
+        //  1. Roll in 360 usdc every day in the first year
+        //
+        //  Check the total amount vested after the second year
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+
+        let mut total_vested = 0;
+        let mut expect_vested = 0;
+
+        // First year
+        for _ in 0..VESTING_PERIOD {
+            vest.assert_roll(DAY, usdc(360.), expect_vested);
+            total_vested += expect_vested;
+
+            expect_vested += usdc(1.0);
+        }
+
+        assert_eq!(expect_vested, usdc(360.));
+
+        // Second year
+        for _ in 0..VESTING_PERIOD {
+            vest.assert_roll(DAY, usdc(0.), expect_vested);
+            total_vested += expect_vested;
+
+            expect_vested -= usdc(1.0);
+        }
+
+        assert_eq!(expect_vested, usdc(0.));
+        vest.assert_roll(DAY, usdc(0.), expect_vested);
+
+        assert_eq!(total_vested, usdc(360.) * VESTING_PERIOD as u64);
+    }
+
+    #[test]
+    fn test_vest_11() {
+        //
+        //  1. Roll in 360 usdc every other day in the first year
+        //
+        //  Check the total amount vested after the second year
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+
+        let mut total_vested = 0;
+
+        // First year
+        for _ in 0..VESTING_PERIOD / 2 {
+            vest.advance_time(DAY * 2);
+            let vested = vest.roll(usdc(360.)).assert_unwrap();
+            total_vested += vested;
+        }
+
+        // Second year
+        for _ in 0..VESTING_PERIOD {
+            vest.advance_time(DAY);
+            let vested = vest.roll(usdc(0.)).assert_unwrap();
+            total_vested += vested;
+        }
+
+        assert_eq!(total_vested, usdc(360.) * (VESTING_PERIOD / 2) as u64);
+    }
+
+    #[test]
+    fn test_vest_12() {
+        //
+        //  1. Roll in 360 usdc in the first day
+        //  2. Roll in 360 usdc after 10 days
+        //  3. Roll in 360 usdc after 110 days
+        //  4. Roll in 0 usdc after 250 days
+        //  5. Roll in 0 usdc after 500 days
+        //
+        //  Check the amount vested after each roll
+        //
+        let mut vest = VestingMint::default();
+        vest.init_test();
+        vest.roll(usdc(360.)).assert_unwrap();
+
+        vest.advance_time(DAY * 10);
+        let vested = vest.roll(usdc(360.)).assert_unwrap();
+        assert_eq!(vested, usdc(10.));
+
+        vest.advance_time(DAY * 110);
+        let vested = vest.roll(usdc(360.)).assert_unwrap();
+        assert_eq!(vested, usdc(100. + 120.));
+
+        vest.advance_time(DAY * 250);
+        let vested = vest.roll(usdc(0.)).assert_unwrap();
+        assert_eq!(vested, usdc(240. + 250. + 250.));
+
+        vest.advance_time(DAY * 500);
+        let vested = vest.roll(usdc(0.)).assert_unwrap();
+        assert_eq!(vested, usdc(110.));
     }
 }

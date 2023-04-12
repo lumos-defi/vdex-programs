@@ -14,6 +14,8 @@ pub struct StakingPool {
     pub reward_total: u64,
     pub staked_total: u64,
     pub accumulate_reward_per_share: u64,
+    pub es_vdx_total: u64,
+    pub accumulate_es_vdx_per_share: u64,
     pub reward_asset_index: u8,
     pub decimals: u8,
     pub nonce: u8,
@@ -45,7 +47,7 @@ impl StakingPool {
         self.accumulate_reward_per_share = 0;
     }
 
-    pub fn add_reward(&mut self, reward: u64) -> DexResult {
+    pub fn add_rewards(&mut self, reward: u64) -> DexResult {
         self.reward_total = self.reward_total.safe_add(reward)?;
         if self.staked_total == 0 {
             return Ok(());
@@ -56,6 +58,21 @@ impl StakingPool {
             .safe_div(self.staked_total as u128)? as u64;
 
         self.accumulate_reward_per_share = self.accumulate_reward_per_share.safe_add(delta)?;
+
+        Ok(())
+    }
+
+    pub fn add_es_vdx(&mut self, amount: u64) -> DexResult {
+        self.es_vdx_total = self.es_vdx_total.safe_add(amount)?;
+        if self.staked_total == 0 {
+            return Ok(());
+        }
+
+        let delta = amount
+            .safe_mul(REWARD_SHARE_POW_DECIMALS)?
+            .safe_div(self.staked_total as u128)? as u64;
+
+        self.accumulate_es_vdx_per_share = self.accumulate_es_vdx_per_share.safe_add(delta)?;
 
         Ok(())
     }
@@ -77,12 +94,20 @@ impl StakingPool {
         self.reward_total = self.reward_total.safe_sub(pending)?;
         Ok(())
     }
+
+    #[inline]
+    pub fn withdraw_es_vdx(&mut self, pending: u64) -> DexResult {
+        self.es_vdx_total = self.es_vdx_total.safe_sub(pending)?;
+        Ok(())
+    }
 }
 
 pub struct UserStake {
     pub staked: u64,
     pub reward_debt: u64,
     pub reward_accumulated: u64,
+    pub es_vdx_debt: u64,
+    pub es_vdx_accumulated: u64,
     pub padding: [u8; 64],
 }
 
@@ -91,20 +116,33 @@ impl UserStake {
         self.staked = 0;
         self.reward_debt = 0;
         self.reward_accumulated = 0;
+        self.es_vdx_debt = 0;
+        self.es_vdx_accumulated = 0;
     }
 
     pub fn enter_staking(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
         require!(amount > 0, DexError::InvalidAmount);
 
         if self.staked > 0 {
-            let pending = (self
+            let pending_reward = (self
                 .staked
                 .safe_mul(pool.accumulate_reward_per_share)?
-                .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64)
+                .safe_div(REWARD_SHARE_POW_DECIMALS as u128)?
+                as u64)
                 .safe_sub(self.reward_debt)?;
 
-            self.reward_accumulated = self.reward_accumulated.safe_add(pending)?;
-            pool.withdraw_reward(pending)?;
+            self.reward_accumulated = self.reward_accumulated.safe_add(pending_reward)?;
+            pool.withdraw_reward(pending_reward)?;
+
+            let pending_es_vdx = (self
+                .staked
+                .safe_mul(pool.accumulate_es_vdx_per_share)?
+                .safe_div(REWARD_SHARE_POW_DECIMALS as u128)?
+                as u64)
+                .safe_sub(self.es_vdx_debt)?;
+
+            self.es_vdx_accumulated = self.es_vdx_accumulated.safe_add(pending_es_vdx)?;
+            pool.withdraw_es_vdx(pending_es_vdx)?;
         }
 
         pool.increase_staking(amount)?;
@@ -115,34 +153,61 @@ impl UserStake {
             .safe_mul(pool.accumulate_reward_per_share)?
             .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64;
 
+        self.es_vdx_debt = self
+            .staked
+            .safe_mul(pool.accumulate_es_vdx_per_share)?
+            .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64;
+
         Ok(())
     }
 
-    pub fn leave_staking(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
-        require!(amount > 0, DexError::InvalidAmount);
-        let pending = (self
+    pub fn leave_staking(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult<u64> {
+        let actual_amount = if amount > self.staked {
+            self.staked
+        } else {
+            amount
+        };
+        require!(actual_amount > 0, DexError::InvalidAmount);
+
+        let pending_reward = (self
             .staked
             .safe_mul(pool.accumulate_reward_per_share)?
             .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64)
             .safe_sub(self.reward_debt)?;
 
-        if pending > 0 {
-            self.reward_accumulated = self.reward_accumulated.safe_add(pending)?;
-            pool.withdraw_reward(pending)?;
+        if pending_reward > 0 {
+            self.reward_accumulated = self.reward_accumulated.safe_add(pending_reward)?;
+            pool.withdraw_reward(pending_reward)?;
         }
 
-        pool.decrease_staking(amount)?;
-        self.staked = self.staked.safe_sub(amount)?;
+        let pending_es_vdx = (self
+            .staked
+            .safe_mul(pool.accumulate_es_vdx_per_share)?
+            .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64)
+            .safe_sub(self.es_vdx_debt)?;
+
+        if pending_es_vdx > 0 {
+            self.es_vdx_accumulated = self.es_vdx_accumulated.safe_add(pending_es_vdx)?;
+            pool.withdraw_es_vdx(pending_es_vdx)?;
+        }
+
+        pool.decrease_staking(actual_amount)?;
+        self.staked = self.staked.safe_sub(actual_amount)?;
 
         self.reward_debt = self
             .staked
             .safe_mul(pool.accumulate_reward_per_share)?
             .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64;
 
-        Ok(())
+        self.es_vdx_debt = self
+            .staked
+            .safe_mul(pool.accumulate_es_vdx_per_share)?
+            .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64;
+
+        Ok(actual_amount)
     }
 
-    pub fn withdraw_reward(&mut self, pool: &mut StakingPool) -> DexResult<u64> {
+    pub fn withdraw_reward(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult<u64> {
         let pending = (self
             .staked
             .safe_mul(pool.accumulate_reward_per_share)?
@@ -150,12 +215,33 @@ impl UserStake {
             .safe_sub(self.reward_debt)?;
 
         pool.withdraw_reward(pending)?;
-        let withdrawable = self.reward_accumulated.safe_add(pending)?;
+        self.reward_accumulated = self.reward_accumulated.safe_add(pending)?;
 
-        self.reward_accumulated = 0;
+        let withdrawable = amount.min(self.reward_accumulated);
+
+        self.reward_accumulated = self.reward_accumulated.safe_sub(withdrawable)?;
         self.reward_debt = self
             .staked
             .safe_mul(pool.accumulate_reward_per_share)?
+            .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64;
+
+        Ok(withdrawable)
+    }
+
+    pub fn withdraw_es_vdx(&mut self, pool: &mut StakingPool) -> DexResult<u64> {
+        let pending = (self
+            .staked
+            .safe_mul(pool.accumulate_es_vdx_per_share)?
+            .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64)
+            .safe_sub(self.es_vdx_debt)?;
+
+        pool.withdraw_es_vdx(pending)?;
+        let withdrawable = self.es_vdx_accumulated.safe_add(pending)?;
+
+        self.es_vdx_accumulated = 0;
+        self.es_vdx_debt = self
+            .staked
+            .safe_mul(pool.accumulate_es_vdx_per_share)?
             .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64;
 
         Ok(withdrawable)
@@ -169,6 +255,16 @@ impl UserStake {
             .safe_sub(self.reward_debt)?;
 
         self.reward_accumulated.safe_add(pending)
+    }
+
+    pub fn pending_es_vdx(&self, pool: &StakingPool) -> DexResult<u64> {
+        let pending = (self
+            .staked
+            .safe_mul(pool.accumulate_es_vdx_per_share)?
+            .safe_div(REWARD_SHARE_POW_DECIMALS as u128)? as u64)
+            .safe_sub(self.es_vdx_debt)?;
+
+        self.es_vdx_accumulated.safe_add(pending)
     }
 }
 
@@ -214,7 +310,7 @@ mod test {
         }
 
         let reward = eth(10.);
-        pool.add_reward(reward).assert_ok();
+        pool.add_rewards(reward).assert_ok();
 
         for user in &users {
             assert_eq!(
@@ -245,7 +341,7 @@ mod test {
             reward += eth(1.0 * (i + 1) as f64);
             total_share += (i + 1) as u64;
         }
-        pool.add_reward(reward).assert_ok();
+        pool.add_rewards(reward).assert_ok();
 
         let per_share = reward / total_share;
         assert_eq!(per_share, eth(1.0));
@@ -272,7 +368,7 @@ mod test {
         }
 
         let reward = eth(10.);
-        pool.add_reward(reward).assert_ok();
+        pool.add_rewards(reward).assert_ok();
 
         for user in &users {
             assert_eq!(
@@ -296,7 +392,7 @@ mod test {
 
         // Pool got additional rewards
         let additional_reward = eth(10.1);
-        pool.add_reward(additional_reward).assert_ok();
+        pool.add_rewards(additional_reward).assert_ok();
 
         for user in &users {
             assert_eq!(
@@ -325,7 +421,7 @@ mod test {
         }
 
         let reward = eth(10.);
-        pool.add_reward(reward).assert_ok();
+        pool.add_rewards(reward).assert_ok();
 
         for user in &users {
             assert_eq!(
@@ -349,7 +445,7 @@ mod test {
 
         // Pool got additional rewards
         let additional_reward = eth(9.9);
-        pool.add_reward(additional_reward).assert_ok();
+        pool.add_rewards(additional_reward).assert_ok();
 
         for i in 0..user_total as usize - 1 {
             assert_eq!(
@@ -371,7 +467,7 @@ mod test {
 
         // Withdraw rewards
         let withdrawable_reward = users[user_total as usize - 1]
-            .withdraw_reward(&mut pool)
+            .withdraw_reward(&mut pool, u64::MAX)
             .assert_unwrap();
         assert_eq!(pending_reward, withdrawable_reward);
         assert_eq!(
@@ -401,13 +497,13 @@ mod test {
 
         // 2. Alice add liquidity and enter staking
         // No rewards available
-        pool.add_reward(0).assert_ok();
+        pool.add_rewards(0).assert_ok();
         alice.enter_staking(&mut pool, usdc(1000.)).assert_ok();
         assert_eq!(alice.pending_reward(&pool).assert_unwrap(), 0);
 
         // 3. Bob add liquidity and enter staking.
         // Rewards were generated when alice adding liquidity
-        pool.add_reward(eth(0.1)).assert_ok();
+        pool.add_rewards(eth(0.1)).assert_ok();
 
         bob.enter_staking(&mut pool, usdc(1000.)).assert_ok();
 
@@ -415,7 +511,7 @@ mod test {
         assert_eq!(bob.pending_reward(&pool).assert_unwrap(), 0);
 
         // 4. Update rewards later, check the pending rewards
-        pool.add_reward(eth(0.1)).assert_ok();
+        pool.add_rewards(eth(0.1)).assert_ok();
         assert_eq!(alice.pending_reward(&pool).assert_unwrap(), eth(0.1 + 0.05));
         assert_eq!(bob.pending_reward(&pool).assert_unwrap(), eth(0.05));
     }

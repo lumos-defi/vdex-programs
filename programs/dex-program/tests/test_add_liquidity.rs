@@ -89,7 +89,7 @@ async fn test_add_multiple_liquidity() {
 
     market.assert_liquidity(DexAsset::SOL, 999.).await;
     market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_vlp_rewards(1.0).await; // Fee rewards are collected and distributed among the vlp stakers
+    market.assert_rewards(1.0).await; // Fee rewards are collected and distributed among the vlp stakers
 
     // Add ETH
     joe.add_liquidity_with_eth(10.0).await; // fee = 0.01 ETH (20 USD)
@@ -102,7 +102,7 @@ async fn test_add_multiple_liquidity() {
 
     market.assert_liquidity(DexAsset::SOL, 998.).await;
     market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_vlp_rewards(2.0).await;
+    market.assert_rewards(2.0).await;
 
     // Add USDC
     alice.add_liquidity_with_usdc(20000.).await; // fee = (20 USD/1 SOL)
@@ -118,7 +118,7 @@ async fn test_add_multiple_liquidity() {
 
     market.assert_liquidity(DexAsset::SOL, 997.).await;
     market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_vlp_rewards(3.0).await;
+    market.assert_rewards(3.0).await;
 }
 
 #[tokio::test]
@@ -183,7 +183,7 @@ async fn test_add_multiple_liquidity_use_price_feed() {
 
     market.assert_liquidity(DexAsset::SOL, 999.).await;
     market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_vlp_rewards(1.0).await; // Fee rewards are collected and distributed among the vlp stakers
+    market.assert_rewards(1.0).await; // Fee rewards are collected and distributed among the vlp stakers
 
     // Add ETH
     joe.add_liquidity_with_eth(10.0).await; // fee = 0.01 ETH (20 USD)
@@ -196,7 +196,7 @@ async fn test_add_multiple_liquidity_use_price_feed() {
 
     market.assert_liquidity(DexAsset::SOL, 998.).await;
     market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_vlp_rewards(2.0).await;
+    market.assert_rewards(2.0).await;
 
     // Add USDC
     alice.add_liquidity_with_usdc(20000.).await; // fee = (20 USD/1 SOL)
@@ -212,5 +212,5 @@ async fn test_add_multiple_liquidity_use_price_feed() {
 
     market.assert_liquidity(DexAsset::SOL, 997.).await;
     market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_vlp_rewards(3.0).await;
+    market.assert_rewards(3.0).await;
 }

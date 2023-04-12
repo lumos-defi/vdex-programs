@@ -270,6 +270,22 @@ pub mod dex_program {
     pub fn update_price(ctx: Context<UpdatePrice>, prices: [u64; 16]) -> DexResult {
         dex::update_price::handler(ctx, prices)
     }
+
+    pub fn compound(ctx: Context<Compound>) -> DexResult {
+        user::compound::handler(ctx)
+    }
+
+    pub fn stake_vdx(ctx: Context<StakeVdx>, amount: u64) -> DexResult {
+        user::stake_vdx::handler(ctx, amount)
+    }
+
+    pub fn redeem_vdx(ctx: Context<RedeemVdx>, amount: u64) -> DexResult {
+        user::redeem_vdx::handler(ctx, amount)
+    }
+
+    pub fn claim_rewards(ctx: Context<ClaimRewards>, amount: u64) -> DexResult {
+        user::claim_rewards::handler(ctx, amount)
+    }
 }
 
 #[derive(Accounts)]

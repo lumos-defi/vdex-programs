@@ -5,8 +5,9 @@ use crate::{
     errors::{DexError, DexResult},
     utils::{
         swap, time::get_timestamp, value, ISafeAddSub, ISafeMath, SafeMath, BORROW_FEE_RATE_BASE,
-        FEE_RATE_BASE, FEE_RATE_DECIMALS, LEVERAGE_POW_DECIMALS, MAX_ASSET_COUNT, MAX_MARKET_COUNT,
-        MAX_PRICE_COUNT, MAX_USER_LIST_REMAINING_PAGES_COUNT, USD_POW_DECIMALS,
+        ES_VDX_PERCENTAGE_FOR_VDX_POOL, ES_VDX_PER_SECOND, FEE_RATE_BASE, FEE_RATE_DECIMALS,
+        LEVERAGE_POW_DECIMALS, MAX_ASSET_COUNT, MAX_MARKET_COUNT, MAX_PRICE_COUNT,
+        MAX_USER_LIST_REMAINING_PAGES_COUNT, REWARD_PERCENTAGE_FOR_VDX_POOL, USD_POW_DECIMALS,
     },
 };
 
@@ -18,6 +19,7 @@ pub struct Dex {
     pub assets: [AssetInfo; MAX_ASSET_COUNT],
     pub markets: [MarketInfo; MAX_MARKET_COUNT],
     pub vlp_pool: StakingPool,
+    pub vdx_pool: StakingPool,
     pub authority: Pubkey,
     pub delegate: Pubkey,
     pub event_queue: Pubkey,
@@ -27,6 +29,7 @@ pub struct Dex {
     pub price_feed: Pubkey,
     pub user_list_entry_page: Pubkey,
     pub user_list_remaining_pages: [Pubkey; MAX_USER_LIST_REMAINING_PAGES_COUNT],
+    pub mint_es_vdx_last_timestamp: i64,
     pub user_list_remaining_pages_number: u8,
     pub assets_number: u8,
     pub markets_number: u8,
@@ -221,10 +224,13 @@ impl Dex {
 
         if index == reward_asset_index {
             // If adding reward asset, amount should be larger than reward asset debt.
-            require!(reward_asset_debt < added, DexError::InsufficientRewardAsset);
+            require!(
+                reward_asset_debt <= added,
+                DexError::InsufficientSolLiquidity
+            );
         } else {
             // If not adding reward asset, reward asset debt should be zero.
-            require!(reward_asset_debt == 0, DexError::InsufficientRewardAsset);
+            require!(reward_asset_debt == 0, DexError::InsufficientSolLiquidity);
         }
 
         ai.liquidity_amount = ai
@@ -569,7 +575,7 @@ impl Dex {
         &mut self,
         oracles: &[AccountInfo],
         price_feed: &PriceFeed,
-    ) -> DexResult<u64> {
+    ) -> DexResult<(u64, u64)> {
         let index = self.vlp_pool.reward_asset_index;
         require!(
             index < self.assets_number && self.assets[index as usize].valid,
@@ -578,15 +584,13 @@ impl Dex {
 
         let (debt, rewards) = self.collect_fees(index as usize, oracles, price_feed)?;
         if rewards == 0 {
-            return Ok(debt);
+            return Ok((debt, 0));
         }
-
-        self.vlp_pool.add_reward(rewards)?;
 
         let ai = self.asset_as_mut(index)?;
         ai.fee_amount = 0;
 
-        Ok(debt)
+        Ok((debt, rewards))
     }
 
     pub fn swap_in(&mut self, index: u8, amount: u64, fee: u64) -> DexResult {
@@ -654,6 +658,47 @@ impl Dex {
         ai.fee_amount = ai.fee_amount.safe_add(fee)?;
 
         Ok(())
+    }
+
+    pub fn mint_es_vdx(&mut self) -> DexResult {
+        let now = get_timestamp()?;
+        // TODO: handle init & end situation
+        if now <= self.mint_es_vdx_last_timestamp {
+            return Ok(());
+        }
+        let total = (now - self.mint_es_vdx_last_timestamp) as u64 * ES_VDX_PER_SECOND;
+
+        let vdx_pool_amount = total
+            .safe_mul(ES_VDX_PERCENTAGE_FOR_VDX_POOL as u64)?
+            .safe_div(100)? as u64;
+        let vlp_pool_amount = total.safe_sub(vdx_pool_amount)?;
+
+        self.vdx_pool.add_es_vdx(vdx_pool_amount)?;
+        self.vlp_pool.add_es_vdx(vlp_pool_amount)?;
+
+        self.mint_es_vdx_last_timestamp = now;
+
+        Ok(())
+    }
+
+    pub fn update_staking_pool(
+        &mut self,
+        oracles: &[AccountInfo],
+        price_feed: &PriceFeed,
+    ) -> DexResult<u64> {
+        let (reward_asset_debt, rewards) = self.collect_rewards(oracles, price_feed)?;
+
+        let vdx_rewards = rewards
+            .safe_mul(REWARD_PERCENTAGE_FOR_VDX_POOL as u64)?
+            .safe_div(100)? as u64;
+        let vlp_rewards = rewards.safe_sub(vdx_rewards)?;
+
+        self.vdx_pool.add_rewards(vdx_rewards)?;
+        self.vlp_pool.add_rewards(vlp_rewards)?;
+
+        self.mint_es_vdx()?;
+
+        Ok(reward_asset_debt)
     }
 }
 
@@ -1987,7 +2032,7 @@ mod test {
 
         let oracles: Vec<&AccountInfo> = vec![&usdc_oracle, &btc_oracle];
 
-        let mut price_feed = PriceFeed::default();
+        let price_feed = PriceFeed::default();
         set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
         set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
 
@@ -2020,7 +2065,7 @@ mod test {
         dex.add_asset(USDC_DECIMALS, usdc_oracle.key());
 
         let oracles: Vec<&AccountInfo> = vec![&btc_oracle, &usdc_oracle];
-        let mut price_feed = PriceFeed::default();
+        let price_feed = PriceFeed::default();
 
         set_mock_price(&btc_oracle, usdc(20000.)).assert_ok();
         set_mock_price(&usdc_oracle, usdc(1.)).assert_ok();
@@ -2058,7 +2103,7 @@ mod test {
         set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
 
         let oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle];
-        let mut price_feed = PriceFeed::default();
+        let price_feed = PriceFeed::default();
 
         dex.collect_fees(2, &oracles, &price_feed).assert_ok();
 
@@ -2111,7 +2156,7 @@ mod test {
         set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
 
         let mut oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle, btc_oracle2];
-        let mut price_feed = PriceFeed::default();
+        let price_feed = PriceFeed::default();
 
         let aum = dex.aum(&oracles, &price_feed).assert_unwrap();
         assert_eq!(aum, 0);
@@ -2202,7 +2247,7 @@ mod test {
         set_mock_price(&sol_oracle, usdc(20.)).assert_ok();
 
         let oracles: Vec<AccountInfo> = vec![btc_oracle, usdc_oracle, sol_oracle, btc_oracle2];
-        let mut price_feed = PriceFeed::default();
+        let price_feed = PriceFeed::default();
 
         // Add 1000 SOL, add liquidity fee rate = 0.1%
         let (vlp_amount, fee) = dex

@@ -120,7 +120,9 @@ pub fn handler(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
     }
 
     // Update rewards
-    dex.collect_rewards(&ctx.remaining_accounts[0..assets_oracles_len], price_feed)?;
+    let reward_asset_debt =
+        dex.update_staking_pool(&ctx.remaining_accounts[0..assets_oracles_len], price_feed)?;
+    require!(reward_asset_debt == 0, DexError::InsufficientSolLiquidity);
 
     us.borrow_mut()
         .leave_staking_vlp(&mut dex.vlp_pool, actual_vlp_amount)?;

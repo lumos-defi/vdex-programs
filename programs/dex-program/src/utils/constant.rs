@@ -2,6 +2,7 @@ pub const NIL8: u8 = u8::MAX;
 pub const NIL16: u16 = u16::MAX;
 pub const NIL32: u32 = u32::MAX;
 
+pub const SECONDS_PER_DAY: i64 = 3600 * 24;
 pub const MAX_ASSET_COUNT: usize = 16;
 pub const MAX_MARKET_COUNT: usize = 16;
 pub const MAX_USER_LIST_REMAINING_PAGES_COUNT: usize = 8;
@@ -27,3 +28,11 @@ pub const USDC_POW_DECIMALS: u64 = 10u64.pow(USDC_DECIMALS as u32);
 pub const MAX_FILLED_PER_INSTRUCTION: u32 = 20;
 
 pub const REWARD_SHARE_POW_DECIMALS: u64 = 10u64.pow(12 as u32);
+
+pub const VDX_DECIMALS: u8 = 6;
+pub const ES_VDX_PER_SECOND: u64 = 500u64.pow(VDX_DECIMALS as u32);
+
+pub const ES_VDX_PERCENTAGE_FOR_VDX_POOL: u32 = 50;
+pub const REWARD_PERCENTAGE_FOR_VDX_POOL: u32 = 30;
+
+pub const VESTING_PERIOD: u16 = 360;
