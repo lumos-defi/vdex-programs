@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, TokenAccount, Transfer};
+use anchor_spl::token::{self, Mint, MintTo, TokenAccount, Transfer};
 
 use crate::{
     dex::{Dex, PriceFeed},
@@ -12,13 +12,6 @@ use crate::{
 pub struct RedeemVdx<'info> {
     #[account(mut)]
     pub dex: AccountLoader<'info, Dex>,
-
-    /// CHECK
-    #[account(mut)]
-    vault: AccountInfo<'info>,
-
-    /// CHECK
-    pub vault_program_signer: AccountInfo<'info>,
 
     #[account(
          mut,
@@ -37,6 +30,17 @@ pub struct RedeemVdx<'info> {
     /// CHECK
     #[account(owner = *program_id)]
     pub price_feed: AccountLoader<'info, PriceFeed>,
+
+    /// CHECK:
+    pub vdx_program_signer: AccountInfo<'info>,
+
+    /// CHECK:
+    #[account(mut)]
+    vdx_mint: Box<Account<'info, Mint>>,
+
+    /// CHECK: Vault for locking asset
+    #[account(mut,constraint = vdx_vault.mint == vdx_mint.key() && vdx_vault.owner == vdx_program_signer.key()  @DexError::InvalidMint)]
+    vdx_vault: Box<Account<'info, TokenAccount>>,
 
     /// CHECK
     pub authority: Signer<'info>,
@@ -75,16 +79,23 @@ pub fn handler(ctx: Context<RedeemVdx>, amount: u64) -> DexResult {
     }
 
     require!(
-        ctx.accounts.vault.key() == dex.vdx_pool.vault,
+        dex.vdx_pool.mint == ctx.accounts.vdx_mint.key(),
+        DexError::InvalidMint
+    );
+
+    require!(
+        ctx.accounts.vdx_vault.key() == dex.vdx_pool.vault,
         DexError::InvalidVault
     );
+
+    require!(
+        ctx.accounts.vdx_program_signer.key() == dex.vdx_pool.program_signer,
+        DexError::InvalidProgramSigner
+    );
+
     require!(
         ctx.accounts.user_mint_acc.mint.key() == dex.vdx_pool.mint,
         DexError::InvalidUserMintAccount
-    );
-    require!(
-        ctx.accounts.vault_program_signer.key() == dex.vdx_pool.program_signer,
-        DexError::InvalidProgramSigner
     );
 
     let price_feed = &ctx.accounts.price_feed.load()?;
@@ -93,19 +104,30 @@ pub fn handler(ctx: Context<RedeemVdx>, amount: u64) -> DexResult {
         dex.update_staking_pool(&ctx.remaining_accounts[0..assets_oracles_len], price_feed)?;
     require!(reward_asset_debt == 0, DexError::InsufficientSolLiquidity);
 
-    let redeemable = us.borrow_mut().redeem_vdx(&mut dex, amount)?;
+    let (vdx_vested, redeemable) = us.borrow_mut().redeem_vdx(&mut dex, amount)?;
 
     let seeds = &[
         dex.vdx_pool.mint.as_ref(),
         ctx.accounts.dex.to_account_info().key.as_ref(),
         &[dex.vdx_pool.nonce],
     ];
-
     let signer = &[&seeds[..]];
+    if vdx_vested > 0 {
+        let cpi_accounts = MintTo {
+            mint: ctx.accounts.vdx_mint.to_account_info(),
+            to: ctx.accounts.vdx_vault.to_account_info(),
+            authority: ctx.accounts.vdx_program_signer.to_account_info(),
+        };
+        let cpi_ctx =
+            CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_accounts, signer);
+
+        token::mint_to(cpi_ctx, vdx_vested)?;
+    }
+
     let cpi_accounts = Transfer {
-        from: ctx.accounts.vault.to_account_info(),
+        from: ctx.accounts.vdx_vault.to_account_info(),
         to: ctx.accounts.user_mint_acc.to_account_info(),
-        authority: ctx.accounts.vault_program_signer.to_account_info(),
+        authority: ctx.accounts.vdx_program_signer.to_account_info(),
     };
 
     let cpi_ctx =
