@@ -117,7 +117,7 @@ pub async fn create_mint(
                 &spl_token::id(),
                 &mint.pubkey(),
                 owner,
-                None,
+                Some(&payer.pubkey()),
                 decimals,
             )
             .unwrap(),
