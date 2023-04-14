@@ -13,3 +13,14 @@ export async function createAccountInstruction(signer: Signer, size: number): Pr
     programId: program.programId,
   })
 }
+
+export async function createAccount(signer: Signer, size: number) {
+  const { provider } = getProviderAndProgram()
+
+  const instruction = await createAccountInstruction(signer, size)
+
+  const tx = new anchor.web3.Transaction()
+  tx.add(instruction)
+
+  await provider.sendAndConfirm(tx, [signer])
+}

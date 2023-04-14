@@ -666,7 +666,10 @@ impl Dex {
         if now <= self.mint_es_vdx_last_timestamp {
             return Ok(());
         }
-        let total = (now - self.mint_es_vdx_last_timestamp) as u64 * ES_VDX_PER_SECOND;
+
+        let es_vdx_per_second = ES_VDX_PER_SECOND.pow(self.vdx_pool.decimals as u32);
+        let total =
+            es_vdx_per_second.safe_mul((now - self.mint_es_vdx_last_timestamp) as u64)? as u64;
 
         let vdx_pool_amount = total
             .safe_mul(ES_VDX_PERCENTAGE_FOR_VDX_POOL as u64)?

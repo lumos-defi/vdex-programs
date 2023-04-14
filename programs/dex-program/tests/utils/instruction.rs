@@ -34,7 +34,10 @@ pub async fn compose_init_dex_ixs(
     user_list_entry_page: &Keypair,
     di_option: &Keypair,
     reward_mint: &Pubkey,
-    vlp_decimals: u8,
+    vdx_mint: &Pubkey,
+    vdx_vault: &Pubkey,
+    vdx_program_signer: &Pubkey,
+    vdx_nonce: u8,
     di_fee_rate: u16,
 ) -> Vec<Instruction> {
     let rent = context.banks_client.get_rent().await.unwrap();
@@ -88,11 +91,14 @@ pub async fn compose_init_dex_ixs(
             event_queue: event_queue.pubkey(),
             match_queue: match_queue.pubkey(),
             user_list_entry_page: user_list_entry_page.pubkey(),
+            vdx_program_signer: *vdx_program_signer,
+            vdx_mint: *vdx_mint,
+            vdx_vault: *vdx_vault,
             reward_mint: *reward_mint,
             di_option: di_option.pubkey(),
         })
         .args(dex_program::instruction::InitDex {
-            vlp_decimals,
+            vdx_nonce,
             di_fee_rate,
         })
         .instructions()

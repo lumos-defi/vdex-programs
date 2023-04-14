@@ -117,5 +117,9 @@ pub fn handler(
         dex.vlp_pool.reward_asset_index = asset_index as u8;
     }
 
+    if dex.vdx_pool.reward_mint == ctx.accounts.mint.key() {
+        dex.vdx_pool.reward_asset_index = asset_index as u8;
+    }
+
     Ok(())
 }

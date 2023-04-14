@@ -26,7 +26,7 @@ use crate::utils::{
         TEST_SOL_TARGET_WEIGHT, TEST_USDC_ADD_LIQUIDITY_FEE_RATE, TEST_USDC_BORROW_FEE_RATE,
         TEST_USDC_DECIMALS, TEST_USDC_ORACLE_EXPO, TEST_USDC_ORACLE_PRICE,
         TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE, TEST_USDC_SWAP_FEE_RATE, TEST_USDC_SYMBOL,
-        TEST_USDC_TARGET_WEIGHT, TEST_VLP_DECIMALS,
+        TEST_USDC_TARGET_WEIGHT,
     },
     convert_to_big_number, create_mint, create_token_account, get_context, get_dex_info,
     get_keypair_from_file, get_program, set_mock_oracle, MAX_LEVERAGE, TEST_DI_FEE_RATE,
@@ -47,6 +47,7 @@ use bincode::deserialize;
 use dex_program::{
     dex::Dex,
     errors::{DexError, DexResult},
+    utils::VDX_DECIMALS,
 };
 use solana_program_test::ProgramTestContext;
 
@@ -86,6 +87,36 @@ impl DexTestContext {
         let dex = Keypair::new();
         let usdc_mint = Keypair::new();
         let price_feed = Keypair::new();
+        let vdx_mint = Keypair::new();
+        let vdx_vault = Keypair::new();
+
+        // Create vdx mint
+        let (vdx_program_signer, vdx_nonce) = Pubkey::find_program_address(
+            &[&vdx_mint.pubkey().to_bytes(), &dex.pubkey().to_bytes()],
+            &program.id(),
+        );
+
+        create_mint(
+            &mut context.borrow_mut(),
+            &admin,
+            &vdx_mint,
+            VDX_DECIMALS,
+            &vdx_program_signer,
+        )
+        .await
+        .unwrap();
+
+        //create vdx vault
+        create_token_account(
+            &mut context.borrow_mut(),
+            &admin,
+            &vdx_vault,
+            &vdx_mint.pubkey(),
+            &vdx_program_signer,
+            0,
+        )
+        .await
+        .unwrap();
 
         //oracle
         let usdc_mock_oracle = Keypair::new();
@@ -100,6 +131,10 @@ impl DexTestContext {
             &admin,
             &dex,
             &usdc_mint,
+            &vdx_mint.pubkey(),
+            &vdx_vault.pubkey(),
+            &vdx_program_signer,
+            vdx_nonce,
         )
         .await;
 
@@ -413,6 +448,8 @@ impl DexTestContext {
         }
     }
 
+    pub async fn create_vdx_mint(&self) {}
+
     pub async fn di_set_admin(&self, admin: &Pubkey) {
         let context = &mut self.context.borrow_mut();
         let binding = self.dex_info.borrow();
@@ -633,14 +670,16 @@ pub async fn init_dex(
     payer: &Keypair,
     dex: &Keypair,
     usdc_mint: &Keypair,
+    vdx_mint: &Pubkey,
+    vdx_vault: &Pubkey,
+    vdx_program_signer: &Pubkey,
+    vdx_nonce: u8,
 ) {
     let event_queue = Keypair::new();
     let match_queue = Keypair::new();
     let user_list_entry_page = Keypair::new();
     let di_option = Keypair::new();
     let reward_mint = spl_token::native_mint::id();
-
-    let vlp_decimals = TEST_VLP_DECIMALS;
 
     let init_dex_ixs = compose_init_dex_ixs(
         context,
@@ -653,7 +692,10 @@ pub async fn init_dex(
         &user_list_entry_page,
         &di_option,
         &reward_mint,
-        vlp_decimals,
+        &vdx_mint,
+        &vdx_vault,
+        &vdx_program_signer,
+        vdx_nonce,
         TEST_DI_FEE_RATE,
     )
     .await;

@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, CloseAccount, TokenAccount, Transfer};
+use anchor_spl::token::{self, CloseAccount, Mint, MintTo, TokenAccount, Transfer};
 
 use crate::{
     dex::{Dex, PriceFeed},
@@ -15,10 +15,10 @@ pub struct ClaimRewards<'info> {
 
     /// CHECK
     #[account(mut)]
-    vault: AccountInfo<'info>,
+    reward_vault: AccountInfo<'info>,
 
     /// CHECK
-    pub vault_program_signer: AccountInfo<'info>,
+    pub reward_vault_program_signer: AccountInfo<'info>,
 
     #[account(
          mut,
@@ -37,6 +37,17 @@ pub struct ClaimRewards<'info> {
     /// CHECK
     #[account(owner = *program_id)]
     pub price_feed: AccountLoader<'info, PriceFeed>,
+
+    /// CHECK:
+    pub vdx_program_signer: AccountInfo<'info>,
+
+    /// CHECK:
+    #[account(mut)]
+    vdx_mint: Box<Account<'info, Mint>>,
+
+    /// CHECK: Vault for locking asset
+    #[account(mut, constraint = vdx_vault.mint == vdx_mint.key() && vdx_vault.owner == vdx_program_signer.key()  @DexError::InvalidMint)]
+    vdx_vault: Box<Account<'info, TokenAccount>>,
 
     /// CHECK
     pub authority: Signer<'info>,
@@ -76,17 +87,20 @@ pub fn handler(ctx: Context<ClaimRewards>, amount: u64) -> DexResult {
 
     let ai = dex.asset_as_ref(dex.vlp_pool.reward_asset_index)?;
 
-    require!(ctx.accounts.vault.key() == ai.vault, DexError::InvalidVault);
+    require!(
+        ctx.accounts.reward_vault.key() == ai.vault,
+        DexError::InvalidVault
+    );
     require!(
         ctx.accounts.user_mint_acc.mint.key() == token::spl_token::native_mint::id(),
         DexError::InvalidUserMintAccount
     );
     require!(
-        ctx.accounts.vault_program_signer.key() == ai.program_signer,
+        ctx.accounts.reward_vault_program_signer.key() == ai.program_signer,
         DexError::InvalidProgramSigner
     );
 
-    let seeds = &[
+    let reward_vault_seeds = &[
         ctx.accounts.user_mint_acc.mint.as_ref(),
         ctx.accounts.dex.to_account_info().key.as_ref(),
         &[ai.nonce],
@@ -98,25 +112,62 @@ pub fn handler(ctx: Context<ClaimRewards>, amount: u64) -> DexResult {
         dex.update_staking_pool(&ctx.remaining_accounts[0..assets_oracles_len], price_feed)?;
     require!(reward_asset_debt == 0, DexError::InsufficientSolLiquidity);
 
-    let claimable = us.borrow_mut().claim_rewards(&mut dex, amount)?;
+    let (vdx_vested, claimable) = us.borrow_mut().claim_rewards(&mut dex, amount)?;
+    if vdx_vested > 0 {
+        require!(
+            dex.vdx_pool.mint == ctx.accounts.vdx_mint.key(),
+            DexError::InvalidMint
+        );
 
-    let signer = &[&seeds[..]];
-    let cpi_accounts = Transfer {
-        from: ctx.accounts.vault.to_account_info(),
-        to: ctx.accounts.user_mint_acc.to_account_info(),
-        authority: ctx.accounts.vault_program_signer.to_account_info(),
-    };
+        require!(
+            dex.vdx_pool.vault == ctx.accounts.vdx_vault.key(),
+            DexError::InvalidVault
+        );
 
-    let cpi_ctx =
-        CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_accounts, signer);
-    token::transfer(cpi_ctx, claimable)?;
+        require!(
+            dex.vdx_pool.program_signer == ctx.accounts.vdx_program_signer.key(),
+            DexError::InvalidVault
+        );
 
-    let cpi_close = CloseAccount {
-        account: ctx.accounts.user_mint_acc.to_account_info(),
-        destination: ctx.accounts.authority.to_account_info(),
-        authority: ctx.accounts.authority.to_account_info(),
-    };
+        let seeds = &[
+            dex.vdx_pool.mint.as_ref(),
+            ctx.accounts.dex.to_account_info().key.as_ref(),
+            &[dex.vdx_pool.nonce],
+        ];
 
-    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_close);
-    token::close_account(cpi_ctx)
+        let signer = &[&seeds[..]];
+        let cpi_accounts = MintTo {
+            mint: ctx.accounts.vdx_mint.to_account_info(),
+            to: ctx.accounts.vdx_vault.to_account_info(),
+            authority: ctx.accounts.vdx_program_signer.to_account_info(),
+        };
+        let cpi_ctx =
+            CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_accounts, signer);
+
+        token::mint_to(cpi_ctx, vdx_vested)?;
+    }
+
+    if claimable > 0 {
+        let signer = &[&reward_vault_seeds[..]];
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.vdx_vault.to_account_info(),
+            to: ctx.accounts.user_mint_acc.to_account_info(),
+            authority: ctx.accounts.vdx_program_signer.to_account_info(),
+        };
+
+        let cpi_ctx =
+            CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_accounts, signer);
+        token::transfer(cpi_ctx, claimable)?;
+
+        let cpi_close = CloseAccount {
+            account: ctx.accounts.user_mint_acc.to_account_info(),
+            destination: ctx.accounts.authority.to_account_info(),
+            authority: ctx.accounts.authority.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_close);
+        token::close_account(cpi_ctx)?;
+    }
+
+    Ok(())
 }

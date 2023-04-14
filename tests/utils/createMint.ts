@@ -4,7 +4,7 @@ import { getProviderAndProgram } from './getProvider'
 import { Keypair, PublicKey } from '@solana/web3.js'
 
 const TOKEN_PROGRAM_ID = new anchor.web3.PublicKey(TokenInstructions.TOKEN_PROGRAM_ID.toString())
-async function createMintInstructions(provider, authority, mint, decimals) {
+async function createMintInstructions(provider, mintAuthority, freezeAuthority, mint, decimals) {
   const instructions = [
     anchor.web3.SystemProgram.createAccount({
       fromPubkey: provider.wallet.publicKey,
@@ -16,7 +16,8 @@ async function createMintInstructions(provider, authority, mint, decimals) {
     TokenInstructions.initializeMint({
       mint,
       decimals: decimals,
-      mintAuthority: authority,
+      mintAuthority,
+      freezeAuthority,
     }),
   ]
   return instructions
@@ -28,7 +29,7 @@ export async function createMint(authority, decimals) {
     authority = provider.wallet.publicKey
   }
   const mint = anchor.web3.Keypair.generate()
-  const instructions = await createMintInstructions(provider, authority, mint.publicKey, decimals)
+  const instructions = await createMintInstructions(provider, authority, authority, mint.publicKey, decimals)
 
   const tx = new anchor.web3.Transaction()
   tx.add(...instructions)
@@ -38,12 +39,10 @@ export async function createMint(authority, decimals) {
   return mint.publicKey
 }
 
-export async function createMintWithKeypair(mint: Keypair, authority: PublicKey, decimals) {
+export async function createMintWithKeypair(mint: Keypair, authority: PublicKey, freezeAuthority: PublicKey, decimals) {
   const { provider } = getProviderAndProgram()
-  if (authority === undefined) {
-    authority = provider.wallet.publicKey
-  }
-  const instructions = await createMintInstructions(provider, authority, mint.publicKey, decimals)
+
+  const instructions = await createMintInstructions(provider, authority, freezeAuthority, mint.publicKey, decimals)
 
   const tx = new anchor.web3.Transaction()
   tx.add(...instructions)

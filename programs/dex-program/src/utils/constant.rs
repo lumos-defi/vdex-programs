@@ -30,7 +30,7 @@ pub const MAX_FILLED_PER_INSTRUCTION: u32 = 20;
 pub const REWARD_SHARE_POW_DECIMALS: u64 = 10u64.pow(12 as u32);
 
 pub const VDX_DECIMALS: u8 = 6;
-pub const ES_VDX_PER_SECOND: u64 = 500u64.pow(VDX_DECIMALS as u32);
+pub const ES_VDX_PER_SECOND: u64 = 500;
 
 pub const ES_VDX_PERCENTAGE_FOR_VDX_POOL: u32 = 50;
 pub const REWARD_PERCENTAGE_FOR_VDX_POOL: u32 = 30;

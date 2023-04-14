@@ -3,9 +3,9 @@ import { airdrop, getProviderAndProgram } from './getProvider'
 
 export async function createUserState(user: Keypair, dex: Keypair) {
   const { provider, program } = getProviderAndProgram()
-  const orderSlotCount = 32
-  const positionSlotCount = 32
-  const assetSlotCount = 8
+  const orderSlotCount = 16
+  const positionSlotCount = 16
+  const assetSlotCount = 10
 
   await airdrop(provider, user.publicKey, 10000000000)
 
