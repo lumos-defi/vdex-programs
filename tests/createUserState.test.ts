@@ -35,9 +35,9 @@ describe('Test Create User State', () => {
     })
 
     it('should create user state account successfully', async () => {
-      const orderSlotCount = 32
-      const positionSlotCount = 32
-      const assetSlotCount = 8
+      const orderSlotCount = 16
+      const positionSlotCount = 16
+      const assetSlotCount = 10
       await program.methods
         .createUserState(orderSlotCount, positionSlotCount, assetSlotCount)
         .accounts({

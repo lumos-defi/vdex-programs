@@ -40,41 +40,6 @@ pub struct Compound<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-// pub fn mint_vdx<T>(ctx: Context<T>, dex: &Dex, amount: u64) -> DexResult {
-//     require!(
-//         dex.vdx_pool.mint == ctx.accounts.vdx_mint.key(),
-//         DexError::InvalidMint
-//     );
-
-//     require!(
-//         dex.vdx_pool.vault == ctx.accounts.vdx_vault.key(),
-//         DexError::InvalidVault
-//     );
-
-//     require!(
-//         dex.vdx_pool.program_signer == ctx.accounts.vdx_program_signer.key(),
-//         DexError::InvalidVault
-//     );
-
-//     let seeds = &[
-//         dex.vdx_pool.mint.as_ref(),
-//         ctx.accounts.dex.to_account_info().key.as_ref(),
-//         &[dex.vdx_pool.nonce],
-//     ];
-
-//     let signer = &[&seeds[..]];
-//     let cpi_accounts = MintTo {
-//         mint: ctx.accounts.vdx_mint.to_account_info(),
-//         to: ctx.accounts.vdx_vault.to_account_info(),
-//         authority: ctx.accounts.vdx_program_signer.to_account_info(),
-//     };
-//     let cpi_ctx =
-//         CpiContext::new_with_signer(ctx.accounts.token_program.clone(), cpi_accounts, signer);
-
-//     token::mint_to(cpi_ctx, amount)?;
-//     Ok(())
-// }
-
 // Remaining accounts layout:
 // dex.assets.map({
 //   asset index price oracle account

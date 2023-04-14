@@ -1,11 +1,11 @@
 import { BN } from '@project-serum/anchor'
 import { Keypair, PublicKey } from '@solana/web3.js'
-import { createAccountInstruction } from './createAccountInstruction'
+import { createAccount, createAccountInstruction } from './createAccountInstruction'
 import { TOKEN_PROGRAM_ID, Token } from '@solana/spl-token'
 import { createMockOracle } from './createMockOracle'
 import { createTokenAccount } from './createTokenAccount'
 import { airdrop, getProviderAndProgram } from './getProvider'
-import { createMint } from './createMint'
+import { createMint, createMintWithKeypair } from './createMint'
 import { TokenInstructions } from '@project-serum/serum'
 
 export async function createDexFull(authority: Keypair) {
@@ -50,18 +50,33 @@ export async function createDexFull(authority: Keypair) {
   const matchQueue = Keypair.generate()
   const userListEntryPage = Keypair.generate()
   const diOption = Keypair.generate()
-  const VLP_DECIMALS = 6
 
   const orderBook = Keypair.generate()
   const orderPoolEntryPage = Keypair.generate()
   const priceFeed = Keypair.generate()
 
   await airdrop(provider, authority.publicKey, 10000000000)
+
+  const vdxMint = Keypair.generate()
+
+  const [vdxProgramSigner, vdxNonce] = PublicKey.findProgramAddressSync(
+    [vdxMint.publicKey.toBuffer(), dex.publicKey.toBuffer()],
+    program.programId
+  )
+
+  await createMintWithKeypair(vdxMint, vdxProgramSigner, authority.publicKey, 6)
+  const vdxVault = await createTokenAccount(vdxMint.publicKey, vdxProgramSigner)
+
   const usdcMint = await createMint(authority.publicKey, USDC_MINT_DECIMALS)
+
+  await createAccount(eventQueue, 128 * 1024)
+  await createAccount(matchQueue, 128 * 1024)
+  await createAccount(userListEntryPage, 128 * 1024)
+  await createAccount(diOption, 128 * 1024)
 
   //init dex
   await program.methods
-    .initDex(VLP_DECIMALS, 30)
+    .initDex(vdxNonce, 30)
     .accounts({
       dex: dex.publicKey,
       usdcMint,
@@ -69,17 +84,14 @@ export async function createDexFull(authority: Keypair) {
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
       userListEntryPage: userListEntryPage.publicKey,
+      vdxProgramSigner,
+      vdxMint: vdxMint.publicKey,
+      vdxVault,
       rewardMint: TokenInstructions.WRAPPED_SOL_MINT,
       diOption: diOption.publicKey,
     })
-    .preInstructions([
-      await program.account.dex.createInstruction(dex),
-      await createAccountInstruction(eventQueue, 128 * 1024),
-      await createAccountInstruction(matchQueue, 128 * 1024),
-      await createAccountInstruction(userListEntryPage, 128 * 1024),
-      await createAccountInstruction(diOption, 128 * 1024),
-    ])
-    .signers([authority, dex, eventQueue, matchQueue, userListEntryPage, diOption])
+    .preInstructions([await program.account.dex.createInstruction(dex)])
+    .signers([authority, dex])
     .rpc()
 
   //Add BTC asset
