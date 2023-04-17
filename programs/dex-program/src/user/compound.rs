@@ -6,7 +6,6 @@ use crate::{
     errors::DexError,
     errors::DexResult,
     user::UserState,
-    utils::get_timestamp,
 };
 
 #[derive(Accounts)]
@@ -109,8 +108,6 @@ pub fn handler(ctx: Context<Compound>) -> DexResult {
 
         token::mint_to(cpi_ctx, vdx_vested)?;
     }
-
-    msg!("time: {}", get_timestamp()?);
 
     Ok(())
 }

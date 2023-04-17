@@ -672,14 +672,6 @@ impl Dex {
         let total =
             es_vdx_per_second.safe_mul((now - self.mint_es_vdx_last_timestamp) as u64)? as u64;
 
-        msg!(
-            "ES VDX minter: {}, {}, {},{}",
-            now - self.mint_es_vdx_last_timestamp,
-            total,
-            ES_VDX_PER_SECOND,
-            self.vdx_pool.decimals
-        );
-
         let vdx_pool_amount = total
             .safe_mul(ES_VDX_PERCENTAGE_FOR_VDX_POOL as u64)?
             .safe_div(100)? as u64;
