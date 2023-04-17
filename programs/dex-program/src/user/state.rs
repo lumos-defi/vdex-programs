@@ -126,10 +126,6 @@ impl VestingMint {
         }
 
         let today_offset = (self.last_day_offset + passed_days) % VESTING_PERIOD;
-        // println!(
-        //     "passed days {},last day {}, first day offset {},  last day offset {}",
-        //     passed_days, self.last_day, self.first_day_offset, self.last_day_offset
-        // );
 
         if self.last_day_offset >= self.first_day_offset {
             if today_offset > self.last_day_offset || today_offset <= self.first_day_offset {
@@ -204,6 +200,126 @@ impl VestingMint {
         self.last_day = today;
         self.last_day_offset = today_offset;
         self.amounts[today_offset as usize] = append;
+
+        Ok(vested)
+    }
+
+    #[cfg(feature = "client-support")]
+    pub fn vesting(&self) -> DexResult<u64> {
+        let mut vesting = 0u64;
+        let mut offset = self.first_day_offset;
+
+        loop {
+            vesting = self.amounts[offset as usize].safe_add(vesting)?;
+            if offset == self.last_day_offset {
+                break;
+            }
+            offset = (offset + 1) % VESTING_PERIOD;
+        }
+
+        Ok(vesting)
+    }
+
+    #[cfg(feature = "client-support")]
+    pub fn pending_vested(&self) -> DexResult<u64> {
+        #[cfg(not(test))]
+        let today = get_timestamp()? / SECONDS_PER_DAY;
+
+        #[cfg(test)]
+        let today = self.mock_time / SECONDS_PER_DAY;
+
+        if self.last_day == -1 {
+            return Ok(0);
+        }
+
+        if today == self.last_day {
+            return Ok(0);
+        }
+
+        let mut vested = 0;
+
+        let passed_days = (today - self.last_day) as u16;
+        if passed_days >= VESTING_PERIOD {
+            let mut offset = self.first_day_offset;
+            loop {
+                let remained_days = VESTING_PERIOD
+                    - if offset <= self.last_day_offset {
+                        self.last_day_offset - offset
+                    } else {
+                        VESTING_PERIOD - offset + self.last_day_offset
+                    };
+
+                let vested_of_day = self.vest(offset, remained_days)?;
+                vested = vested.safe_add(vested_of_day)?;
+
+                if offset == self.last_day_offset {
+                    break;
+                }
+                offset = (offset + 1) % VESTING_PERIOD;
+            }
+
+            return Ok(vested);
+        }
+
+        let today_offset = (self.last_day_offset + passed_days) % VESTING_PERIOD;
+
+        if self.last_day_offset >= self.first_day_offset {
+            if today_offset > self.last_day_offset || today_offset <= self.first_day_offset {
+                for offset in self.first_day_offset..=self.last_day_offset {
+                    let vested_of_day = self.vest(offset, passed_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+                }
+            } else {
+                for offset in self.first_day_offset..=today_offset {
+                    let remained_days = VESTING_PERIOD - (self.last_day_offset - offset);
+
+                    let vested_of_day = self.vest(offset, remained_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+                }
+
+                for offset in (today_offset + 1)..=self.last_day_offset {
+                    let vested_of_day = self.vest(offset, passed_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+                }
+            }
+        } else {
+            if today_offset > self.last_day_offset && today_offset < self.first_day_offset {
+                let mut offset = self.first_day_offset;
+                loop {
+                    let vested_of_day = self.vest(offset, passed_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+
+                    if offset == self.last_day_offset {
+                        break;
+                    }
+                    offset = (offset + 1) % VESTING_PERIOD;
+                }
+            } else {
+                let mut offset = self.first_day_offset;
+                loop {
+                    let remained_days = offset - self.last_day_offset;
+
+                    let vested_of_day = self.vest(offset, remained_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+
+                    if offset == today_offset {
+                        break;
+                    }
+                    offset = (offset + 1) % VESTING_PERIOD;
+                }
+
+                offset = (today_offset + 1) % VESTING_PERIOD;
+                loop {
+                    let vested_of_day = self.vest(offset, passed_days)?;
+                    vested = vested.safe_add(vested_of_day)?;
+
+                    if offset == self.last_day_offset {
+                        break;
+                    }
+                    offset = (offset + 1) % VESTING_PERIOD;
+                }
+            }
+        }
 
         Ok(vested)
     }

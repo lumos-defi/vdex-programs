@@ -286,6 +286,15 @@ pub mod dex_program {
     pub fn claim_rewards(ctx: Context<ClaimRewards>, amount: u64) -> DexResult {
         user::claim_rewards::handler(ctx, amount)
     }
+
+    pub fn set_liquidity_fee_rate(
+        ctx: Context<SetLiquidityFeeRate>,
+        index: u8,
+        add_fee_rate: u16,
+        remove_fee_rate: u16,
+    ) -> DexResult {
+        pool::set_fee_rate::handler(ctx, index, add_fee_rate, remove_fee_rate)
+    }
 }
 
 #[derive(Accounts)]

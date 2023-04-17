@@ -121,7 +121,9 @@ impl UserStake {
     }
 
     pub fn enter_staking(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
-        require!(amount > 0, DexError::InvalidAmount);
+        if amount == 0 {
+            return Ok(());
+        }
 
         if self.staked > 0 {
             let pending_reward = (self
@@ -514,5 +516,36 @@ mod test {
         pool.add_rewards(eth(0.1)).assert_ok();
         assert_eq!(alice.pending_reward(&pool).assert_unwrap(), eth(0.1 + 0.05));
         assert_eq!(bob.pending_reward(&pool).assert_unwrap(), eth(0.05));
+    }
+
+    #[test]
+    //
+    // 1. Alice add the first liquidity, she will have all the rewards( add liquidity fee );
+    // 2. Bob add the second liquidity, he will share the generated rewards with Alice.
+    //
+    fn test_es_vdx_share() {
+        let mut pool = StakingPool::default();
+        let mut alice = UserStake::default();
+        let mut bob = UserStake::default();
+
+        // 1. Initially no pending rewards
+        assert_eq!(alice.pending_es_vdx(&pool).assert_unwrap(), 0);
+        assert_eq!(bob.pending_es_vdx(&pool).assert_unwrap(), 0);
+
+        // 2. Alice add liquidity and enter staking
+        // No rewards available
+        alice.enter_staking(&mut pool, usdc(200000.)).assert_ok();
+        assert_eq!(alice.pending_es_vdx(&pool).assert_unwrap(), 0);
+
+        // 3. Bob add liquidity and enter staking.
+        // Rewards were generated when alice adding liquidity
+        bob.enter_staking(&mut pool, usdc(200000.)).assert_ok();
+        assert_eq!(alice.pending_es_vdx(&pool).assert_unwrap(), 0);
+        assert_eq!(bob.pending_es_vdx(&pool).assert_unwrap(), 0);
+
+        // 4. Update rewards later, check the pending rewards
+        pool.add_es_vdx(usdc(250.)).assert_ok();
+        assert_eq!(alice.pending_es_vdx(&pool).assert_unwrap(), usdc(125.));
+        assert_eq!(bob.pending_es_vdx(&pool).assert_unwrap(), usdc(125.));
     }
 }

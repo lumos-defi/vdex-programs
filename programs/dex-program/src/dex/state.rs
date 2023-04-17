@@ -47,7 +47,7 @@ impl Dex {
         Ok(&self.assets[index as usize])
     }
 
-    fn asset_as_mut(&mut self, index: u8) -> DexResult<&mut AssetInfo> {
+    pub fn asset_as_mut(&mut self, index: u8) -> DexResult<&mut AssetInfo> {
         require!(
             index < self.assets_number && self.assets[index as usize].valid,
             DexError::InvalidAssetIndex
@@ -667,9 +667,18 @@ impl Dex {
             return Ok(());
         }
 
-        let es_vdx_per_second = ES_VDX_PER_SECOND.pow(self.vdx_pool.decimals as u32);
+        let es_vdx_per_second =
+            ES_VDX_PER_SECOND.safe_mul(10u64.pow(self.vdx_pool.decimals as u32))? as u64;
         let total =
             es_vdx_per_second.safe_mul((now - self.mint_es_vdx_last_timestamp) as u64)? as u64;
+
+        msg!(
+            "ES VDX minter: {}, {}, {},{}",
+            now - self.mint_es_vdx_last_timestamp,
+            total,
+            ES_VDX_PER_SECOND,
+            self.vdx_pool.decimals
+        );
 
         let vdx_pool_amount = total
             .safe_mul(ES_VDX_PERCENTAGE_FOR_VDX_POOL as u64)?
