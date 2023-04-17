@@ -89,9 +89,13 @@ export async function createDexFull(authority: Keypair) {
       vdxVault,
       rewardMint: TokenInstructions.WRAPPED_SOL_MINT,
       diOption: diOption.publicKey,
+      priceFeed: priceFeed.publicKey,
     })
-    .preInstructions([await program.account.dex.createInstruction(dex)])
-    .signers([authority, dex])
+    .preInstructions([
+      await program.account.dex.createInstruction(dex),
+      await program.account.priceFeed.createInstruction(priceFeed),
+    ])
+    .signers([authority, dex, priceFeed])
     .rpc()
 
   //Add BTC asset
@@ -200,18 +204,6 @@ export async function createDexFull(authority: Keypair) {
       await createAccountInstruction(orderPoolEntryPage, 128 * 1024),
     ])
     .signers([authority, orderBook, orderPoolEntryPage])
-    .rpc()
-
-  //init price feed
-  await program.methods
-    .initPriceFeed()
-    .accounts({
-      dex: dex.publicKey,
-      priceFeed: priceFeed.publicKey,
-      authority: authority.publicKey,
-    })
-    .preInstructions([await program.account.priceFeed.createInstruction(priceFeed)])
-    .signers([authority, priceFeed])
     .rpc()
 
   return {

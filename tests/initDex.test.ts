@@ -16,6 +16,7 @@ describe('Init Dex', () => {
   let matchQueue: Keypair
   let userListEntryPage: Keypair
   let diOption: Keypair
+  let priceFeed: Keypair
 
   let usdcMint: PublicKey
   let rewardMint: PublicKey
@@ -31,6 +32,7 @@ describe('Init Dex', () => {
     matchQueue = Keypair.generate()
     userListEntryPage = Keypair.generate()
     diOption = Keypair.generate()
+    priceFeed = Keypair.generate()
 
     authority = Keypair.generate()
     await airdrop(provider, authority.publicKey, 100_000_000_000)
@@ -69,9 +71,13 @@ describe('Init Dex', () => {
         vdxVault,
         rewardMint,
         diOption: diOption.publicKey,
+        priceFeed: priceFeed.publicKey,
       })
-      .preInstructions([await program.account.dex.createInstruction(dex)])
-      .signers([authority, dex])
+      .preInstructions([
+        await program.account.dex.createInstruction(dex),
+        await program.account.priceFeed.createInstruction(priceFeed),
+      ])
+      .signers([authority, dex, priceFeed])
       .rpc()
 
     const dexInfo = await program.account.dex.fetch(dex.publicKey)
