@@ -293,9 +293,6 @@ pub enum DexError {
     #[msg("Invalid admin or delegate")]
     InvalidAdminOrDelegate,
 
-    #[msg("Account has already been initialized")]
-    AccountHasAlreadyBeenInitialized,
-
     #[msg("Failed load price feed account")]
     FailedLoadPriceFeed,
 

@@ -1,6 +1,5 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(dead_code)]
-use std::mem;
 
 use anchor_client::{
     solana_sdk::{instruction::Instruction, signer::Signer, system_instruction, system_program},
@@ -12,12 +11,10 @@ use dex_program::{
         AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClaimRewards,
         ClosePosition, Compound, Crank, CreateUserState, DiBuy, DiCreateOption, DiRemoveOption,
         DiSetAdmin, DiSetFeeRate, DiSetSettlePrice, DiSettle, DiUpdateOption, DiWithdrawSettled,
-        FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, InitPriceFeed, LimitAsk, LimitBid,
-        OpenPosition, RedeemVdx, RemoveLiquidity, SetLiquidityFeeRate, StakeVdx, Swap, UpdatePrice,
+        FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, LimitAsk, LimitBid, OpenPosition,
+        RedeemVdx, RemoveLiquidity, SetLiquidityFeeRate, StakeVdx, Swap, UpdatePrice,
         WithdrawAsset,
     },
-    dex::{Dex, PriceFeed},
-    dual_invest::DI,
     utils::MAX_ASSET_COUNT,
 };
 use solana_program_test::ProgramTestContext;
@@ -25,7 +22,6 @@ use solana_program_test::ProgramTestContext;
 use {anchor_client::solana_sdk::signature::Keypair, spl_token};
 
 pub async fn compose_init_dex_ixs(
-    context: &mut ProgramTestContext,
     program: &Program,
     payer: &Keypair,
     dex: &Keypair,
@@ -34,6 +30,7 @@ pub async fn compose_init_dex_ixs(
     match_queue: &Keypair,
     user_list_entry_page: &Keypair,
     di_option: &Keypair,
+    price_feed: &Keypair,
     reward_mint: &Pubkey,
     vdx_mint: &Pubkey,
     vdx_vault: &Pubkey,
@@ -41,50 +38,8 @@ pub async fn compose_init_dex_ixs(
     vdx_nonce: u8,
     di_fee_rate: u16,
 ) -> Vec<Instruction> {
-    let rent = context.banks_client.get_rent().await.unwrap();
-    let dex_account_size = 8 + mem::size_of::<Dex>();
-    let event_queue_account_size = 16 * 1024;
-    let match_queue_account_size = 16 * 1024;
-    let user_list_entry_page_account_size = 4 * 1024;
-    let di_option_account_size = DI::required_account_size(64u8);
-
     let init_dex_ixs = program
         .request()
-        .instruction(system_instruction::create_account(
-            &payer.pubkey(),
-            &dex.pubkey(),
-            rent.minimum_balance(dex_account_size),
-            dex_account_size as u64,
-            &program.id(),
-        ))
-        .instruction(system_instruction::create_account(
-            &payer.pubkey(),
-            &event_queue.pubkey(),
-            rent.minimum_balance(event_queue_account_size),
-            event_queue_account_size as u64,
-            &program.id(),
-        ))
-        .instruction(system_instruction::create_account(
-            &payer.pubkey(),
-            &match_queue.pubkey(),
-            rent.minimum_balance(match_queue_account_size),
-            match_queue_account_size as u64,
-            &program.id(),
-        ))
-        .instruction(system_instruction::create_account(
-            &payer.pubkey(),
-            &user_list_entry_page.pubkey(),
-            rent.minimum_balance(user_list_entry_page_account_size),
-            user_list_entry_page_account_size as u64,
-            &program.id(),
-        ))
-        .instruction(system_instruction::create_account(
-            &payer.pubkey(),
-            &di_option.pubkey(),
-            rent.minimum_balance(di_option_account_size),
-            di_option_account_size as u64,
-            &program.id(),
-        ))
         .accounts(InitDex {
             dex: dex.pubkey(),
             usdc_mint: usdc_mint.pubkey(),
@@ -97,6 +52,7 @@ pub async fn compose_init_dex_ixs(
             vdx_vault: *vdx_vault,
             reward_mint: *reward_mint,
             di_option: di_option.pubkey(),
+            price_feed: price_feed.pubkey(),
         })
         .args(dex_program::instruction::InitDex {
             vdx_nonce,
@@ -1043,35 +999,6 @@ pub async fn compose_withdraw_asset_ix(
         .instructions()
         .unwrap()
         .pop()
-        .unwrap()
-}
-
-pub async fn compose_init_price_feed_ixs(
-    context: &mut ProgramTestContext,
-    program: &Program,
-    payer: &Keypair,
-    dex: &Pubkey,
-    price_feed: &Keypair,
-) -> Vec<Instruction> {
-    let rent = context.banks_client.get_rent().await.unwrap();
-    let price_feed_account_size = 8 + mem::size_of::<PriceFeed>();
-
-    program
-        .request()
-        .instruction(system_instruction::create_account(
-            &payer.pubkey(),
-            &price_feed.pubkey(),
-            rent.minimum_balance(price_feed_account_size),
-            price_feed_account_size as u64,
-            &program.id(),
-        ))
-        .accounts(InitPriceFeed {
-            dex: *dex,
-            price_feed: price_feed.pubkey(),
-            authority: payer.pubkey(),
-        })
-        .args(dex_program::instruction::InitPriceFeed {})
-        .instructions()
         .unwrap()
 }
 

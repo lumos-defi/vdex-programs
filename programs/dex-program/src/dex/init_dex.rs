@@ -8,7 +8,7 @@ use crate::{
     dual_invest::DI,
     errors::{DexError, DexResult},
     order::MatchEvent,
-    utils::{get_timestamp, DEX_MAGIC_NUMBER, USER_LIST_MAGIC_BYTE},
+    utils::{get_timestamp, DEX_MAGIC_NUMBER, PRICE_FEED_MAGIC_NUMBER, USER_LIST_MAGIC_BYTE},
 };
 
 #[derive(Accounts)]
@@ -51,6 +51,10 @@ pub struct InitDex<'info> {
     /// CHECK
     #[account(mut, constraint= di_option.owner == program_id)]
     pub di_option: UncheckedAccount<'info>,
+
+    /// CHECK
+    #[account(zero)]
+    pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
 pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexResult {
@@ -115,6 +119,12 @@ pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexRes
         MountMode::Initialize,
     )
     .map_err(|_| DexError::FailedInitializeUserList)?;
+
+    let price_feed = &mut ctx.accounts.price_feed.load_init()?;
+    price_feed.magic = PRICE_FEED_MAGIC_NUMBER;
+    price_feed.authority = ctx.accounts.authority.key();
+
+    dex.price_feed = ctx.accounts.price_feed.key();
 
     DI::initialize(
         &mut ctx.accounts.di_option,
