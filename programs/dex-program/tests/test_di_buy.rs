@@ -6,17 +6,11 @@ mod utils;
 use anchor_client::solana_sdk::signer::Signer;
 use solana_program_test::tokio;
 
+use crate::utils::now;
 use crate::utils::DexAsset;
 use crate::utils::TestResult;
 use context::DexTestContext;
 use utils::constant::*;
-
-fn now() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64
-}
 
 #[tokio::test]
 async fn test_not_exist() {

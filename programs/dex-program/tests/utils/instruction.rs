@@ -9,11 +9,12 @@ use anchor_client::{
 use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
     accounts::{
-        AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClosePosition, Crank,
-        CreateUserState, DiBuy, DiCreateOption, DiRemoveOption, DiSetAdmin, DiSetFeeRate,
-        DiSetSettlePrice, DiSettle, DiUpdateOption, DiWithdrawSettled, FeedMockOraclePrice,
-        FillOrder, InitDex, InitMockOracle, InitPriceFeed, LimitAsk, LimitBid, OpenPosition,
-        RemoveLiquidity, Swap, UpdatePrice, WithdrawAsset,
+        AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClaimRewards,
+        ClosePosition, Compound, Crank, CreateUserState, DiBuy, DiCreateOption, DiRemoveOption,
+        DiSetAdmin, DiSetFeeRate, DiSetSettlePrice, DiSettle, DiUpdateOption, DiWithdrawSettled,
+        FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, InitPriceFeed, LimitAsk, LimitBid,
+        OpenPosition, RedeemVdx, RemoveLiquidity, SetLiquidityFeeRate, StakeVdx, Swap, UpdatePrice,
+        WithdrawAsset,
     },
     dex::{Dex, PriceFeed},
     dual_invest::DI,
@@ -1089,6 +1090,174 @@ pub async fn compose_update_price_ix(
             authority: payer.pubkey(),
         })
         .args(dex_program::instruction::UpdatePrice { prices })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_compound_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    price_feed: &Pubkey,
+    user_state: &Pubkey,
+    vdx_mint: &Pubkey,
+    vdx_program_signer: &Pubkey,
+    vdx_vault: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+) -> Instruction {
+    program
+        .request()
+        .accounts(Compound {
+            dex: *dex,
+            user_state: *user_state,
+            price_feed: *price_feed,
+            vdx_program_signer: *vdx_program_signer,
+            vdx_mint: *vdx_mint,
+            vdx_vault: *vdx_vault,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::Compound {})
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_stake_vdx_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    user_mint_acc: &Pubkey,
+    price_feed: &Pubkey,
+    user_state: &Pubkey,
+    event_queue: &Pubkey,
+    vdx_mint: &Pubkey,
+    vdx_program_signer: &Pubkey,
+    vdx_vault: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    amount: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(StakeVdx {
+            dex: *dex,
+            user_mint_acc: *user_mint_acc,
+            user_state: *user_state,
+            event_queue: *event_queue,
+            price_feed: *price_feed,
+            vdx_program_signer: *vdx_program_signer,
+            vdx_mint: *vdx_mint,
+            vdx_vault: *vdx_vault,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::StakeVdx { amount })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_redeem_vdx_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    user_mint_acc: &Pubkey,
+    price_feed: &Pubkey,
+    user_state: &Pubkey,
+    event_queue: &Pubkey,
+    vdx_mint: &Pubkey,
+    vdx_program_signer: &Pubkey,
+    vdx_vault: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    amount: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(RedeemVdx {
+            dex: *dex,
+            user_mint_acc: *user_mint_acc,
+            user_state: *user_state,
+            event_queue: *event_queue,
+            price_feed: *price_feed,
+            vdx_program_signer: *vdx_program_signer,
+            vdx_mint: *vdx_mint,
+            vdx_vault: *vdx_vault,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::StakeVdx { amount })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_claim_rewards_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    reward_vault: &Pubkey,
+    reward_vault_program_signer: &Pubkey,
+    user_mint_acc: &Pubkey,
+    user_state: &Pubkey,
+    event_queue: &Pubkey,
+    price_feed: &Pubkey,
+    vdx_program_signer: &Pubkey,
+    vdx_mint: &Pubkey,
+    vdx_vault: &Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+    amount: u64,
+) -> Instruction {
+    program
+        .request()
+        .accounts(ClaimRewards {
+            dex: *dex,
+            reward_vault: *reward_vault,
+            reward_vault_program_signer: *reward_vault_program_signer,
+            user_mint_acc: *user_mint_acc,
+            user_state: *user_state,
+            event_queue: *event_queue,
+            price_feed: *price_feed,
+            vdx_program_signer: *vdx_program_signer,
+            vdx_mint: *vdx_mint,
+            vdx_vault: *vdx_vault,
+            authority: payer.pubkey(),
+            token_program: spl_token::id(),
+        })
+        .accounts(remaining_accounts)
+        .args(dex_program::instruction::ClaimRewards { amount })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub async fn compose_set_liquidity_fee_rate_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    index: u8,
+    add_fee_rate: u16,
+    remove_fee_rate: u16,
+) -> Instruction {
+    program
+        .request()
+        .accounts(SetLiquidityFeeRate {
+            dex: *dex,
+            authority: payer.pubkey(),
+        })
+        .args(dex_program::instruction::SetLiquidityFeeRate {
+            index,
+            add_fee_rate,
+            remove_fee_rate,
+        })
         .instructions()
         .unwrap()
         .pop()

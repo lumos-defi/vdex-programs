@@ -13,6 +13,9 @@ pub const MAX_LEVERAGE: u32 = 30_000; // 30 (30_000 / 1_000);
 pub const MAX_ASSET_COUNT: usize = 16;
 pub const PRICE_FEED_DECIMALS: u8 = 6;
 
+pub const SECOND: i64 = 1;
+pub const DAY: i64 = 3600 * 24;
+
 //USDC ASSET
 pub const TEST_USDC_SYMBOL: &str = "USDC";
 pub const TEST_USDC_DECIMALS: u8 = 6;
@@ -172,4 +175,8 @@ pub fn eth_i(size: f64) -> i64 {
 
 pub fn sol_i(size: f64) -> i64 {
     (size * (10u64.pow(TEST_SOL_DECIMALS as u32) as f64)) as i64
+}
+
+pub fn es_vdx(size: f64) -> u64 {
+    (size * (10u64.pow(TEST_USDC_DECIMALS as u32) as f64)) as u64
 }

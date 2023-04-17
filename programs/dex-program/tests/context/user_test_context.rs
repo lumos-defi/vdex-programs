@@ -8,11 +8,12 @@ use crate::utils::{
     assert_eq_with_dust, btc, convert_to_big_number, create_associated_token_account,
     create_token_account, get_dex_info, get_keypair, get_price_feed_info, get_program,
     get_token_balance, mint_tokens, set_add_liquidity, set_ask, set_bid, set_cancel,
-    set_cancel_all, set_close, set_crank, set_di_buy, set_di_create, set_di_remove_option,
-    set_di_set_settle_price, set_di_settle, set_di_update_option, set_di_withdraw_settled,
-    set_feed_mock_oracle, set_fill, set_market_swap, set_open, set_remove_liquidity,
-    set_update_price, set_user_state, set_withdraw_asset, transfer, usdc, DexAsset, DexMarket,
-    MAX_ASSET_COUNT, PRICE_FEED_DECIMALS, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
+    set_cancel_all, set_claim_rewards, set_close, set_compound, set_crank, set_di_buy,
+    set_di_create, set_di_remove_option, set_di_set_settle_price, set_di_settle,
+    set_di_update_option, set_di_withdraw_settled, set_feed_mock_oracle, set_fill, set_market_swap,
+    set_open, set_redeem_vdx, set_remove_liquidity, set_stake_vdx, set_update_price,
+    set_user_state, set_withdraw_asset, transfer, usdc, DexAsset, DexMarket, MAX_ASSET_COUNT,
+    PRICE_FEED_DECIMALS, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{
@@ -209,6 +210,18 @@ impl UserTestContext {
         )
         .await;
         user
+    }
+
+    pub async fn get_asset_oracle_remaining_accounts(&self) -> Vec<AccountMeta> {
+        let mut remaining_accounts: Vec<AccountMeta> = Vec::new();
+
+        for asset in &self.dex_info.borrow().assets {
+            if asset.valid {
+                remaining_accounts.append(&mut vec![AccountMeta::new(asset.oracle, false)])
+            }
+        }
+
+        remaining_accounts
     }
 
     pub async fn get_oracle_remaining_accounts(&self) -> Vec<AccountMeta> {
@@ -644,24 +657,6 @@ impl UserTestContext {
 
         assert_eq_with_dust(vlp_amount, convert_to_big_number(amount, TEST_VLP_DECIMALS));
     }
-
-    // pub async fn assert_vlp_amount(&self, user_mint_acc: &Pubkey, amount: f64) {
-    //     let vlp_account = self.get_account(self.dex_info.borrow().vlp_mint).await;
-    //     let vlp_mint_info = Mint::try_deserialize(&mut vlp_account.data.as_ref()).unwrap();
-    //     let asset_amount =
-    //         get_token_balance(&mut self.context.borrow_mut().banks_client, user_mint_acc).await;
-
-    //     assert_eq!(
-    //         asset_amount,
-    //         convert_to_big_number(amount.into(), vlp_mint_info.decimals)
-    //     );
-    // }
-
-    // pub async fn get_user_vlp_token_pubkey(&self) -> Pubkey {
-    //     let user_mint_acc =
-    //         get_associated_token_address(&self.user.pubkey(), &self.dex_info.borrow().vlp_mint);
-    //     user_mint_acc
-    // }
 
     pub async fn get_user_usdc_token_pubkey(&self) -> Pubkey {
         self.get_user_asset_token_pubkey(DexAsset::USDC as usize)
@@ -2317,5 +2312,161 @@ impl UserTestContext {
 
     pub async fn assert_sol_price(&self, price: f64) {
         self.assert_asset_price(price, DexAsset::SOL as usize).await;
+    }
+
+    pub async fn compound(&self) -> DexResult {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let remaining_accounts = self.get_asset_oracle_remaining_accounts().await;
+
+        if let Ok(_) = set_compound::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.dex_info.borrow().price_feed,
+            &self.user_state,
+            &self.dex_info.borrow().vdx_pool.mint,
+            &self.dex_info.borrow().vdx_pool.program_signer,
+            &self.dex_info.borrow().vdx_pool.vault,
+            remaining_accounts,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::NotInitialized));
+        }
+    }
+
+    pub async fn stake_vdx(&self, amount: u64) -> DexResult {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let remaining_accounts = self.get_asset_oracle_remaining_accounts().await;
+
+        if let Ok(_) = set_stake_vdx::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.dex_info.borrow().price_feed,
+            &self.user_state,
+            &self.dex_info.borrow().event_queue,
+            &self.dex_info.borrow().vdx_pool.mint,
+            &self.dex_info.borrow().vdx_pool.program_signer,
+            &self.dex_info.borrow().vdx_pool.vault,
+            remaining_accounts,
+            amount,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::NotInitialized));
+        }
+    }
+
+    pub async fn redeem_vdx(&self, amount: u64) -> DexResult {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let remaining_accounts = self.get_asset_oracle_remaining_accounts().await;
+
+        if let Ok(_) = set_redeem_vdx::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &self.dex_info.borrow().price_feed,
+            &self.user_state,
+            &self.dex_info.borrow().event_queue,
+            &self.dex_info.borrow().vdx_pool.mint,
+            &self.dex_info.borrow().vdx_pool.program_signer,
+            &self.dex_info.borrow().vdx_pool.vault,
+            remaining_accounts,
+            amount,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::NotInitialized));
+        }
+    }
+
+    pub async fn claim_rewards(&self, amount: u64) -> DexResult {
+        let reward_asset_index = self.dex_info.borrow().vdx_pool.reward_asset_index;
+        let ai = self.dex_info.borrow().assets[reward_asset_index as usize];
+
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let remaining_accounts = self.get_asset_oracle_remaining_accounts().await;
+
+        if let Ok(_) = set_claim_rewards::setup(
+            context,
+            &self.program,
+            &self.user,
+            &self.dex,
+            &ai.vault,
+            &ai.program_signer,
+            &self.user_state,
+            &self.dex_info.borrow().event_queue,
+            &self.dex_info.borrow().price_feed,
+            &self.dex_info.borrow().vdx_pool.program_signer,
+            &self.dex_info.borrow().vdx_pool.mint,
+            &self.dex_info.borrow().vdx_pool.vault,
+            remaining_accounts,
+            amount,
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::NotInitialized));
+        }
+    }
+
+    pub async fn staked_vdx(&self) -> DexResult<u64> {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+
+        let staked_vdx = us.borrow().meta.vdx.staked;
+        let pending_vested_vdx = us.borrow().meta.es_vdx.pending_vested()?;
+
+        Ok(staked_vdx + pending_vested_vdx)
+    }
+
+    pub async fn pending_es_vdx(&self) -> DexResult<u64> {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+
+        let dex = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+
+        let pending_of_vdx_pool = us
+            .borrow()
+            .meta
+            .vdx
+            .pending_es_vdx(&dex.borrow().vdx_pool)?;
+
+        println!("vdx pool {}", pending_of_vdx_pool);
+
+        let pending_of_vlp_pool = us
+            .borrow()
+            .meta
+            .vlp
+            .pending_es_vdx(&dex.borrow().vlp_pool)?;
+
+        println!("vlp pool {}", pending_of_vlp_pool);
+
+        let vesting = us.borrow().meta.es_vdx.vesting()?;
+
+        println!("vesting {}", vesting);
+
+        Ok(pending_of_vdx_pool + pending_of_vlp_pool + vesting)
     }
 }

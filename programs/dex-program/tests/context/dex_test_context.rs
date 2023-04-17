@@ -3,6 +3,7 @@ use std::{borrow::Borrow, cell::RefCell, rc::Rc};
 use crate::utils::{
     compose_add_asset_ix, compose_add_market_ixs, compose_di_set_admin_ix,
     compose_di_set_fee_rate_ix, compose_init_dex_ixs, compose_init_price_feed_ixs,
+    compose_set_liquidity_fee_rate_ix,
     constant::{
         INIT_ADD_SOL_AMOUNT, TEST_BTC_ADD_LIQUIDITY_FEE_RATE, TEST_BTC_ASSET_INDEX,
         TEST_BTC_BORROW_FEE_RATE, TEST_BTC_CHARGE_BORROW_FEE_INTERVAL, TEST_BTC_CLOSE_FEE_RATE,
@@ -77,7 +78,7 @@ impl DexTestContext {
     //9. init price feed
     //10. init users
     //11. init reward asset
-    pub async fn new() -> DexTestContext {
+    pub async fn new_raw(add_sol_liquidity: bool) -> DexTestContext {
         let context = get_context().await;
         let program = get_program().await;
 
@@ -399,7 +400,7 @@ impl DexTestContext {
         }
 
         //11.init reward asset
-        {
+        if add_sol_liquidity {
             let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
             user.add_liquidity_with_sol(INIT_ADD_SOL_AMOUNT).await;
             users.push(user);
@@ -413,6 +414,31 @@ impl DexTestContext {
             dex_info,
             user_context: users,
         }
+    }
+
+    pub async fn new() -> DexTestContext {
+        DexTestContext::new_raw(true).await
+    }
+
+    pub async fn new_with_no_liquidity() -> DexTestContext {
+        let dtc = DexTestContext::new_raw(false).await;
+        dtc.clear_liquidity_fee_rate().await;
+
+        dtc
+    }
+
+    pub async fn get_dex_info(&self, dex: Pubkey) -> RefCell<Dex> {
+        let context = &mut self.context.borrow_mut();
+        let dex_account = context
+            .banks_client
+            .get_account(dex)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let data_ptr = dex_account.data.as_ptr();
+        let dex_info = unsafe { data_ptr.add(8).cast::<Dex>().as_ref() }.unwrap();
+        RefCell::new(*dex_info)
     }
 
     pub async fn di_set_fee_rate(&self, admin: &Keypair, fee_rate: u16) -> DexResult {
@@ -448,8 +474,6 @@ impl DexTestContext {
         }
     }
 
-    pub async fn create_vdx_mint(&self) {}
-
     pub async fn di_set_admin(&self, admin: &Pubkey) {
         let context = &mut self.context.borrow_mut();
         let binding = self.dex_info.borrow();
@@ -477,6 +501,40 @@ impl DexTestContext {
             .unwrap();
     }
 
+    pub async fn set_liquidity_fee_rate(&self, index: u8, add_fee_rate: u16, remove_fee_rate: u16) {
+        let context = &mut self.context.borrow_mut();
+
+        let ix = compose_set_liquidity_fee_rate_ix(
+            &self.program,
+            &self.admin,
+            &self.dex,
+            index,
+            add_fee_rate,
+            remove_fee_rate,
+        )
+        .await;
+
+        let transaction = Transaction::new_signed_with_payer(
+            &vec![ix],
+            Some(&self.admin.pubkey()),
+            &[&self.admin],
+            context.last_blockhash,
+        );
+
+        context
+            .banks_client
+            .process_transaction(transaction)
+            .await
+            .unwrap();
+    }
+
+    pub async fn clear_liquidity_fee_rate(&self) {
+        self.set_liquidity_fee_rate(0, 0, 0).await;
+        self.set_liquidity_fee_rate(1, 0, 0).await;
+        self.set_liquidity_fee_rate(2, 0, 0).await;
+        self.set_liquidity_fee_rate(3, 0, 0).await;
+    }
+
     pub async fn decode_account<T: serde::de::DeserializeOwned>(&self, address: &Pubkey) -> T {
         self.context
             .borrow_mut()
@@ -495,7 +553,7 @@ impl DexTestContext {
     pub async fn advance_clock(&self, unix_timestamp: UnixTimestamp) {
         let mut clock: Clock = self.get_clock().await;
 
-        while clock.unix_timestamp <= unix_timestamp {
+        while clock.unix_timestamp < unix_timestamp {
             self.context
                 .borrow_mut()
                 .warp_to_slot(clock.slot + 400)
@@ -503,6 +561,92 @@ impl DexTestContext {
 
             clock = self.get_clock().await;
         }
+    }
+
+    // pub async fn advance_delta(&self, delta: i64) {
+    //     let mut clock: Clock = self.get_clock().await;
+
+    //     let target_timestamp = clock.unix_timestamp + delta;
+
+    //     let mut count = 0;
+    //     println!("start >>>{}", clock.unix_timestamp);
+    //     while clock.unix_timestamp < target_timestamp {
+    //         self.context
+    //             .borrow_mut()
+    //             .warp_to_slot(clock.slot + 1)
+    //             .unwrap();
+
+    //         clock = self.get_clock().await;
+    //         count += 1;
+    //     }
+
+    //     println!("end   >>>{}", clock.unix_timestamp);
+    //     println!("count: {}", count)
+    // }
+
+    // pub async fn advance_one_day(&self) -> u64 {
+    //     let mut clock: Clock = self.get_clock().await;
+
+    //     let start = clock.unix_timestamp;
+
+    //     self.context
+    //         .borrow_mut()
+    //         .warp_to_slot(clock.slot + 400 * 968)
+    //         .unwrap();
+
+    //     for _ in 0..125 {
+    //         clock = self.get_clock().await;
+
+    //         self.context
+    //             .borrow_mut()
+    //             .warp_to_slot(clock.slot + 300)
+    //             .unwrap();
+    //     }
+
+    //     clock = self.get_clock().await;
+
+    //     println!(
+    //         "epoch timestamp {}, unix timestamp {}, pass   >>> {} {}",
+    //         clock.epoch_start_timestamp,
+    //         clock.unix_timestamp,
+    //         clock.unix_timestamp - start,
+    //         (clock.unix_timestamp - start) / 3600
+    //     );
+
+    //     (clock.unix_timestamp - start) as u64
+    // }
+
+    pub async fn after(&self, span: i64) {
+        let mut clock: Clock = self.get_clock().await;
+
+        clock.epoch_start_timestamp += span;
+        clock.unix_timestamp += span;
+
+        self.context.borrow_mut().set_sysvar::<Clock>(&clock);
+    }
+
+    pub async fn pending_es_vdx_total(&self) -> u64 {
+        let dex = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+
+        let es_vdx = dex.borrow().vdx_pool.es_vdx_total + dex.borrow().vlp_pool.es_vdx_total;
+
+        es_vdx
+    }
+
+    pub async fn pending_es_vdx_for_vdx_pool(&self) -> u64 {
+        let dex = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+
+        let es_vdx = dex.borrow().vdx_pool.es_vdx_total;
+
+        es_vdx
+    }
+
+    pub async fn pending_es_vdx_for_vlp_pool(&self) -> u64 {
+        let dex = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+
+        let es_vdx = dex.borrow().vlp_pool.es_vdx_total;
+
+        es_vdx
     }
 }
 
