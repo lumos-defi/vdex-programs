@@ -12,6 +12,7 @@ export async function createDex(authority: Keypair) {
   const matchQueue = Keypair.generate()
   const userListEntryPage = Keypair.generate()
   const diOption = Keypair.generate()
+  const priceFeed = Keypair.generate()
   const rewardMint = TokenInstructions.WRAPPED_SOL_MINT
   const USDC_MINT_DECIMALS = 6
 
@@ -48,9 +49,13 @@ export async function createDex(authority: Keypair) {
       vdxVault,
       rewardMint,
       diOption: diOption.publicKey,
+      priceFeed: priceFeed.publicKey,
     })
-    .preInstructions([await program.account.dex.createInstruction(dex)])
-    .signers([authority, dex])
+    .preInstructions([
+      await program.account.dex.createInstruction(dex),
+      await program.account.priceFeed.createInstruction(priceFeed),
+    ])
+    .signers([authority, dex, priceFeed])
     .rpc()
 
   return { dex }

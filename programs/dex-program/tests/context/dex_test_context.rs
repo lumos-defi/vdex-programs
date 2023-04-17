@@ -1,9 +1,9 @@
-use std::{borrow::Borrow, cell::RefCell, rc::Rc};
+use std::{borrow::Borrow, cell::RefCell, mem, rc::Rc};
 
+use crate::utils::TestResult;
 use crate::utils::{
     compose_add_asset_ix, compose_add_market_ixs, compose_di_set_admin_ix,
-    compose_di_set_fee_rate_ix, compose_init_dex_ixs, compose_init_price_feed_ixs,
-    compose_set_liquidity_fee_rate_ix,
+    compose_di_set_fee_rate_ix, compose_init_dex_ixs, compose_set_liquidity_fee_rate_ix,
     constant::{
         INIT_ADD_SOL_AMOUNT, TEST_BTC_ADD_LIQUIDITY_FEE_RATE, TEST_BTC_ASSET_INDEX,
         TEST_BTC_BORROW_FEE_RATE, TEST_BTC_CHARGE_BORROW_FEE_INTERVAL, TEST_BTC_CLOSE_FEE_RATE,
@@ -29,10 +29,10 @@ use crate::utils::{
         TEST_USDC_REMOVE_LIQUIDITY_FEE_RATE, TEST_USDC_SWAP_FEE_RATE, TEST_USDC_SYMBOL,
         TEST_USDC_TARGET_WEIGHT,
     },
-    convert_to_big_number, create_mint, create_token_account, get_context, get_dex_info,
-    get_keypair_from_file, get_program, set_mock_oracle, MAX_LEVERAGE, TEST_DI_FEE_RATE,
+    convert_to_big_number, create_account, create_mint, create_token_account, get_context,
+    get_dex_info, get_keypair_from_file, get_program, set_mock_oracle, MAX_LEVERAGE,
+    TEST_DI_FEE_RATE,
 };
-
 use anchor_client::{
     solana_sdk::{
         clock::UnixTimestamp, signature::Keypair, signer::Signer, sysvar, transaction::Transaction,
@@ -45,8 +45,10 @@ use anchor_lang::{
     prelude::{Clock, Pubkey},
 };
 use bincode::deserialize;
+use dex_program::dex::PriceFeed;
 use dex_program::{
     dex::Dex,
+    dual_invest::DI,
     errors::{DexError, DexResult},
     utils::VDX_DECIMALS,
 };
@@ -87,7 +89,6 @@ impl DexTestContext {
 
         let dex = Keypair::new();
         let usdc_mint = Keypair::new();
-        let price_feed = Keypair::new();
         let vdx_mint = Keypair::new();
         let vdx_vault = Keypair::new();
 
@@ -378,28 +379,16 @@ impl DexTestContext {
             .await;
         }
 
-        //9.init price feed
-        {
-            init_price_feed(
-                &mut context.borrow_mut(),
-                &program,
-                &admin,
-                &dex,
-                &price_feed,
-            )
-            .await;
-        }
-
         let dex_info = get_dex_info(&mut context.borrow_mut().banks_client, dex.pubkey()).await;
 
-        //10.init price feed
+        //9.init price feed
         let mut users: Vec<UserTestContext> = vec![];
         for _ in 0..5 {
             let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
             users.push(user);
         }
 
-        //11.init reward asset
+        //10.init reward asset
         if add_sol_liquidity {
             let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
             user.add_liquidity_with_sol(INIT_ADD_SOL_AMOUNT).await;
@@ -563,59 +552,6 @@ impl DexTestContext {
         }
     }
 
-    // pub async fn advance_delta(&self, delta: i64) {
-    //     let mut clock: Clock = self.get_clock().await;
-
-    //     let target_timestamp = clock.unix_timestamp + delta;
-
-    //     let mut count = 0;
-    //     println!("start >>>{}", clock.unix_timestamp);
-    //     while clock.unix_timestamp < target_timestamp {
-    //         self.context
-    //             .borrow_mut()
-    //             .warp_to_slot(clock.slot + 1)
-    //             .unwrap();
-
-    //         clock = self.get_clock().await;
-    //         count += 1;
-    //     }
-
-    //     println!("end   >>>{}", clock.unix_timestamp);
-    //     println!("count: {}", count)
-    // }
-
-    // pub async fn advance_one_day(&self) -> u64 {
-    //     let mut clock: Clock = self.get_clock().await;
-
-    //     let start = clock.unix_timestamp;
-
-    //     self.context
-    //         .borrow_mut()
-    //         .warp_to_slot(clock.slot + 400 * 968)
-    //         .unwrap();
-
-    //     for _ in 0..125 {
-    //         clock = self.get_clock().await;
-
-    //         self.context
-    //             .borrow_mut()
-    //             .warp_to_slot(clock.slot + 300)
-    //             .unwrap();
-    //     }
-
-    //     clock = self.get_clock().await;
-
-    //     println!(
-    //         "epoch timestamp {}, unix timestamp {}, pass   >>> {} {}",
-    //         clock.epoch_start_timestamp,
-    //         clock.unix_timestamp,
-    //         clock.unix_timestamp - start,
-    //         (clock.unix_timestamp - start) / 3600
-    //     );
-
-    //     (clock.unix_timestamp - start) as u64
-    // }
-
     pub async fn after(&self, span: i64) {
         let mut clock: Clock = self.get_clock().await;
 
@@ -739,7 +675,7 @@ pub async fn add_asset(
     .await
     .unwrap();
 
-    println!("init mock oralce {}", mock_oracle.pubkey());
+    println!("init mock oracle {}", mock_oracle.pubkey());
     let mint_pubkey = if symbol == "SOL" {
         spl_token::native_mint::id()
     } else {
@@ -823,10 +759,41 @@ pub async fn init_dex(
     let match_queue = Keypair::new();
     let user_list_entry_page = Keypair::new();
     let di_option = Keypair::new();
+    let price_feed = Keypair::new();
     let reward_mint = spl_token::native_mint::id();
 
-    let init_dex_ixs = compose_init_dex_ixs(
+    let dex_account_size = 8 + mem::size_of::<Dex>();
+    let event_queue_account_size = 16 * 1024;
+    let match_queue_account_size = 16 * 1024;
+    let user_list_entry_page_account_size = 4 * 1024;
+    let di_option_account_size = DI::required_account_size(64u8);
+    let price_feed_account_size = 8 + mem::size_of::<PriceFeed>();
+
+    create_account(context, payer, dex, dex_account_size)
+        .await
+        .assert_ok();
+    create_account(context, payer, &event_queue, event_queue_account_size)
+        .await
+        .assert_ok();
+    create_account(context, payer, &match_queue, match_queue_account_size)
+        .await
+        .assert_ok();
+    create_account(
         context,
+        payer,
+        &user_list_entry_page,
+        user_list_entry_page_account_size,
+    )
+    .await
+    .assert_ok();
+    create_account(context, payer, &di_option, di_option_account_size)
+        .await
+        .assert_ok();
+    create_account(context, payer, &price_feed, price_feed_account_size)
+        .await
+        .assert_ok();
+
+    let init_dex_ixs = compose_init_dex_ixs(
         program,
         payer,
         &dex,
@@ -835,6 +802,7 @@ pub async fn init_dex(
         &match_queue,
         &user_list_entry_page,
         &di_option,
+        &price_feed,
         &reward_mint,
         &vdx_mint,
         &vdx_vault,
@@ -846,42 +814,9 @@ pub async fn init_dex(
 
     let mut signers: Vec<&Keypair> = vec![];
     signers.push(payer);
-    signers.push(dex);
-    signers.push(&event_queue);
-    signers.push(&match_queue);
-    signers.push(&user_list_entry_page);
-    signers.push(&di_option);
 
     let transaction = Transaction::new_signed_with_payer(
         &init_dex_ixs,
-        Some(&payer.pubkey()),
-        &signers,
-        context.last_blockhash,
-    );
-
-    context
-        .banks_client
-        .process_transaction(transaction)
-        .await
-        .unwrap();
-}
-
-pub async fn init_price_feed(
-    context: &mut ProgramTestContext,
-    program: &Program,
-    payer: &Keypair,
-    dex: &Keypair,
-    price_feed: &Keypair,
-) {
-    let init_price_feed_ix =
-        compose_init_price_feed_ixs(context, program, payer, &dex.pubkey(), &price_feed).await;
-
-    let mut signers: Vec<&Keypair> = vec![];
-    signers.push(payer);
-    signers.push(price_feed);
-
-    let transaction = Transaction::new_signed_with_payer(
-        &init_price_feed_ix,
         Some(&payer.pubkey()),
         &signers,
         context.last_blockhash,

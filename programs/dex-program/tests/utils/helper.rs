@@ -172,6 +172,34 @@ pub async fn create_token_account(
         .map_err(|e| e.into())
 }
 
+pub async fn create_account(
+    context: &mut ProgramTestContext,
+    payer: &Keypair,
+    account: &Keypair,
+    size: usize,
+) -> Result<(), TransportError> {
+    let rent = context.banks_client.get_rent().await.unwrap();
+    let account_rent = rent.minimum_balance(size);
+
+    let mut transaction = Transaction::new_with_payer(
+        &[system_instruction::create_account(
+            &payer.pubkey(),
+            &account.pubkey(),
+            account_rent,
+            size as u64,
+            &dex_program::id(),
+        )],
+        Some(&payer.pubkey()),
+    );
+    transaction.sign(&[payer, account], context.last_blockhash);
+
+    context
+        .banks_client
+        .process_transaction(transaction)
+        .await
+        .map_err(|e| e.into())
+}
+
 pub async fn mint_tokens(
     context: &mut ProgramTestContext,
     payer: &Keypair,
