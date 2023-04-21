@@ -5,7 +5,7 @@ mod utils;
 
 use crate::utils::{es_vdx, TestResult, DAY, SECOND};
 use context::DexTestContext;
-use dex_program::utils::{ES_VDX_PERCENTAGE_FOR_VDX_POOL, ES_VDX_PER_SECOND};
+use dex_program::utils::{ES_VDX_PERCENTAGE_FOR_VDX_POOL, ES_VDX_PER_SECOND, VESTING_PERIOD};
 use solana_program_test::tokio;
 
 const ES_VDX_PS_F: f64 = ES_VDX_PER_SECOND as f64;
@@ -93,8 +93,27 @@ async fn test_four_user_single_compound() {
     let es_vdx_in_vlp_pool = dtc.pending_es_vdx_for_vlp_pool().await;
     assert_eq!(es_vdx_in_vlp_pool, 0);
 
-    dtc.after(DAY).await;
-
     let alice = &dtc.user_context[0];
+    let alice_vesting_es_vdx = alice.pending_es_vdx().await.assert_unwrap();
+
+    let time = dtc.after(DAY).await;
+
     alice.compound().await.assert_ok();
+
+    let pending_vdx = alice.staked_vdx(time).await.assert_unwrap();
+    println!(
+        "pending vdx {}, expected {}",
+        pending_vdx,
+        alice_vesting_es_vdx / VESTING_PERIOD as u64
+    );
+    assert_eq!(pending_vdx, alice_vesting_es_vdx / VESTING_PERIOD as u64);
+
+    alice.redeem_vdx(pending_vdx).await.assert_ok();
+    alice.assert_vdx_balance(pending_vdx).await;
+    let pending_vdx = alice.staked_vdx(time).await.assert_unwrap();
+    assert_eq!(pending_vdx, 0);
+
+    alice.stake_vdx(pending_vdx).await.assert_ok();
+    let current_pending_vdx = alice.staked_vdx(time).await.assert_unwrap();
+    assert_eq!(current_pending_vdx, pending_vdx);
 }

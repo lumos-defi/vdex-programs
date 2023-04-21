@@ -10,7 +10,7 @@ use anchor_lang::prelude::{AccountMeta, Pubkey};
 use solana_program_test::ProgramTestContext;
 use spl_associated_token_account::get_associated_token_address;
 
-use super::compose_redeem_vdx_ix;
+use super::{compose_redeem_vdx_ix, create_associated_token_account};
 
 #[allow(clippy::too_many_arguments)]
 pub async fn setup(
@@ -28,7 +28,9 @@ pub async fn setup(
     amount: u64,
 ) -> Result<(), TransportError> {
     let user_mint_acc = get_associated_token_address(&payer.pubkey(), vdx_mint);
-
+    if let Ok(None) = context.banks_client.get_account(user_mint_acc).await {
+        create_associated_token_account(context, payer, &payer.pubkey(), vdx_mint).await
+    }
     let redeem_vdx_ix = compose_redeem_vdx_ix(
         program,
         payer,

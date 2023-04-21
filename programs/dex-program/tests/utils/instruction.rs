@@ -1119,7 +1119,7 @@ pub async fn compose_redeem_vdx_ix(
             token_program: spl_token::id(),
         })
         .accounts(remaining_accounts)
-        .args(dex_program::instruction::StakeVdx { amount })
+        .args(dex_program::instruction::RedeemVdx { amount })
         .instructions()
         .unwrap()
         .pop()
