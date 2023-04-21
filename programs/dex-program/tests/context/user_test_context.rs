@@ -645,6 +645,16 @@ impl UserTestContext {
         assert!(difference.abs() <= 2);
     }
 
+    pub async fn assert_vdx_balance(&self, amount: u64) {
+        let vdx_mint = &self.dex_info.borrow().vdx_pool.mint;
+        let vdx_mint_acc = get_associated_token_address(&self.user.pubkey(), vdx_mint);
+
+        let vdx_amount =
+            get_token_balance(&mut self.context.borrow_mut().banks_client, &vdx_mint_acc).await;
+
+        assert_eq!(vdx_amount, amount);
+    }
+
     pub async fn assert_vlp(&self, amount: f64) {
         let mut user_state_account = self.get_account(self.user_state).await;
         let user_state_account_info: AccountInfo =
@@ -2425,7 +2435,7 @@ impl UserTestContext {
         }
     }
 
-    pub async fn staked_vdx(&self) -> DexResult<u64> {
+    pub async fn staked_vdx(&self, timestamp: i64) -> DexResult<u64> {
         let mut user_state_account = self.get_account(self.user_state).await;
         let user_state_account_info: AccountInfo =
             (&self.user_state, true, &mut user_state_account).into();
@@ -2433,7 +2443,7 @@ impl UserTestContext {
         let us = UserState::mount(&user_state_account_info, true).unwrap();
 
         let staked_vdx = us.borrow().meta.vdx.staked;
-        let pending_vested_vdx = us.borrow().meta.es_vdx.pending_vested()?;
+        let pending_vested_vdx = us.borrow().meta.es_vdx.pending_vested(timestamp)?;
 
         Ok(staked_vdx + pending_vested_vdx)
     }
@@ -2453,19 +2463,13 @@ impl UserTestContext {
             .vdx
             .pending_es_vdx(&dex.borrow().vdx_pool)?;
 
-        println!("vdx pool {}", pending_of_vdx_pool);
-
         let pending_of_vlp_pool = us
             .borrow()
             .meta
             .vlp
             .pending_es_vdx(&dex.borrow().vlp_pool)?;
 
-        println!("vlp pool {}", pending_of_vlp_pool);
-
         let vesting = us.borrow().meta.es_vdx.vesting()?;
-
-        println!("vesting {}", vesting);
 
         Ok(pending_of_vdx_pool + pending_of_vlp_pool + vesting)
     }

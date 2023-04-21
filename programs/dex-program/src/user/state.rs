@@ -221,18 +221,16 @@ impl VestingMint {
     }
 
     #[cfg(feature = "client-support")]
-    pub fn pending_vested(&self) -> DexResult<u64> {
-        #[cfg(not(test))]
-        let today = get_timestamp()? / SECONDS_PER_DAY;
-
-        #[cfg(test)]
-        let today = self.mock_time / SECONDS_PER_DAY;
+    pub fn pending_vested(&self, timestamp: i64) -> DexResult<u64> {
+        let today = timestamp / SECONDS_PER_DAY;
 
         if self.last_day == -1 {
             return Ok(0);
         }
 
-        if today == self.last_day {
+        println!("today {}, last day {}", today, self.last_day);
+
+        if today <= self.last_day {
             return Ok(0);
         }
 

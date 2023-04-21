@@ -552,13 +552,15 @@ impl DexTestContext {
         }
     }
 
-    pub async fn after(&self, span: i64) {
+    pub async fn after(&self, span: i64) -> i64 {
         let mut clock: Clock = self.get_clock().await;
 
         clock.epoch_start_timestamp += span;
         clock.unix_timestamp += span;
 
         self.context.borrow_mut().set_sysvar::<Clock>(&clock);
+
+        clock.unix_timestamp
     }
 
     pub async fn pending_es_vdx_total(&self) -> u64 {
