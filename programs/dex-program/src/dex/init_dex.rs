@@ -8,7 +8,10 @@ use crate::{
     dual_invest::DI,
     errors::{DexError, DexResult},
     order::MatchEvent,
-    utils::{get_timestamp, DEX_MAGIC_NUMBER, PRICE_FEED_MAGIC_NUMBER, USER_LIST_MAGIC_BYTE},
+    utils::{
+        get_timestamp, DEX_MAGIC_NUMBER, PRICE_FEED_MAGIC_NUMBER, USER_LIST_MAGIC_BYTE,
+        VLP_DECIMALS,
+    },
 };
 
 #[derive(Accounts)]
@@ -79,7 +82,7 @@ pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexRes
         Pubkey::default(),
         ctx.accounts.reward_mint.key(),
         u8::MAX,
-        6,
+        VLP_DECIMALS,
         u8::MAX, // Will be updated when reward asset is added
     );
 

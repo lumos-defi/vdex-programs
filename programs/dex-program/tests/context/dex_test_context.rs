@@ -383,7 +383,7 @@ impl DexTestContext {
 
         //9.init price feed
         let mut users: Vec<UserTestContext> = vec![];
-        for _ in 0..5 {
+        for _ in 0..8 {
             let user = UserTestContext::new(context.clone(), dex.pubkey()).await;
             users.push(user);
         }
@@ -552,6 +552,11 @@ impl DexTestContext {
         }
     }
 
+    pub async fn advance_second(&self) {
+        self.advance_clock(self.get_clock().await.unix_timestamp + 1)
+            .await;
+    }
+
     pub async fn after(&self, span: i64) -> i64 {
         let mut clock: Clock = self.get_clock().await;
 
@@ -585,6 +590,44 @@ impl DexTestContext {
         let es_vdx = dex.borrow().vlp_pool.es_vdx_total;
 
         es_vdx
+    }
+
+    pub async fn assert_total_rewards(&self, total: u64) {
+        let dex = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+
+        let vdx_pool_rewards = dex.borrow().vdx_pool.reward_total;
+        let vlp_pool_rewards = dex.borrow().vlp_pool.reward_total;
+
+        println!(
+            "total rewards {}, expect {}",
+            vdx_pool_rewards + vlp_pool_rewards,
+            total
+        );
+
+        assert!((vdx_pool_rewards + vlp_pool_rewards).abs_diff(total) <= 1);
+    }
+
+    pub async fn assert_vdx_pool_rewards(&self, rewards: u64) {
+        let dex = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+
+        let vdx_pool_rewards = dex.borrow().vdx_pool.reward_total;
+        println!(
+            "vdx pool rewards {}, expect rewards {}",
+            vdx_pool_rewards, rewards
+        );
+        assert!(vdx_pool_rewards.abs_diff(rewards) <= 1);
+    }
+
+    pub async fn assert_vlp_pool_rewards(&self, rewards: u64) {
+        let dex = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+
+        let vlp_pool_rewards = dex.borrow().vlp_pool.reward_total;
+        println!(
+            "vlp pool rewards {}, expect rewards {}",
+            vlp_pool_rewards, rewards
+        );
+
+        assert!(vlp_pool_rewards.abs_diff(rewards) <= 1);
     }
 }
 

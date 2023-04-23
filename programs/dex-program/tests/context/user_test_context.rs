@@ -728,6 +728,7 @@ impl UserTestContext {
         let ai = di.borrow().assets[asset as usize];
 
         let expect = convert_to_big_number(fee, ai.decimals);
+        println!("fee amount: {}, expect: {}", ai.fee_amount, expect);
         assert_eq_with_dust(expect, ai.fee_amount);
     }
 
@@ -2472,5 +2473,43 @@ impl UserTestContext {
         let vesting = us.borrow().meta.es_vdx.vesting()?;
 
         Ok(pending_of_vdx_pool + pending_of_vlp_pool + vesting)
+    }
+
+    pub async fn pending_rewards(&self) -> u64 {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+
+        let dex = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+
+        let pending_of_vdx_pool = us
+            .borrow()
+            .meta
+            .vdx
+            .pending_reward(&dex.borrow().vdx_pool)
+            .assert_unwrap();
+
+        let pending_of_vlp_pool = us
+            .borrow()
+            .meta
+            .vlp
+            .pending_reward(&dex.borrow().vlp_pool)
+            .assert_unwrap();
+
+        println!(
+            "vlp pool reward per share: {}",
+            dex.borrow().vlp_pool.accumulate_reward_per_share
+        );
+
+        let total = pending_of_vdx_pool + pending_of_vlp_pool;
+        total
+    }
+
+    pub async fn assert_pending_rewards(&self, expect: u64) {
+        let total = self.pending_rewards().await;
+
+        assert!(total.abs_diff(expect) <= 1);
     }
 }

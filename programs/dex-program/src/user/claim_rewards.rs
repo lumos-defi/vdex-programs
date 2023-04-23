@@ -100,7 +100,7 @@ pub fn handler(ctx: Context<ClaimRewards>, amount: u64) -> DexResult {
         DexError::InvalidProgramSigner
     );
 
-    let reward_vault_seeds = &[
+    let reward_vault_seeds: &[&[u8]; 3] = &[
         ctx.accounts.user_mint_acc.mint.as_ref(),
         ctx.accounts.dex.to_account_info().key.as_ref(),
         &[ai.nonce],
@@ -150,9 +150,9 @@ pub fn handler(ctx: Context<ClaimRewards>, amount: u64) -> DexResult {
     if claimable > 0 {
         let signer = &[&reward_vault_seeds[..]];
         let cpi_accounts = Transfer {
-            from: ctx.accounts.vdx_vault.to_account_info(),
+            from: ctx.accounts.reward_vault.to_account_info(),
             to: ctx.accounts.user_mint_acc.to_account_info(),
-            authority: ctx.accounts.vdx_program_signer.to_account_info(),
+            authority: ctx.accounts.reward_vault_program_signer.to_account_info(),
         };
 
         let cpi_ctx =

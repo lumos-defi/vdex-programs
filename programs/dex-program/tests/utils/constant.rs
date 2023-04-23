@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use dex_program::utils::VLP_DECIMALS;
+
 const BORROW_FEE_RATE: u16 = 10; //1-10_000  0.1%
 const ADD_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
 const REMOVE_LIQUIDITY_FEE_RATE: u16 = 10; //0.1%
@@ -159,6 +161,10 @@ pub fn eth(size: f64) -> u64 {
 
 pub fn usdc(size: f64) -> u64 {
     (size * (10u64.pow(TEST_USDC_DECIMALS as u32) as f64)) as u64
+}
+
+pub fn vlp(size: f64) -> u64 {
+    (size * (10u64.pow(VLP_DECIMALS as u32) as f64)) as u64
 }
 
 pub fn usdc_i(size: f64) -> i64 {
