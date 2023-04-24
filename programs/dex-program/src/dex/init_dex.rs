@@ -70,7 +70,7 @@ pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexRes
     dex.usdc_mint = ctx.accounts.usdc_mint.key();
     dex.di_option = ctx.accounts.di_option.key();
     dex.user_list_entry_page = ctx.accounts.user_list_entry_page.key();
-    dex.mint_es_vdx_last_timestamp = get_timestamp()?;
+    dex.update_rewards_last_timestamp = get_timestamp()?;
     dex.user_list_remaining_pages_number = 0;
     dex.assets_number = 0;
     dex.markets_number = 0;

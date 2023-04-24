@@ -7,7 +7,8 @@ use crate::{
         swap, time::get_timestamp, value, ISafeAddSub, ISafeMath, SafeMath, BORROW_FEE_RATE_BASE,
         ES_VDX_PERCENTAGE_FOR_VDX_POOL, ES_VDX_PER_SECOND, FEE_RATE_BASE, FEE_RATE_DECIMALS,
         LEVERAGE_POW_DECIMALS, MAX_ASSET_COUNT, MAX_MARKET_COUNT, MAX_PRICE_COUNT,
-        MAX_USER_LIST_REMAINING_PAGES_COUNT, REWARD_PERCENTAGE_FOR_VDX_POOL, USD_POW_DECIMALS,
+        MAX_USER_LIST_REMAINING_PAGES_COUNT, REWARD_PERCENTAGE_FOR_VDX_POOL, UPDATE_REWARDS_PERIOD,
+        USD_POW_DECIMALS,
     },
 };
 
@@ -29,7 +30,7 @@ pub struct Dex {
     pub price_feed: Pubkey,
     pub user_list_entry_page: Pubkey,
     pub user_list_remaining_pages: [Pubkey; MAX_USER_LIST_REMAINING_PAGES_COUNT],
-    pub mint_es_vdx_last_timestamp: i64,
+    pub update_rewards_last_timestamp: i64,
     pub user_list_remaining_pages_number: u8,
     pub assets_number: u8,
     pub markets_number: u8,
@@ -660,17 +661,15 @@ impl Dex {
         Ok(())
     }
 
-    pub fn mint_es_vdx(&mut self) -> DexResult {
-        let now = get_timestamp()?;
+    fn mint_es_vdx(&mut self, seconds: u64) -> DexResult {
         // TODO: handle init & end situation
-        if now <= self.mint_es_vdx_last_timestamp {
+        if seconds == 0 {
             return Ok(());
         }
 
         let es_vdx_per_second =
             ES_VDX_PER_SECOND.safe_mul(10u64.pow(self.vdx_pool.decimals as u32))? as u64;
-        let total =
-            es_vdx_per_second.safe_mul((now - self.mint_es_vdx_last_timestamp) as u64)? as u64;
+        let total = es_vdx_per_second.safe_mul(seconds)? as u64;
 
         let vdx_pool_amount = total
             .safe_mul(ES_VDX_PERCENTAGE_FOR_VDX_POOL as u64)?
@@ -680,8 +679,6 @@ impl Dex {
         self.vdx_pool.add_es_vdx(vdx_pool_amount)?;
         self.vlp_pool.add_es_vdx(vlp_pool_amount)?;
 
-        self.mint_es_vdx_last_timestamp = now;
-
         Ok(())
     }
 
@@ -689,7 +686,14 @@ impl Dex {
         &mut self,
         oracles: &[AccountInfo],
         price_feed: &PriceFeed,
+        force: bool,
     ) -> DexResult<u64> {
+        let now = get_timestamp()?;
+        let elapsed = now - self.update_rewards_last_timestamp;
+        if elapsed < UPDATE_REWARDS_PERIOD && !force {
+            return Ok(0);
+        }
+
         let (reward_asset_debt, rewards) = self.collect_rewards(oracles, price_feed)?;
 
         let vdx_rewards = rewards
@@ -700,7 +704,9 @@ impl Dex {
         self.vdx_pool.add_rewards(vdx_rewards)?;
         self.vlp_pool.add_rewards(vlp_rewards)?;
 
-        self.mint_es_vdx()?;
+        self.mint_es_vdx(elapsed as u64)?;
+
+        self.update_rewards_last_timestamp = now;
 
         Ok(reward_asset_debt)
     }

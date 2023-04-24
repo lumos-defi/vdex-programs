@@ -8,7 +8,9 @@ use crate::utils::{
     TEST_SOL_ORACLE_PRICE,
 };
 use context::DexTestContext;
-use dex_program::utils::{REWARD_PERCENTAGE_FOR_VDX_POOL, REWARD_SHARE_POW_DECIMALS};
+use dex_program::utils::{
+    REWARD_PERCENTAGE_FOR_VDX_POOL, REWARD_SHARE_POW_DECIMALS, UPDATE_REWARDS_PERIOD,
+};
 use solana_program_test::tokio;
 
 fn calc_rewards_per_share(total: u64, total_shares: u64) -> u64 {
@@ -22,6 +24,7 @@ fn calc_rewards(rewards_per_share: u64, shares: u64) -> u64 {
 #[tokio::test]
 async fn test_claim_rewards_same_share() {
     let dtc = DexTestContext::new_with_no_liquidity().await;
+    let anonymous = &dtc.user_context[5];
 
     // Four user have the same amount of VLP staked, they will have the same rewards.
     for i in 0..4 {
@@ -53,7 +56,7 @@ async fn test_claim_rewards_same_share() {
     }
 
     // Collect rewards
-    let anonymous = &dtc.user_context[5];
+    dtc.after(UPDATE_REWARDS_PERIOD).await;
     anonymous.compound().await.assert_ok();
 
     let expect_total_rewards = expected_open_fee / TEST_SOL_ORACLE_PRICE;
@@ -127,6 +130,7 @@ async fn test_claim_rewards_same_share() {
 #[tokio::test]
 async fn test_claim_rewards_different_share() {
     let dtc = DexTestContext::new_with_no_liquidity().await;
+    let anonymous = &dtc.user_context[5];
 
     // Four user have the 10 / 20 / 30 / 40 percent of VLP staked, check their rewards.
     for i in 0..4 {
@@ -158,7 +162,7 @@ async fn test_claim_rewards_different_share() {
     }
 
     // Collect rewards
-    let anonymous = &dtc.user_context[5];
+    dtc.after(UPDATE_REWARDS_PERIOD).await;
     anonymous.compound().await.assert_ok();
 
     let expect_total_rewards = expected_open_fee / TEST_SOL_ORACLE_PRICE;
@@ -253,6 +257,7 @@ async fn test_increment_rewards() {
     let expected_open_fee = 58.252427; // In usdc
     let increase_rewards = expected_open_fee / TEST_SOL_ORACLE_PRICE;
 
+    dtc.after(UPDATE_REWARDS_PERIOD).await;
     anonymous.compound().await.assert_ok(); // Collect rewards
 
     expect_total_rewards += increase_rewards;
@@ -288,6 +293,8 @@ async fn test_increment_rewards() {
     let increase_rewards = expected_open_fee * TEST_BTC_ORACLE_PRICE / TEST_SOL_ORACLE_PRICE;
     println!("increase rewards: {}", increase_rewards);
     anonymous.assert_fee(DexAsset::BTC, expected_open_fee).await;
+
+    dtc.after(UPDATE_REWARDS_PERIOD).await;
     anonymous.compound().await.assert_ok(); // Collect rewards
 
     expect_total_rewards += increase_rewards;
@@ -324,6 +331,8 @@ async fn test_increment_rewards() {
     let increase_rewards = expected_open_fee * TEST_ETH_ORACLE_PRICE / TEST_SOL_ORACLE_PRICE;
     println!("increase rewards: {}", increase_rewards);
     anonymous.assert_fee(DexAsset::ETH, expected_open_fee).await;
+
+    dtc.after(UPDATE_REWARDS_PERIOD).await;
     anonymous.compound().await.assert_ok(); // Collect rewards
 
     expect_total_rewards += increase_rewards;
