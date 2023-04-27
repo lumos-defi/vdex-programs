@@ -80,6 +80,7 @@ async fn test_four_user_single_compound() {
             user_es_vdx,
             es_vdx_for_vlp_pool(es_vdx(ES_VDX_PS_F * UPDATE_REWARDS_PERIOD as f64)) / 4
         );
+        dtc.advance_second().await;
     }
 
     // No es-vdx left in vlp pool
