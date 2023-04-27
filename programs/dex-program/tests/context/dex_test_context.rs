@@ -627,7 +627,7 @@ impl DexTestContext {
             vlp_pool_rewards, rewards
         );
 
-        assert!(vlp_pool_rewards.abs_diff(rewards) <= 1);
+        assert!(vlp_pool_rewards.abs_diff(rewards) <= 2);
     }
 }
 

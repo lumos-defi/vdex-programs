@@ -26,7 +26,7 @@ async fn test_claim_rewards_same_share() {
     let dtc = DexTestContext::new_with_no_liquidity().await;
     let anonymous = &dtc.user_context[5];
 
-    // Four user have the same amount of VLP staked, they will have the same rewards.
+    // Four users have the same amount of VLP staked, they will have the same share of rewards.
     for i in 0..4 {
         let user = &dtc.user_context[i];
         user.add_liquidity_with_sol(100.0).await;
@@ -132,7 +132,7 @@ async fn test_claim_rewards_different_share() {
     let dtc = DexTestContext::new_with_no_liquidity().await;
     let anonymous = &dtc.user_context[5];
 
-    // Four user have the 10 / 20 / 30 / 40 percent of VLP staked, check their rewards.
+    // Four users have the 10 / 20 / 30 / 40 percent of VLP staked respectively, check their rewards.
     for i in 0..4 {
         let user = &dtc.user_context[i];
         user.add_liquidity_with_sol(100.0 * (i + 1) as f64).await;
@@ -226,7 +226,7 @@ async fn test_increment_rewards() {
     let anonymous = &dtc.user_context[5];
     let alice = &dtc.user_context[4];
 
-    // Four user have the 10 / 20 / 30 / 40 percent of VLP staked, check their rewards.
+    // Four users have the 10 / 20 / 30 / 40 percent of VLP staked, rewards is increased by opening btc long, btc short and eth long positions, check users' rewards
     for i in 0..4 {
         let user = &dtc.user_context[i];
         user.add_liquidity_with_sol(100.0 * (i + 1) as f64).await;
@@ -363,4 +363,244 @@ async fn test_increment_rewards() {
         sol(expect_vlp_pool_rewards)
     );
     assert!(total_pending_rewards <= sol(expect_vlp_pool_rewards));
+}
+
+#[tokio::test]
+async fn test_claim_rewards_after_removing_liquidity() {
+    let dtc = DexTestContext::new_with_no_liquidity().await;
+    let alice = &dtc.user_context[4];
+    let anonymous = &dtc.user_context[5];
+
+    // Four users have the 10 / 20 / 30 / 40 percent of VLP staked. User0 removes its liquidity after having some rewards.
+    // Check if user0 can claim its rewards after removing liquidity.
+    for i in 0..4 {
+        let user = &dtc.user_context[i];
+        user.add_liquidity_with_sol(100.0 * (i + 1) as f64).await;
+        user.add_liquidity_with_usdc(10000. * (i + 1) as f64).await;
+    }
+
+    for i in 0..4 {
+        let user = &dtc.user_context[i];
+        user.assert_vlp(30000. * (i + 1) as f64).await;
+    }
+
+    //  Alice open short position, rewards generated.
+    alice.mint_usdc(2000.).await;
+    alice
+        .assert_open(DexAsset::USDC, DexMarket::BTC, false, 2000., 10 * 1000)
+        .await;
+    alice.assert_usdc_balance(0.).await;
+
+    let expected_open_fee = 58.252427;
+    alice.assert_fee(DexAsset::USDC, expected_open_fee).await;
+    dtc.assert_total_rewards(0).await;
+
+    for i in 0..4 {
+        let user = &dtc.user_context[i];
+        user.assert_rewards(0.).await;
+    }
+
+    // Collect rewards
+    dtc.after(UPDATE_REWARDS_PERIOD).await;
+    anonymous.compound().await.assert_ok();
+
+    let expect_total_rewards = expected_open_fee / TEST_SOL_ORACLE_PRICE;
+    let expect_vdx_pool_rewards =
+        expect_total_rewards * REWARD_PERCENTAGE_FOR_VDX_POOL as f64 / 100.;
+    let expect_vlp_pool_rewards = expect_total_rewards - expect_vdx_pool_rewards;
+
+    dtc.assert_total_rewards(sol(expect_total_rewards)).await;
+    dtc.assert_vdx_pool_rewards(sol(expect_vdx_pool_rewards))
+        .await;
+    dtc.assert_vlp_pool_rewards(sol(expect_vlp_pool_rewards))
+        .await;
+
+    let mut total_share = 0;
+    for i in 0..4 {
+        let user = &dtc.user_context[i];
+        let user_vlp = 30000. * (i + 1) as f64;
+        user.assert_vlp(user_vlp).await;
+        total_share += vlp(user_vlp);
+    }
+
+    // Check each user's pending rewards
+    let expect_rewards_per_share =
+        calc_rewards_per_share(sol(expect_vlp_pool_rewards), total_share);
+
+    for i in 0..4 {
+        let user = &dtc.user_context[i];
+        let user_vlp = 30000. * (i + 1) as f64;
+        let user_expect_rewards = calc_rewards(expect_rewards_per_share, vlp(user_vlp));
+
+        user.assert_pending_rewards(user_expect_rewards).await;
+    }
+
+    // User[0] remove liquidity
+    let user_0 = &dtc.user_context[0];
+    user_0.remove_liquidity_withdraw_usdc(30000.0).await;
+    user_0.assert_vlp(0.).await;
+
+    // User[0]'s pending rewards
+    let user_0_expect_rewards = calc_rewards(expect_rewards_per_share, vlp(30000.));
+    user_0.assert_pending_rewards(user_0_expect_rewards).await;
+
+    dtc.advance_second().await;
+
+    // Collect another rewards
+    alice.mint_usdc(2000.).await;
+    alice.assert_usdc_balance(2000.).await;
+    alice
+        .assert_open(DexAsset::USDC, DexMarket::BTC, false, 2000., 10 * 1000)
+        .await;
+
+    dtc.after(UPDATE_REWARDS_PERIOD + 10).await;
+    anonymous.compound().await.assert_ok();
+
+    // User[0] got no more rewards
+    user_0.assert_pending_rewards(user_0_expect_rewards).await;
+
+    // User[0] claim rewards
+    user_0
+        .claim_rewards(user_0_expect_rewards)
+        .await
+        .assert_ok();
+
+    // User[0] has no pending rewards
+    user_0.assert_pending_rewards(0).await;
+}
+
+#[tokio::test]
+async fn test_rewards_share_after_removing_liquidity() {
+    let dtc = DexTestContext::new_with_no_liquidity().await;
+    let alice = &dtc.user_context[4];
+    let anonymous = &dtc.user_context[5];
+
+    // Four user have the 10 / 20 / 30 / 40 percent of VLP staked, they shares the rewards.
+    // User0 remove liquidity.
+    // Check if user1-2-3 shares the rewards properly.
+    for i in 0..4 {
+        let user = &dtc.user_context[i];
+        user.add_liquidity_with_sol(100.0 * (i + 1) as f64).await;
+        user.add_liquidity_with_usdc(10000. * (i + 1) as f64).await;
+    }
+
+    for i in 0..4 {
+        let user = &dtc.user_context[i];
+        user.assert_vlp(30000. * (i + 1) as f64).await;
+    }
+
+    //  Alice open short position, rewards generated.
+    alice.mint_usdc(2000.).await;
+    alice
+        .assert_open(DexAsset::USDC, DexMarket::BTC, false, 2000., 10 * 1000)
+        .await;
+    alice.assert_usdc_balance(0.).await;
+
+    let expected_open_fee = 58.252427;
+    alice.assert_fee(DexAsset::USDC, expected_open_fee).await;
+    dtc.assert_total_rewards(0).await;
+
+    for i in 0..4 {
+        let user = &dtc.user_context[i];
+        user.assert_rewards(0.).await;
+    }
+
+    // Collect rewards
+    dtc.after(UPDATE_REWARDS_PERIOD).await;
+    anonymous.compound().await.assert_ok();
+
+    let expect_total_rewards = expected_open_fee / TEST_SOL_ORACLE_PRICE;
+    let expect_vdx_pool_rewards =
+        expect_total_rewards * REWARD_PERCENTAGE_FOR_VDX_POOL as f64 / 100.;
+    let expect_vlp_pool_rewards = expect_total_rewards - expect_vdx_pool_rewards;
+
+    dtc.assert_total_rewards(sol(expect_total_rewards)).await;
+    dtc.assert_vdx_pool_rewards(sol(expect_vdx_pool_rewards))
+        .await;
+    dtc.assert_vlp_pool_rewards(sol(expect_vlp_pool_rewards))
+        .await;
+
+    let mut total_share = 0;
+    for i in 0..4 {
+        let user = &dtc.user_context[i];
+        let user_vlp = 30000. * (i + 1) as f64;
+        user.assert_vlp(user_vlp).await;
+        total_share += vlp(user_vlp);
+    }
+
+    // Check each user's pending rewards
+    let expect_rewards_per_share =
+        calc_rewards_per_share(sol(expect_vlp_pool_rewards), total_share);
+
+    for i in 0..4 {
+        let user = &dtc.user_context[i];
+        let user_vlp: f64 = 30000. * (i + 1) as f64;
+        let user_expect_rewards = calc_rewards(expect_rewards_per_share, vlp(user_vlp));
+
+        user.assert_pending_rewards(user_expect_rewards).await;
+    }
+
+    dtc.assert_vlp_pool_rewards(sol(expect_vlp_pool_rewards))
+        .await;
+
+    // User[0] remove liquidity
+    let user_0 = &dtc.user_context[0];
+    user_0.remove_liquidity_withdraw_usdc(30000.0).await;
+    user_0.assert_vlp(0.).await;
+
+    // User[0]'s pending rewards
+    let user_0_expect_rewards = calc_rewards(expect_rewards_per_share, vlp(30000.));
+    user_0.assert_pending_rewards(user_0_expect_rewards).await;
+
+    dtc.advance_second().await;
+
+    // User[0]'s rewards is deducted from the the pool
+    dtc.assert_vlp_pool_rewards(sol(expect_vlp_pool_rewards) - user_0_expect_rewards)
+        .await;
+
+    // Collect another rewards
+    alice.mint_usdc(2000.).await;
+    alice.assert_usdc_balance(2000.).await;
+    alice
+        .assert_open(DexAsset::USDC, DexMarket::BTC, false, 2000., 10 * 1000)
+        .await;
+
+    dtc.after(UPDATE_REWARDS_PERIOD + 10).await;
+    anonymous.compound().await.assert_ok();
+
+    dtc.assert_vlp_pool_rewards(sol(expect_vlp_pool_rewards) * 2 - user_0_expect_rewards)
+        .await;
+
+    total_share = 0;
+    for i in 1..4 {
+        let user = &dtc.user_context[i];
+        let user_vlp = 30000. * (i + 1) as f64;
+        user.assert_vlp(user_vlp).await;
+        total_share += vlp(user_vlp);
+    }
+    assert_eq!(total_share, vlp(270000.));
+
+    let current_expect_rewards_per_share =
+        calc_rewards_per_share(sol(expect_vlp_pool_rewards), total_share);
+
+    // Check User[1..3]'s rewards
+    for i in 1..4 {
+        let user = &dtc.user_context[i];
+        let user_vlp: f64 = 30000. * (i + 1) as f64;
+        let last_expect_rewards = calc_rewards(expect_rewards_per_share, vlp(user_vlp));
+        let current_expect_rewards = calc_rewards(current_expect_rewards_per_share, vlp(user_vlp));
+
+        user.assert_pending_rewards(last_expect_rewards + current_expect_rewards)
+            .await;
+
+        user.claim_rewards(last_expect_rewards + current_expect_rewards)
+            .await
+            .assert_ok();
+        dtc.advance_second().await;
+    }
+
+    for i in 1..4 {
+        let user = &dtc.user_context[i];
+        user.assert_pending_rewards(0).await;
+    }
 }
