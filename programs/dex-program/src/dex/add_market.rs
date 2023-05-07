@@ -81,7 +81,7 @@ pub fn handler(
 
     let market_index = dex.markets_number as usize;
     if market_index == dex.markets.len() {
-        return Err(error!(DexError::InsufficientMarketIndex));
+        return Err(error!(DexError::InsufficientMarketSlots));
     }
 
     let market = MarketInfo {

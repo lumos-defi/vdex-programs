@@ -6,7 +6,7 @@ pub const SECONDS_PER_DAY: i64 = 3600 * 24;
 pub const MAX_ASSET_COUNT: usize = 16;
 pub const MAX_MARKET_COUNT: usize = 16;
 pub const MAX_USER_LIST_REMAINING_PAGES_COUNT: usize = 8;
-pub const MAX_PRICE_COUNT: usize = 5;
+pub const MAX_PRICE_COUNT: usize = 16;
 
 pub const DEX_MAGIC_NUMBER: u64 = 0x6666;
 pub const MOCK_ORACLE_MAGIC_NUMBER: u64 = 0x66667;

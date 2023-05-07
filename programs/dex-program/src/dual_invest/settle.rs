@@ -419,7 +419,7 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
         USER_LIST_MAGIC_BYTE,
         MountMode::ReadWrite,
     )
-    .map_err(|_| DexError::FailedInitializeUserList)?;
+    .map_err(|_| DexError::FailedMountUserList)?;
 
     update_user_serial_number(&user_list, us.borrow_mut(), ctx.accounts.user_state.key())
 }
