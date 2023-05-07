@@ -199,7 +199,7 @@ pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> De
         USER_LIST_MAGIC_BYTE,
         MountMode::ReadWrite,
     )
-    .map_err(|_| DexError::FailedInitializeUserList)?;
+    .map_err(|_| DexError::FailedMountUserList)?;
 
     di.borrow_mut().add_volume(id, size)?;
 

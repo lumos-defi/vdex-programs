@@ -113,7 +113,7 @@ pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexRes
     EventQueue::mount(&mut ctx.accounts.event_queue, false)?.initialize(true)?;
     SingleEventQueue::<MatchEvent>::mount(&mut ctx.accounts.match_queue, false)?
         .initialize()
-        .map_err(|_| DexError::FailedInitMatchQueue)?;
+        .map_err(|_| DexError::FailedInitializeMatchQueue)?;
 
     PagedList::<UserListItem>::mount(
         &mut ctx.accounts.user_list_entry_page,

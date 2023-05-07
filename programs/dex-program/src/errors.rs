@@ -2,7 +2,7 @@ use anchor_lang::{error_code, Result};
 
 #[error_code]
 pub enum DexError {
-    #[msg("Not initialized")]
+    #[msg("Account not initialized")]
     NotInitialized,
 
     #[msg("Invalid mint")]
@@ -20,8 +20,8 @@ pub enum DexError {
     #[msg("Duplicate asset")]
     DuplicateAsset,
 
-    #[msg("Insufficient asset index")]
-    InsufficientAssetIndex,
+    #[msg("Insufficient asset slots")]
+    InsufficientAssetSlots,
 
     #[msg("Invalid significant decimals")]
     InvalidSignificantDecimals,
@@ -30,7 +30,7 @@ pub enum DexError {
     DuplicateMarketName,
 
     #[msg("Insufficient market index")]
-    InsufficientMarketIndex,
+    InsufficientMarketSlots,
 
     #[msg("Already in use")]
     AlreadyInUse,
@@ -38,7 +38,7 @@ pub enum DexError {
     #[msg("Invalid index")]
     InvalidIndex,
 
-    #[msg("Mount Account failed")]
+    #[msg("Failed mount account")]
     FailedMountAccount,
 
     #[msg("Empty queue")]
@@ -65,11 +65,14 @@ pub enum DexError {
     #[msg("Failed initialize user list")]
     FailedInitializeUserList,
 
+    #[msg("Failed mount user list")]
+    FailedMountUserList,
+
     #[msg("Invalid user list entry page")]
     InvalidUserListEntryPage,
 
     #[msg(" Failed init match queue")]
-    FailedInitMatchQueue,
+    FailedInitializeMatchQueue,
 
     #[msg("Small list slot in use")]
     SmallListSlotInUse,
@@ -82,9 +85,6 @@ pub enum DexError {
 
     #[msg("Failed mount user state")]
     FailedMountUserState,
-
-    #[msg("Invalid PDA")]
-    InvalidPDA,
 
     #[msg("Invalid vault")]
     InvalidVault,
@@ -119,22 +119,10 @@ pub enum DexError {
     #[msg("Failed append to event queue")]
     FailedAppendEvent,
 
-    #[msg("Invalid Withdraw Amount")]
-    InvalidWithdrawAmount,
-
-    #[msg("Found no position")]
-    FoundNoPosition,
-
     #[msg("Need no liquidation")]
     RequireNoLiquidation,
 
-    #[msg("Invalid vlp mint")]
-    InvalidVlpMint,
-
-    #[msg("Invalid vlp mint authority")]
-    InvalidVlpMintAuthority,
-
-    #[msg("Position too small")]
+    #[msg("Collateral too small")]
     CollateralTooSmall,
 
     #[msg("Invalid position time")]
@@ -179,7 +167,7 @@ pub enum DexError {
     #[msg("Invalid RBTree node")]
     InvalidRBTNode,
 
-    #[msg("Page Linked List Error")]
+    #[msg("Page linked list Error")]
     PageLinkedListError,
 
     #[msg("Zero size order")]
@@ -194,12 +182,6 @@ pub enum DexError {
     #[msg("No free slot in order pool")]
     NoFreeSlotInOrderPool,
 
-    #[msg("Ask size too large")]
-    AskSizeTooLarge,
-
-    #[msg("Unclosing size too small")]
-    UnclosingSizeTooSmall,
-
     #[msg("Invalid order slot")]
     InvalidOrderSlot,
 
@@ -208,9 +190,6 @@ pub enum DexError {
 
     #[msg("Fail to append match event")]
     FailedAppendMatchEvent,
-
-    #[msg("User state mismatch")]
-    UserStateMismatch,
 
     #[msg("Order slot mismatch")]
     OrderSlotMismatch,
@@ -292,9 +271,6 @@ pub enum DexError {
 
     #[msg("Invalid admin or delegate")]
     InvalidAdminOrDelegate,
-
-    #[msg("Failed load price feed account")]
-    FailedLoadPriceFeed,
 
     #[msg("Invalid price feed")]
     InvalidPriceFeed,

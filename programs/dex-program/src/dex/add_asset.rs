@@ -81,7 +81,7 @@ pub fn handler(
     require_neq!(
         asset_index,
         dex.assets.len(),
-        DexError::InsufficientAssetIndex
+        DexError::InsufficientAssetSlots
     );
 
     let asset = AssetInfo {

@@ -123,11 +123,16 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         DexError::InvalidPriceFeed
     );
 
+    require!(market < dex.markets_number, DexError::InvalidMarketIndex);
+
     require!(
-        (market < dex.markets.len() as u8)
-            && dex.event_queue == ctx.accounts.event_queue.key()
-            && dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
-        DexError::InvalidMarketIndex
+        dex.event_queue == ctx.accounts.event_queue.key(),
+        DexError::InvalidEventQueue
+    );
+
+    require!(
+        dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
+        DexError::InvalidUserListEntryPage
     );
 
     let mi = &dex.markets[market as usize];
@@ -311,7 +316,7 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         USER_LIST_MAGIC_BYTE,
         MountMode::ReadWrite,
     )
-    .map_err(|_| DexError::FailedInitializeUserList)?;
+    .map_err(|_| DexError::FailedMountUserList)?;
 
     update_user_serial_number(&user_list, us.borrow_mut(), ctx.accounts.user_state.key())
 }
