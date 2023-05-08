@@ -8,7 +8,7 @@ use anchor_client::{
 use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
     accounts::{
-        AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClaimRewards,
+        AddAsset, AddLiquidity, AddMarket, AddUserPage, CancelAllOrders, CancelOrder, ClaimRewards,
         ClosePosition, Compound, Crank, CreateUserState, DiBuy, DiCreateOption, DiRemoveOption,
         DiSetAdmin, DiSetFeeRate, DiSetSettlePrice, DiSettle, DiUpdateOption, DiWithdrawSettled,
         FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, LimitAsk, LimitBid, OpenPosition,
@@ -1185,6 +1185,35 @@ pub async fn compose_set_liquidity_fee_rate_ix(
             add_fee_rate,
             remove_fee_rate,
         })
+        .instructions()
+        .unwrap()
+        .pop()
+        .unwrap()
+}
+
+pub fn compose_add_user_page_ix(
+    program: &Program,
+    payer: &Keypair,
+    dex: &Pubkey,
+    user_list_entry_page: &Pubkey,
+    user_list_remaining_pages: &[Pubkey],
+    new_page: &Pubkey,
+) -> Instruction {
+    let remaining_accounts: Vec<AccountMeta> = user_list_remaining_pages
+        .iter()
+        .map(|x| AccountMeta::new(*x, false))
+        .collect();
+
+    program
+        .request()
+        .accounts(AddUserPage {
+            dex: *dex,
+            page: *new_page,
+            authority: payer.pubkey(),
+            user_list_entry_page: *user_list_entry_page,
+        })
+        .args(dex_program::instruction::AddUserPage)
+        .accounts(remaining_accounts)
         .instructions()
         .unwrap()
         .pop()

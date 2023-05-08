@@ -5,15 +5,16 @@ use std::{
 };
 
 use crate::utils::{
-    assert_eq_with_dust, btc, convert_to_big_number, create_associated_token_account,
-    create_token_account, get_dex_info, get_keypair, get_price_feed_info, get_program,
-    get_token_balance, mint_tokens, set_add_liquidity, set_ask, set_bid, set_cancel,
-    set_cancel_all, set_claim_rewards, set_close, set_compound, set_crank, set_di_buy,
-    set_di_create, set_di_remove_option, set_di_set_settle_price, set_di_settle,
-    set_di_update_option, set_di_withdraw_settled, set_feed_mock_oracle, set_fill, set_market_swap,
-    set_open, set_redeem_vdx, set_remove_liquidity, set_stake_vdx, set_update_price,
-    set_user_state, set_withdraw_asset, transfer, usdc, DexAsset, DexMarket, MAX_ASSET_COUNT,
-    PRICE_FEED_DECIMALS, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
+    assert_eq_with_dust, btc, convert_to_big_number, create_account,
+    create_associated_token_account, create_token_account, get_dex_info, get_keypair,
+    get_price_feed_info, get_program, get_token_balance, mint_tokens, set_add_liquidity,
+    set_add_user_page, set_ask, set_bid, set_cancel, set_cancel_all, set_claim_rewards, set_close,
+    set_compound, set_crank, set_di_buy, set_di_create, set_di_remove_option,
+    set_di_set_settle_price, set_di_settle, set_di_update_option, set_di_withdraw_settled,
+    set_feed_mock_oracle, set_fill, set_market_swap, set_open, set_redeem_vdx,
+    set_remove_liquidity, set_stake_vdx, set_update_price, set_user_state, set_withdraw_asset,
+    transfer, usdc, DexAsset, DexMarket, MAX_ASSET_COUNT, PRICE_FEED_DECIMALS, TEST_SOL_DECIMALS,
+    TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{
@@ -2511,5 +2512,51 @@ impl UserTestContext {
         let total = self.pending_rewards().await;
 
         assert!(total.abs_diff(expect) <= 1);
+    }
+
+    pub async fn add_user_page(&self) -> DexResult {
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let mut remaining_pages: Vec<Pubkey> = Vec::new();
+
+        let dex = get_dex_info(&mut context.banks_client, self.dex).await;
+
+        for i in 0..dex.borrow().user_list_remaining_pages_number as usize {
+            let page = dex.borrow().user_list_remaining_pages[i];
+            remaining_pages.push(page);
+            println!("+++++++++++++++++---------------- {}", page.to_string());
+        }
+
+        let new_page = Keypair::new();
+        create_account(context, &self.admin, &new_page, 512)
+            .await
+            .assert_ok();
+
+        println!(
+            "+++++++++++++++++----------------new page: {}",
+            new_page.pubkey().to_string()
+        );
+
+        if let Ok(_) = set_add_user_page::setup(
+            context,
+            &self.program,
+            &self.admin,
+            &self.dex,
+            &self.dex_info.borrow().user_list_entry_page,
+            &remaining_pages,
+            &new_page.pubkey(),
+        )
+        .await
+        {
+            return Ok(());
+        } else {
+            return Err(error!(DexError::NotInitialized));
+        }
+    }
+
+    pub async fn assert_user_page_count(&self, count: u8) {
+        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
+
+        assert_eq!(di.borrow().user_list_remaining_pages_number, count);
     }
 }

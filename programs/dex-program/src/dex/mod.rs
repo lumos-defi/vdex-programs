@@ -1,5 +1,6 @@
 pub mod add_asset;
 pub mod add_market;
+pub mod add_user_page;
 pub mod event;
 pub mod feed_mock_oracle_price;
 pub mod init_dex;
@@ -12,6 +13,7 @@ pub mod update_price;
 
 pub use add_asset::*;
 pub use add_market::*;
+pub use add_user_page::*;
 pub use event::*;
 pub use feed_mock_oracle_price::*;
 pub use init_dex::*;
