@@ -38,3 +38,6 @@ pub const REWARD_PERCENTAGE_FOR_VDX_POOL: u32 = 30;
 
 pub const VESTING_PERIOD: u16 = 360;
 pub const UPDATE_REWARDS_PERIOD: i64 = 1800;
+
+pub const ASSET_VDX: u8 = u8::MAX;
+pub const ASSET_REWARDS: u8 = u8::MAX - 1;
