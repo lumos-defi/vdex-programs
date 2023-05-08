@@ -14,10 +14,7 @@ use super::Dex;
 
 #[derive(Accounts)]
 pub struct AddMarket<'info> {
-    #[account(
-        mut,
-        has_one = authority,
-    )]
+    #[account(mut, owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK
@@ -60,6 +57,11 @@ pub fn handler(
     let order_pool_entry_page = &mut ctx.accounts.order_pool_entry_page;
 
     let dex = &mut ctx.accounts.dex.load_mut()?;
+    require!(
+        dex.delegate == ctx.accounts.authority.key()
+            || dex.authority == ctx.accounts.authority.key(),
+        DexError::InvalidAdminOrDelegate
+    );
 
     let mut market_symbol: [u8; 16] = Default::default();
     let given_name = symbol.as_bytes();

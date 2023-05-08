@@ -10,10 +10,7 @@ use crate::{
 
 #[derive(Accounts)]
 pub struct AddAsset<'info> {
-    #[account(
-        mut,
-        has_one = authority,
-    )]
+    #[account(mut, owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
     /// CHECK: Mint asset to trade
@@ -62,6 +59,12 @@ pub fn handler(
     );
 
     let dex = &mut ctx.accounts.dex.load_mut()?;
+
+    require!(
+        dex.delegate == ctx.accounts.authority.key()
+            || dex.authority == ctx.accounts.authority.key(),
+        DexError::InvalidAdminOrDelegate
+    );
 
     let mut asset_symbol: [u8; 16] = Default::default();
     let given_name = symbol.as_bytes();

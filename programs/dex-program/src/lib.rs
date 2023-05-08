@@ -291,6 +291,10 @@ pub mod dex_program {
     ) -> DexResult {
         pool::set_fee_rate::handler(ctx, index, add_fee_rate, remove_fee_rate)
     }
+
+    pub fn set_delegate(ctx: Context<SetDelegate>) -> DexResult {
+        dex::set_delegate::handler(ctx)
+    }
 }
 
 #[derive(Accounts)]
