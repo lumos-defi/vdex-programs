@@ -2,10 +2,12 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, CloseAccount, Mint, MintTo, TokenAccount, Transfer};
 
 use crate::{
-    dex::{Dex, PriceFeed},
+    collections::EventQueue,
+    dex::{event::AppendEvent, Dex, PriceFeed},
     errors::DexError,
     errors::DexResult,
     user::UserState,
+    utils::ASSET_REWARDS,
 };
 
 #[derive(Accounts)]
@@ -106,6 +108,11 @@ pub fn handler(ctx: Context<ClaimRewards>, amount: u64) -> DexResult {
         &[ai.nonce],
     ];
 
+    require!(
+        dex.event_queue == ctx.accounts.event_queue.key(),
+        DexError::InvalidEventQueue
+    );
+
     let price_feed = &ctx.accounts.price_feed.load()?;
 
     let reward_asset_debt = dex.update_staking_pool(
@@ -170,6 +177,13 @@ pub fn handler(ctx: Context<ClaimRewards>, amount: u64) -> DexResult {
 
         let cpi_ctx = CpiContext::new(ctx.accounts.token_program.clone(), cpi_close);
         token::close_account(cpi_ctx)?;
+
+        // Save to event queue
+        let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)
+            .map_err(|_| DexError::FailedMountEventQueue)?;
+
+        let user_state_key = ctx.accounts.user_state.key().to_bytes();
+        event_queue.move_liquidity(user_state_key, false, ASSET_REWARDS, claimable, 0, 0)?;
     }
 
     Ok(())
