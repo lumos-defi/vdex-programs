@@ -10,7 +10,7 @@ use crate::{
 
 #[derive(Accounts)]
 pub struct StakeVdx<'info> {
-    #[account(mut)]
+    #[account(mut, owner = *program_id)]
     pub dex: AccountLoader<'info, Dex>,
 
     #[account(
