@@ -645,7 +645,7 @@ mod paged_linked_list_test_suite {
     #[test]
     fn test_append_success() {
         let bump = Bump::new();
-        let accounts = create_accounts(
+        let mut accounts = create_accounts(
             &[
                 LIST_HEAD_SIZE + USER_SLOT_SIZE,
                 PAGE_HEAD_SIZE + USER_SLOT_SIZE,
@@ -658,7 +658,7 @@ mod paged_linked_list_test_suite {
             list.new_slot().expect("when 2nd new slot");
         }
 
-        let new_accounts = create_accounts(
+        let mut new_accounts = create_accounts(
             &[
                 PAGE_HEAD_SIZE + USER_SLOT_SIZE,
                 PAGE_HEAD_SIZE + USER_SLOT_SIZE,
@@ -676,6 +676,20 @@ mod paged_linked_list_test_suite {
 
         list.new_slot().expect("when 3rd new slot");
         list.new_slot().expect("when 4th new slot");
+
+        let new_accounts_2 = create_accounts(&[PAGE_HEAD_SIZE + USER_SLOT_SIZE, 1024 * 16], &bump);
+        accounts.append(&mut new_accounts);
+
+        let list2 = PagedList::<UserSlot>::append_pages(
+            accounts.first().unwrap(),
+            &accounts[1..],
+            &new_accounts_2[..],
+            2,
+        )
+        .expect("when append pages");
+
+        list2.new_slot().expect("when 5th new slot");
+        list2.new_slot().expect("when 6th new slot");
     }
 
     #[test]

@@ -145,6 +145,7 @@ impl<'a, TSlot> Page<'a, TSlot> {
         THeader: PageHeader,
     {
         let account_raw_size = account.data_len();
+
         let account_ptr = try_borrow_mut_data_from_account(account)?;
         Page::internal_mount::<THeader>(
             account_ptr,
@@ -347,10 +348,18 @@ impl<'a, TSlot> PagedList<'a, TSlot> {
             magic_byte,
             MountMode::ReadWrite,
         )?;
-        get_offset_cast::<RemainingPageHeader>(0)(
-            list.pages.last().ok_or(Error::InvalidIndex)?.account_ptr,
-        )?
-        .next_page = *new_accounts.first().ok_or(Error::InvalidIndex)?.key;
+
+        if list.pages.len() == 1 {
+            get_offset_cast::<PagedListHeader>(0)(
+                list.pages.last().ok_or(Error::InvalidIndex)?.account_ptr,
+            )?
+            .next_page = *new_accounts.first().ok_or(Error::InvalidIndex)?.key;
+        } else {
+            get_offset_cast::<RemainingPageHeader>(0)(
+                list.pages.last().ok_or(Error::InvalidIndex)?.account_ptr,
+            )?
+            .next_page = *new_accounts.first().ok_or(Error::InvalidIndex)?.key;
+        }
 
         for i in 0..new_accounts.len() {
             let expected_next_page = if i == new_accounts.len() - 1 {
@@ -371,6 +380,7 @@ impl<'a, TSlot> PagedList<'a, TSlot> {
 
         let list_header = try_borrow_mut_data_from_account(first_account)
             .and_then(get_offset_cast::<PagedListHeader>(0))?;
+
         list_header.last_slot = PagedListIndex {
             page_no: list.pages.len() as u16,
             offset: list.pages.iter().last().ok_or(Error::InvalidIndex)?.count,
@@ -506,6 +516,7 @@ impl<'a, TSlot> PagedList<'a, TSlot> {
         } else {
             *remaining_accounts[0].key
         };
+
         let first_page_data = Page::<'a, TSlot>::mount::<PagedListHeader>(
             first_account,
             mount_mode,
@@ -513,6 +524,7 @@ impl<'a, TSlot> PagedList<'a, TSlot> {
             0,
             expected_next_page_for_first_page,
         )?;
+
         let mut ret = vec![first_page_data];
         for i in 0..remaining_accounts.len() {
             let expected_next_page = if i == remaining_accounts.len() - 1 {

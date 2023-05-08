@@ -167,7 +167,7 @@ pub enum DexError {
     #[msg("Invalid RBTree node")]
     InvalidRBTNode,
 
-    #[msg("Page linked list Error")]
+    #[msg("Page linked list error")]
     PageLinkedListError,
 
     #[msg("Zero size order")]
@@ -274,6 +274,12 @@ pub enum DexError {
 
     #[msg("Invalid price feed")]
     InvalidPriceFeed,
+
+    #[msg("Failed append user page")]
+    FailedAppendUserPage,
+
+    #[msg("Insufficient user page slots")]
+    InsufficientUserPageSlots,
 }
 
 pub type DexResult<T = ()> = Result<T>;
