@@ -8,7 +8,7 @@ use crate::{
         ES_VDX_PERCENTAGE_FOR_VDX_POOL, ES_VDX_PER_SECOND, FEE_RATE_BASE, FEE_RATE_DECIMALS,
         LEVERAGE_POW_DECIMALS, MAX_ASSET_COUNT, MAX_MARKET_COUNT, MAX_PRICE_COUNT,
         MAX_USER_LIST_REMAINING_PAGES_COUNT, REWARD_PERCENTAGE_FOR_VDX_POOL, UPDATE_REWARDS_PERIOD,
-        USD_POW_DECIMALS,
+        USD_POW_DECIMALS, VDX_TOTAL_SUPPLY,
     },
 };
 
@@ -31,6 +31,7 @@ pub struct Dex {
     pub user_list_entry_page: Pubkey,
     pub user_list_remaining_pages: [Pubkey; MAX_USER_LIST_REMAINING_PAGES_COUNT],
     pub update_rewards_last_timestamp: i64,
+    pub vdx_supply: u64,
     pub user_list_remaining_pages_number: u8,
     pub assets_number: u8,
     pub markets_number: u8,
@@ -662,19 +663,24 @@ impl Dex {
     }
 
     fn mint_es_vdx(&mut self, seconds: u64) -> DexResult {
-        // TODO: handle init & end situation
         if seconds == 0 {
             return Ok(());
         }
 
-        let es_vdx_per_second =
-            ES_VDX_PER_SECOND.safe_mul(10u64.pow(self.vdx_pool.decimals as u32))? as u64;
-        let total = es_vdx_per_second.safe_mul(seconds)? as u64;
+        let mut mint_amount = ES_VDX_PER_SECOND.safe_mul(seconds)? as u64;
+        if mint_amount.safe_add(self.vdx_supply)? > VDX_TOTAL_SUPPLY {
+            mint_amount = VDX_TOTAL_SUPPLY.safe_sub(self.vdx_supply)?;
+        }
 
-        let vdx_pool_amount = total
+        self.vdx_supply += mint_amount;
+        if mint_amount == 0 {
+            return Ok(());
+        }
+
+        let vdx_pool_amount = mint_amount
             .safe_mul(ES_VDX_PERCENTAGE_FOR_VDX_POOL as u64)?
             .safe_div(100)? as u64;
-        let vlp_pool_amount = total.safe_sub(vdx_pool_amount)?;
+        let vlp_pool_amount = mint_amount.safe_sub(vdx_pool_amount)?;
 
         self.vdx_pool.add_es_vdx(vdx_pool_amount)?;
         self.vlp_pool.add_es_vdx(vlp_pool_amount)?;

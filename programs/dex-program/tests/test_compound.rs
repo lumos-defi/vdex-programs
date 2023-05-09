@@ -3,7 +3,7 @@
 mod context;
 mod utils;
 
-use crate::utils::{es_vdx, TestResult, DAY};
+use crate::utils::{TestResult, DAY};
 use context::DexTestContext;
 use dex_program::utils::{
     ES_VDX_PERCENTAGE_FOR_VDX_POOL, ES_VDX_PER_SECOND, UPDATE_REWARDS_PERIOD, VESTING_PERIOD,
@@ -11,6 +11,10 @@ use dex_program::utils::{
 use solana_program_test::tokio;
 
 const ES_VDX_PS_F: f64 = ES_VDX_PER_SECOND as f64;
+
+fn es_vdx(size: f64) -> u64 {
+    size as u64
+}
 
 #[tokio::test]
 async fn test_es_vdx_minter() {

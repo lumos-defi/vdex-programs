@@ -71,6 +71,7 @@ pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexRes
     dex.di_option = ctx.accounts.di_option.key();
     dex.user_list_entry_page = ctx.accounts.user_list_entry_page.key();
     dex.update_rewards_last_timestamp = get_timestamp()?;
+    dex.vdx_supply = 0;
     dex.user_list_remaining_pages_number = 0;
     dex.assets_number = 0;
     dex.markets_number = 0;
@@ -98,6 +99,12 @@ pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexRes
         vdx_nonce == program_signer_nonce
             && ctx.accounts.vdx_program_signer.key() == program_signer,
         DexError::InvalidProgramSigner
+    );
+
+    require_eq!(
+        ctx.accounts.vdx_mint.decimals,
+        VLP_DECIMALS,
+        DexError::InvalidVDXDecimals
     );
 
     dex.vdx_pool.init(

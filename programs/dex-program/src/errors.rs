@@ -280,6 +280,9 @@ pub enum DexError {
 
     #[msg("Insufficient user page slots")]
     InsufficientUserPageSlots,
+
+    #[msg("Invalid vdx decimals")]
+    InvalidVDXDecimals,
 }
 
 pub type DexResult<T = ()> = Result<T>;

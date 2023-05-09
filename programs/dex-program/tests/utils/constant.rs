@@ -182,7 +182,3 @@ pub fn eth_i(size: f64) -> i64 {
 pub fn sol_i(size: f64) -> i64 {
     (size * (10u64.pow(TEST_SOL_DECIMALS as u32) as f64)) as i64
 }
-
-pub fn es_vdx(size: f64) -> u64 {
-    (size * (10u64.pow(TEST_USDC_DECIMALS as u32) as f64)) as u64
-}
