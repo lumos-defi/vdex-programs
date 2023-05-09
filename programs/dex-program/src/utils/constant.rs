@@ -31,7 +31,8 @@ pub const REWARD_SHARE_POW_DECIMALS: u64 = 10u64.pow(9 as u32);
 
 pub const VLP_DECIMALS: u8 = 6;
 pub const VDX_DECIMALS: u8 = 6;
-pub const ES_VDX_PER_SECOND: u64 = 500;
+pub const VDX_TOTAL_SUPPLY: u64 = 20000000 * 10u64.pow(VDX_DECIMALS as u32);
+pub const ES_VDX_PER_SECOND: u64 = 32000; // Carrying decimals
 
 pub const ES_VDX_PERCENTAGE_FOR_VDX_POOL: u32 = 50;
 pub const REWARD_PERCENTAGE_FOR_VDX_POOL: u32 = 30;
