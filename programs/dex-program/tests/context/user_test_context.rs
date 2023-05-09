@@ -1247,6 +1247,27 @@ impl UserTestContext {
         .unwrap()
     }
 
+    pub async fn collect_orders(&self) -> Vec<u8> {
+        let mut user_state_account = self.get_account(self.user_state).await;
+        let user_state_account_info: AccountInfo =
+            (&self.user_state, true, &mut user_state_account).into();
+
+        let us = UserState::mount(&user_state_account_info, true).unwrap();
+        let ref_us = us.borrow();
+
+        let di = self.dex_info.borrow();
+        let mut orders: Vec<u8> = vec![];
+        for market in 0..di.markets_number as usize {
+            let mut bid_orders = ref_us.collect_orders(market, true);
+            let mut ask_orders = ref_us.collect_orders(market, false);
+
+            orders.append(&mut bid_orders);
+            orders.append(&mut ask_orders);
+        }
+
+        orders
+    }
+
     pub async fn assert_bid_order(
         &self,
         in_asset: DexAsset,

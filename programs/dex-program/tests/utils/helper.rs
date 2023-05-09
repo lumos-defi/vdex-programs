@@ -144,7 +144,7 @@ pub async fn create_token_account(
     let rent = context.banks_client.get_rent().await.unwrap();
     let account_rent = rent.minimum_balance(spl_token::state::Account::LEN);
 
-    let mut transaction = Transaction::new_with_payer(
+    let transaction = Transaction::new_signed_with_payer(
         &[
             system_instruction::create_account(
                 &payer.pubkey(),
@@ -162,12 +162,13 @@ pub async fn create_token_account(
             .unwrap(),
         ],
         Some(&payer.pubkey()),
+        &[payer, account],
+        context.banks_client.get_latest_blockhash().await.unwrap(),
     );
-    transaction.sign(&[payer, account], context.last_blockhash);
 
     context
         .banks_client
-        .process_transaction(transaction)
+        .process_transaction_with_preflight(transaction)
         .await
         .map_err(|e| e.into())
 }
