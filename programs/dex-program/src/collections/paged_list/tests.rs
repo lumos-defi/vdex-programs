@@ -68,8 +68,11 @@ mod list_index_test_suite {
 #[cfg(test)]
 #[allow(dead_code)]
 mod paged_linked_list_test_suite {
+    use std::vec;
+
     use anchor_lang::prelude::AccountInfo;
     use bumpalo::Bump;
+    use rand::Rng;
 
     const LIST_HEAD_SIZE: u16 = std::mem::size_of::<PagedListHeader>() as u16;
     const PAGE_HEAD_SIZE: u16 = std::mem::size_of::<RemainingPageHeader>() as u16;
@@ -762,6 +765,54 @@ mod paged_linked_list_test_suite {
         match list.release_slot(slot.index()) {
             Ok(_) => panic!("should fail"),
             Err(err) => assert_eq!(err, Error::SlotNotInUse),
+        }
+    }
+
+    #[test]
+    fn test_multi_pages_random_release_slot() {
+        const SLOTS_PER_PAGE: u16 = 499;
+        let bump = Bump::new();
+        let mut accounts =
+            create_accounts(&[LIST_HEAD_SIZE + USER_SLOT_SIZE * SLOTS_PER_PAGE], &bump);
+        create_list(&accounts, 2, MountMode::Initialize);
+
+        let mut slot_index_table: Vec<u32> = vec![];
+
+        for page in 0..16 {
+            let list = create_list(&accounts, 2, MountMode::ReadWrite);
+            assert_eq!(list.into_iter().count(), 0);
+            let total_slots = (page + 1) * SLOTS_PER_PAGE;
+
+            for _ in 0..total_slots {
+                let slot = list.new_slot().expect("new slot");
+                slot_index_table.push(slot.index());
+            }
+            assert_eq!(list.into_iter().count(), total_slots as usize);
+            list.new_slot().expect_err("no more slot");
+
+            while list.into_iter().count() > 0 {
+                // Pick up random slot to release
+                let remove_index = rand::thread_rng().gen_range(0, slot_index_table.len());
+
+                let slot_index: u32 = slot_index_table.remove(remove_index);
+                list.release_slot(slot_index).expect("release slot");
+            }
+            assert_eq!(list.into_iter().count(), 0);
+            assert_eq!(slot_index_table.len(), 0);
+
+            // Append another page
+            let mut new_accounts =
+                create_accounts(&[PAGE_HEAD_SIZE + USER_SLOT_SIZE * SLOTS_PER_PAGE], &bump);
+
+            PagedList::<UserSlot>::append_pages(
+                accounts.first().unwrap(),
+                &accounts[1..],
+                &new_accounts[..],
+                2,
+            )
+            .expect("when append pages");
+
+            accounts.append(&mut new_accounts);
         }
     }
 }
