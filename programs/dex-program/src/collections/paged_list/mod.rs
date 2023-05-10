@@ -15,8 +15,8 @@ use std::mem::ManuallyDrop;
 
 const MAGIC_HEADER: u32 = 0xd1c34400;
 const NIL_LIST_INDEX: PagedListIndex = PagedListIndex {
-    page_no: 0xff,
-    offset: 0xff,
+    page_no: 0xffff,
+    offset: 0xffff,
 };
 const PAGE_NIL: Pubkey = Pubkey::new_from_array([0; 32]);
 
@@ -436,6 +436,9 @@ impl<'a, TSlot> PagedList<'a, TSlot> {
 
     pub fn release_slot(&self, index: u32) -> Result<(), Error> {
         let list_index = PagedListIndex::new(index);
+        if list_index == NIL_LIST_INDEX {
+            return Ok(());
+        }
         let header = get_offset_cast::<PagedListHeader>(0)(self.pages[0].account_ptr)?;
         if list_index >= header.last_slot {
             return Err(Error::InvalidIndex);

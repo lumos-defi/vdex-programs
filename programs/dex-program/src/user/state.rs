@@ -878,7 +878,6 @@ impl<'a> UserState<'a> {
         Ok(position)
     }
 
-    #[cfg(feature = "client-support")]
     pub fn has_position(&self) -> bool {
         for position in self.position_pool.into_iter() {
             if (position.data.long.size > 0) || (position.data.short.size > 0) {
@@ -1059,6 +1058,16 @@ impl<'a> UserState<'a> {
         options
     }
 
+    fn has_unsettled_di_option(&self) -> bool {
+        for o in self.di_option_pool.into_iter() {
+            if !o.data.settled {
+                return true;
+            }
+        }
+
+        false
+    }
+
     #[cfg(feature = "client-support")]
     pub fn collect_unsettled_di_options(&self) -> Vec<UserDIOption> {
         let mut options: Vec<UserDIOption> = vec![];
@@ -1160,6 +1169,10 @@ impl<'a> UserState<'a> {
         }
 
         return Err(error!(DexError::AssetNotExist));
+    }
+
+    pub fn release_user_list_slot(&self) -> bool {
+        !self.has_position() && !self.has_unsettled_di_option()
     }
 }
 

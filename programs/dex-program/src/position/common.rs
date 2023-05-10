@@ -3,7 +3,7 @@ use std::{
     cell::RefMut,
 };
 
-use anchor_lang::prelude::Pubkey;
+use anchor_lang::prelude::*;
 
 use crate::{
     collections::PagedList,
@@ -19,8 +19,19 @@ pub fn update_user_serial_number(
     user_pubkey: Pubkey,
 ) -> DexResult {
     user.borrow_mut().inc_serial_number();
-    let serial_number = user.borrow().serial_number();
 
+    if user.release_user_list_slot() {
+        user_list
+            .release_slot(user.borrow().meta.user_list_index)
+            .map_err(|e| {
+                msg!("{}", e.to_string());
+                DexError::FailedReleaseUserListSlot
+            })?;
+
+        return Ok(());
+    }
+
+    let serial_number = user.borrow().serial_number();
     if user.borrow().user_list_index() == NIL32 {
         let slot = user_list
             .new_slot()

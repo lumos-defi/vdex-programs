@@ -104,6 +104,9 @@ pub enum DexError {
     #[msg("Failed new user list slot")]
     FailedNewUserListSlot,
 
+    #[msg("Failed release user list slot")]
+    FailedReleaseUserListSlot,
+
     #[msg("Failed locate user list slot")]
     FailedLocateUserListSlot,
 
