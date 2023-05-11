@@ -10,7 +10,7 @@ use solana_program_test::tokio;
 
 #[tokio::test]
 async fn test_add_dex_user_page() {
-    let dtc = DexTestContext::new().await;
+    let dtc = DexTestContext::new_raw(true).await;
     let admin = &dtc.user_context[0];
 
     for i in 0..MAX_USER_LIST_REMAINING_PAGES_COUNT {

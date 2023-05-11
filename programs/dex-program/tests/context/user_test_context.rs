@@ -278,8 +278,12 @@ impl UserTestContext {
     pub async fn get_user_list_remaining_accounts(&self) -> Vec<AccountMeta> {
         let mut remaining_accounts: Vec<AccountMeta> = Vec::new();
 
-        for i in 0..self.dex_info.borrow().user_list_remaining_pages_number as usize {
-            let page = self.dex_info.borrow().user_list_remaining_pages[i];
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
+
+        let dex = get_dex_info(&mut context.banks_client, self.dex).await;
+
+        for i in 0..dex.borrow().user_list_remaining_pages_number as usize {
+            let page = dex.borrow().user_list_remaining_pages[i];
             remaining_accounts.append(&mut vec![AccountMeta::new(page, false)])
         }
 
@@ -401,6 +405,8 @@ impl UserTestContext {
         amount: f64,
         leverage: u32,
     ) -> Result<(), TransportError> {
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
+
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
         let ai = self.dex_info.borrow().assets[in_asset as usize];
@@ -425,8 +431,6 @@ impl UserTestContext {
         let market_oracle = mi.oracle;
 
         let user_state = self.user_state;
-
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
 
         set_open::setup(
             context,
@@ -485,6 +489,7 @@ impl UserTestContext {
         long: bool,
         size: f64,
     ) -> Result<(), TransportError> {
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
@@ -504,7 +509,6 @@ impl UserTestContext {
         let oracle = mi.oracle;
 
         let user_state = self.user_state;
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
 
         set_close::setup(
             context,
@@ -881,8 +885,8 @@ impl UserTestContext {
             .market_asset_as_ref(order.market, order.long)
             .assert_unwrap();
 
-        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
         let remaining_accounts = self.get_user_list_remaining_accounts().await;
+        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
         let out_mint = if order.open {
             in_asset.mint // don't care
@@ -1777,6 +1781,7 @@ impl UserTestContext {
         premium_rate: u16,
         size: u64,
     ) -> DexResult {
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
         let bai = self.dex_info.borrow().assets[base_asset_index as usize];
@@ -1784,7 +1789,6 @@ impl UserTestContext {
 
         let in_mint_info = if is_call { &bai } else { &qai };
         let user_state = self.user_state;
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
 
         if let Ok(_) = set_di_buy::setup(
             context,
@@ -1812,6 +1816,7 @@ impl UserTestContext {
     }
 
     pub async fn di_buy(&self, id: u64, premium_rate: u16, size: u64) -> DexResult {
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let option = self.di_read_option(id).await;
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
@@ -1820,7 +1825,6 @@ impl UserTestContext {
 
         let in_mint_info = if option.is_call { &bai } else { &qai };
         let user_state = self.user_state;
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
 
         if let Ok(_) = set_di_buy::setup(
             context,
@@ -1874,12 +1878,11 @@ impl UserTestContext {
             actual_settle_price <= option.strike_price
         };
 
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
         let bai = self.dex_info.borrow().assets[option.base_asset_index as usize];
         let qai = self.dex_info.borrow().assets[option.quote_asset_index as usize];
-
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
 
         let (user_state, _) = Pubkey::find_program_address(
             &[&self.dex.to_bytes(), &user.to_bytes()],
@@ -1940,6 +1943,7 @@ impl UserTestContext {
         let di = DI::mount_buf(di_account.data).unwrap();
         let di_ref = di.borrow();
 
+        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let option = self.di_find_option(user, created).await;
 
         let actual_settle_price = if let Ok(slot) = di_ref.find_option(option.id) {
@@ -1961,8 +1965,6 @@ impl UserTestContext {
 
         let bai = self.dex_info.borrow().assets[option.base_asset_index as usize];
         let qai = self.dex_info.borrow().assets[option.quote_asset_index as usize];
-
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
 
         let (user_state, _) = Pubkey::find_program_address(
             &[&self.dex.to_bytes(), &user.to_bytes()],
@@ -2545,18 +2547,12 @@ impl UserTestContext {
         for i in 0..dex.borrow().user_list_remaining_pages_number as usize {
             let page = dex.borrow().user_list_remaining_pages[i];
             remaining_pages.push(page);
-            println!("+++++++++++++++++---------------- {}", page.to_string());
         }
 
         let new_page = Keypair::new();
         create_account(context, &self.admin, &new_page, 512)
             .await
             .assert_ok();
-
-        println!(
-            "+++++++++++++++++----------------new page: {}",
-            new_page.pubkey().to_string()
-        );
 
         if let Ok(_) = set_add_user_page::setup(
             context,
