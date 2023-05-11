@@ -413,6 +413,11 @@ impl DexTestContext {
         let dtc = DexTestContext::new_raw(false).await;
         dtc.clear_liquidity_fee_rate().await;
 
+        // Add user list page (x2)
+        let user = &dtc.user_context[0];
+        user.add_user_page().await.assert_ok();
+        user.add_user_page().await.assert_ok();
+
         dtc
     }
 
