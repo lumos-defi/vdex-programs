@@ -297,6 +297,7 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
     event_queue.fill_position(
         user_state_key,
+        us.borrow().get_position_status(),
         market,
         PositionAct::Liquidate,
         long,

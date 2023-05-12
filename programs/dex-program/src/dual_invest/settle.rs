@@ -410,6 +410,7 @@ pub fn handler(ctx: Context<DiSettle>, created: u64, force: bool, settle_price: 
         fee,
         option.is_call,
         exercised,
+        us.borrow().get_position_status(),
     )?;
 
     // Update user

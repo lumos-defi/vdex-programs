@@ -344,6 +344,7 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
             // Save to event queue
             event_queue.fill_position(
                 user_state_key,
+                us.borrow().get_position_status(),
                 order.market,
                 PositionAct::Open,
                 order.long,
@@ -395,6 +396,7 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
         // Save to event queue
         event_queue.fill_position(
             user_state_key,
+            us.borrow().get_position_status(),
             order.market,
             PositionAct::Close,
             order.long,

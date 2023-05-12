@@ -5,10 +5,10 @@ use crate::dex::{state::*, StakingPool, UserStake};
 use crate::dual_invest::DIOption;
 use crate::errors::{DexError, DexResult};
 
-use crate::utils::VESTING_PERIOD;
 use crate::utils::{
     time::get_timestamp, SafeMath, NIL32, SECONDS_PER_DAY, USER_STATE_MAGIC_NUMBER,
 };
+use crate::utils::{MASK_DI_OPTION, MASK_PERP_POSITION, VESTING_PERIOD};
 use anchor_lang::prelude::*;
 use std::mem;
 
@@ -1173,6 +1173,20 @@ impl<'a> UserState<'a> {
 
     pub fn release_user_list_slot(&self) -> bool {
         !self.has_position() && !self.has_unsettled_di_option()
+    }
+
+    pub fn get_position_status(&self) -> u8 {
+        let mut status = 0u8;
+
+        if self.has_position() {
+            status |= MASK_PERP_POSITION;
+        }
+
+        if self.has_unsettled_di_option() {
+            status |= MASK_DI_OPTION;
+        }
+
+        status
     }
 }
 
