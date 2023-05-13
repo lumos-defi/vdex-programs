@@ -3,15 +3,12 @@ use anchor_lang::solana_program::program_option::COption::Some as CSome;
 use anchor_spl::token::{Mint, TokenAccount};
 
 use crate::{
-    collections::{EventQueue, MountMode, PagedList, SingleEventQueue},
+    collections::{EventQueue, SingleEventQueue},
     dex::state::*,
     dual_invest::DI,
     errors::{DexError, DexResult},
     order::MatchEvent,
-    utils::{
-        get_timestamp, DEX_MAGIC_NUMBER, PRICE_FEED_MAGIC_NUMBER, USER_LIST_MAGIC_BYTE,
-        VLP_DECIMALS,
-    },
+    utils::{get_timestamp, DEX_MAGIC_NUMBER, PRICE_FEED_MAGIC_NUMBER, VLP_DECIMALS},
 };
 
 #[derive(Accounts)]
@@ -32,10 +29,6 @@ pub struct InitDex<'info> {
     /// CHECK
     #[account(mut, constraint= match_queue.owner == program_id)]
     pub match_queue: UncheckedAccount<'info>,
-
-    /// CHECK
-    #[account(mut, constraint= user_list_entry_page.owner == program_id)]
-    pub user_list_entry_page: UncheckedAccount<'info>,
 
     /// CHECK:
     pub vdx_program_signer: AccountInfo<'info>,
@@ -69,7 +62,6 @@ pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexRes
     dex.match_queue = ctx.accounts.match_queue.key();
     dex.usdc_mint = ctx.accounts.usdc_mint.key();
     dex.di_option = ctx.accounts.di_option.key();
-    dex.user_list_entry_page = ctx.accounts.user_list_entry_page.key();
     dex.update_rewards_last_timestamp = get_timestamp()?;
     dex.vdx_supply = 0;
     dex.user_list_remaining_pages_number = 0;
@@ -121,14 +113,6 @@ pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexRes
     SingleEventQueue::<MatchEvent>::mount(&mut ctx.accounts.match_queue, false)?
         .initialize()
         .map_err(|_| DexError::FailedInitializeMatchQueue)?;
-
-    PagedList::<UserListItem>::mount(
-        &mut ctx.accounts.user_list_entry_page,
-        &[],
-        USER_LIST_MAGIC_BYTE,
-        MountMode::Initialize,
-    )
-    .map_err(|_| DexError::FailedInitializeUserList)?;
 
     let price_feed = &mut ctx.accounts.price_feed.load_init()?;
     price_feed.magic = PRICE_FEED_MAGIC_NUMBER;

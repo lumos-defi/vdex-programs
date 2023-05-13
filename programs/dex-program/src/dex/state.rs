@@ -7,8 +7,7 @@ use crate::{
         swap, time::get_timestamp, value, ISafeAddSub, ISafeMath, SafeMath, BORROW_FEE_RATE_BASE,
         ES_VDX_PERCENTAGE_FOR_VDX_POOL, ES_VDX_PER_SECOND, FEE_RATE_BASE, FEE_RATE_DECIMALS,
         LEVERAGE_POW_DECIMALS, MAX_ASSET_COUNT, MAX_MARKET_COUNT, MAX_PRICE_COUNT,
-        MAX_USER_LIST_REMAINING_PAGES_COUNT, REWARD_PERCENTAGE_FOR_VDX_POOL, UPDATE_REWARDS_PERIOD,
-        USD_POW_DECIMALS, VDX_TOTAL_SUPPLY,
+        REWARD_PERCENTAGE_FOR_VDX_POOL, UPDATE_REWARDS_PERIOD, USD_POW_DECIMALS, VDX_TOTAL_SUPPLY,
     },
 };
 
@@ -28,8 +27,6 @@ pub struct Dex {
     pub usdc_mint: Pubkey,
     pub di_option: Pubkey,
     pub price_feed: Pubkey,
-    pub user_list_entry_page: Pubkey,
-    pub user_list_remaining_pages: [Pubkey; MAX_USER_LIST_REMAINING_PAGES_COUNT],
     pub update_rewards_last_timestamp: i64,
     pub vdx_supply: u64,
     pub user_list_remaining_pages_number: u8,
