@@ -2,13 +2,11 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
 
 use crate::{
-    collections::{MountMode, PagedList},
-    dex::{get_price, Dex, PriceFeed, UserListItem},
+    dex::{get_price, Dex, PriceFeed},
     dual_invest::DI,
     errors::{DexError, DexResult},
-    position::update_user_serial_number,
     user::UserState,
-    utils::{get_timestamp, swap, SafeMath, FEE_RATE_BASE, USER_LIST_MAGIC_BYTE},
+    utils::{get_timestamp, swap, SafeMath, FEE_RATE_BASE},
 };
 
 #[derive(Accounts)]
@@ -45,22 +43,12 @@ pub struct DiBuy<'info> {
     pub token_program: AccountInfo<'info>,
 
     /// CHECK
-    #[account(mut, constraint= user_list_entry_page.owner == program_id)]
-    pub user_list_entry_page: UncheckedAccount<'info>,
-
-    /// CHECK
     #[account(owner = *program_id)]
     pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
-// Layout of remaining accounts:
-//  offset 0 ~ n: user_list remaining pages
 pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
-    require!(
-        dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
-        DexError::InvalidUserListEntryPage
-    );
 
     require!(
         dex.price_feed == ctx.accounts.price_feed.key(),
@@ -192,16 +180,7 @@ pub fn handler(ctx: Context<DiBuy>, id: u64, premium_rate: u16, size: u64) -> De
     us.borrow_mut()
         .di_new_option(&option, size, borrow_base_funds, borrow_quote_funds)?;
 
-    // Update user
-    let user_list = PagedList::<UserListItem>::mount(
-        &ctx.accounts.user_list_entry_page,
-        &ctx.remaining_accounts,
-        USER_LIST_MAGIC_BYTE,
-        MountMode::ReadWrite,
-    )
-    .map_err(|_| DexError::FailedMountUserList)?;
-
     di.borrow_mut().add_volume(id, size)?;
 
-    update_user_serial_number(&user_list, us.borrow_mut(), ctx.accounts.user_state.key())
+    Ok(())
 }
