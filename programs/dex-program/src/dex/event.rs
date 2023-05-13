@@ -27,7 +27,7 @@ impl PositionAct {
 #[cfg_attr(feature = "client-support", derive(Serialize))]
 pub struct PositionFilled {
     pub user_state: [u8; 32],
-
+    pub position_status: u8,
     pub price: u64,
     pub size: u64,
     pub collateral: u64,
@@ -67,6 +67,7 @@ impl PackedEvent for LiquidityMoved {
 #[cfg_attr(feature = "client-support", derive(Serialize))]
 pub struct AssetSwapped {
     pub user_state: [u8; 32],
+
     pub in_mint: [u8; 32],
     pub out_mint: [u8; 32],
     pub in_amount: u64,
@@ -95,6 +96,7 @@ pub struct DIOptionSettled {
     pub fee: u64,
     pub is_call: bool,
     pub exercised: bool,
+    pub position_status: u8,
 }
 
 impl PackedEvent for DIOptionSettled {
@@ -122,6 +124,7 @@ pub trait AppendEvent {
     fn fill_position(
         &mut self,
         user_state: [u8; 32],
+        position_status: u8,
         market: u8,
         action: PositionAct,
         long: bool,
@@ -172,6 +175,7 @@ pub trait AppendEvent {
         fee: u64,
         is_call: bool,
         exercised: bool,
+        position_status: u8,
     ) -> DexResult;
 
     #[allow(clippy::too_many_arguments)]
@@ -192,6 +196,7 @@ impl AppendEvent for EventQueue<'_> {
     fn fill_position(
         &mut self,
         user_state: [u8; 32],
+        position_status: u8,
         market: u8,
         action: PositionAct,
         long: bool,
@@ -207,6 +212,7 @@ impl AppendEvent for EventQueue<'_> {
 
         let event = PositionFilled {
             user_state,
+            position_status,
             price,
             size,
             collateral,
@@ -323,9 +329,11 @@ impl AppendEvent for EventQueue<'_> {
         fee: u64,
         is_call: bool,
         exercised: bool,
+        position_status: u8,
     ) -> DexResult {
         let event = DIOptionSettled {
             user_state,
+            position_status,
             base_mint,
             quote_mint,
             option_id,

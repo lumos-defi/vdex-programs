@@ -157,6 +157,7 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
     let user_state_key = ctx.accounts.user_state.key().to_bytes();
     event_queue.fill_position(
         user_state_key,
+        us.borrow().get_position_status(),
         market,
         PositionAct::Close,
         long,
