@@ -1,13 +1,11 @@
 use crate::{
-    collections::{EventQueue, MountMode, PagedList},
+    collections::EventQueue,
     dex::{
         event::{AppendEvent, PositionAct},
-        get_price, Dex, PriceFeed, UserListItem,
+        get_price, Dex, PriceFeed,
     },
     errors::{DexError, DexResult},
-    position::update_user_serial_number,
     user::state::*,
-    utils::USER_LIST_MAGIC_BYTE,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Transfer};
@@ -45,10 +43,6 @@ pub struct ClosePosition<'info> {
     pub event_queue: UncheckedAccount<'info>,
 
     /// CHECK
-    #[account(mut, constraint= user_list_entry_page.owner == program_id)]
-    pub user_list_entry_page: UncheckedAccount<'info>,
-
-    /// CHECK
     #[account(executable, constraint = (token_program.key == &token::ID))]
     pub token_program: AccountInfo<'info>,
 
@@ -57,8 +51,6 @@ pub struct ClosePosition<'info> {
     pub price_feed: AccountLoader<'info, PriceFeed>,
 }
 
-// Layout of remaining accounts:
-//  offset 0 ~ n: user_list remaining pages
 pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
 
@@ -70,18 +62,8 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
     );
 
     require!(
-        dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
-        DexError::InvalidUserListEntryPage
-    );
-
-    require!(
         dex.price_feed == ctx.accounts.price_feed.key(),
         DexError::InvalidPriceFeed
-    );
-
-    require!(
-        dex.user_list_remaining_pages_number as usize == ctx.remaining_accounts.len(),
-        DexError::InvalidRemainingAccounts
     );
 
     let mi = &dex.markets[market as usize];
@@ -170,14 +152,5 @@ pub fn handler(ctx: Context<ClosePosition>, market: u8, long: bool, size: u64) -
         pnl,
     )?;
 
-    // Update user list
-    let user_list = PagedList::<UserListItem>::mount(
-        &ctx.accounts.user_list_entry_page,
-        &ctx.remaining_accounts,
-        USER_LIST_MAGIC_BYTE,
-        MountMode::ReadWrite,
-    )
-    .map_err(|_| DexError::FailedMountUserList)?;
-
-    update_user_serial_number(&user_list, us.borrow_mut(), ctx.accounts.user_state.key())
+    Ok(())
 }
