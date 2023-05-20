@@ -5,16 +5,15 @@ use std::{
 };
 
 use crate::utils::{
-    assert_eq_with_dust, btc, convert_to_big_number, create_account,
-    create_associated_token_account, create_token_account, get_dex_info, get_keypair,
-    get_price_feed_info, get_program, get_token_balance, mint_tokens, set_add_liquidity,
-    set_add_user_page, set_ask, set_bid, set_cancel, set_cancel_all, set_claim_rewards, set_close,
-    set_compound, set_crank, set_di_buy, set_di_create, set_di_remove_option,
-    set_di_set_settle_price, set_di_settle, set_di_update_option, set_di_withdraw_settled,
-    set_feed_mock_oracle, set_fill, set_market_swap, set_open, set_redeem_vdx,
-    set_remove_liquidity, set_stake_vdx, set_update_price, set_user_state, set_withdraw_asset,
-    transfer, usdc, DexAsset, DexMarket, MAX_ASSET_COUNT, PRICE_FEED_DECIMALS, TEST_SOL_DECIMALS,
-    TEST_USDC_DECIMALS,
+    assert_eq_with_dust, btc, convert_to_big_number, create_associated_token_account,
+    create_token_account, get_dex_info, get_keypair, get_price_feed_info, get_program,
+    get_token_balance, mint_tokens, set_add_liquidity, set_ask, set_bid, set_cancel,
+    set_cancel_all, set_claim_rewards, set_close, set_compound, set_crank, set_di_buy,
+    set_di_create, set_di_remove_option, set_di_set_settle_price, set_di_settle,
+    set_di_update_option, set_di_withdraw_settled, set_feed_mock_oracle, set_fill, set_market_swap,
+    set_open, set_redeem_vdx, set_remove_liquidity, set_stake_vdx, set_update_price,
+    set_user_state, set_withdraw_asset, transfer, usdc, DexAsset, DexMarket, MAX_ASSET_COUNT,
+    PRICE_FEED_DECIMALS, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{
@@ -182,22 +181,16 @@ impl UserTestContext {
     pub async fn mock_btc_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::BTC as u8, price)
             .await;
-        // self.feed_asset_mock_oracle_price(self.asset_index("BTC"), price)
-        //     .await
     }
 
     pub async fn mock_eth_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::ETH as u8, price)
             .await;
-        // self.feed_asset_mock_oracle_price(self.asset_index("ETH"), price)
-        //     .await
     }
 
     pub async fn mock_sol_price(&self, price: f64) {
         self.feed_market_mock_oracle_price(DexMarket::SOL as u8, price)
             .await;
-        // self.feed_asset_mock_oracle_price(self.asset_index("SOL"), price)
-        //     .await
     }
 
     pub async fn generate_random_user(&self) -> Keypair {
@@ -245,19 +238,6 @@ impl UserTestContext {
         remaining_accounts
     }
 
-    pub async fn get_market_oracle_remaining_accounts(&self) -> Vec<AccountMeta> {
-        let mut remaining_accounts: Vec<AccountMeta> = Vec::new();
-
-        //process dex market oracle account
-        for market in &self.dex_info.borrow().markets {
-            if market.valid {
-                remaining_accounts.append(&mut vec![AccountMeta::new(market.oracle, false)])
-            }
-        }
-
-        remaining_accounts
-    }
-
     pub async fn get_market_order_pool_remaining_accounts(&self, market: u8) -> Vec<AccountMeta> {
         let mut remaining_accounts: Vec<AccountMeta> = Vec::new();
 
@@ -270,21 +250,6 @@ impl UserTestContext {
                 mi.order_pool_remaining_pages[i],
                 false,
             )])
-        }
-
-        remaining_accounts
-    }
-
-    pub async fn get_user_list_remaining_accounts(&self) -> Vec<AccountMeta> {
-        let mut remaining_accounts: Vec<AccountMeta> = Vec::new();
-
-        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
-
-        let dex = get_dex_info(&mut context.banks_client, self.dex).await;
-
-        for i in 0..dex.borrow().user_list_remaining_pages_number as usize {
-            let page = dex.borrow().user_list_remaining_pages[i];
-            remaining_accounts.append(&mut vec![AccountMeta::new(page, false)])
         }
 
         remaining_accounts
@@ -405,8 +370,6 @@ impl UserTestContext {
         amount: f64,
         leverage: u32,
     ) -> Result<(), TransportError> {
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
-
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
         let ai = self.dex_info.borrow().assets[in_asset as usize];
@@ -446,9 +409,7 @@ impl UserTestContext {
             &market_oracle,
             &user_state,
             &di.event_queue,
-            &di.user_list_entry_page,
             &self.dex_info.borrow().price_feed,
-            remaining_accounts,
             market as u8,
             long,
             open_amount,
@@ -489,7 +450,6 @@ impl UserTestContext {
         long: bool,
         size: f64,
     ) -> Result<(), TransportError> {
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let di = self.dex_info.borrow();
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
@@ -521,9 +481,7 @@ impl UserTestContext {
             &program_signer,
             &user_state,
             &di.event_queue,
-            &di.user_list_entry_page,
             &self.dex_info.borrow().price_feed,
-            remaining_accounts,
             market as u8,
             long,
             close_size,
@@ -885,7 +843,6 @@ impl UserTestContext {
             .market_asset_as_ref(order.market, order.long)
             .assert_unwrap();
 
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
         let out_mint = if order.open {
@@ -913,9 +870,7 @@ impl UserTestContext {
             &out_mint,
             &di.match_queue,
             &di.event_queue,
-            &di.user_list_entry_page,
             &self.dex_info.borrow().price_feed,
-            remaining_accounts,
             create_user_mint_acc,
         )
         .await
@@ -1781,7 +1736,6 @@ impl UserTestContext {
         premium_rate: u16,
         size: u64,
     ) -> DexResult {
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
         let bai = self.dex_info.borrow().assets[base_asset_index as usize];
@@ -1800,9 +1754,7 @@ impl UserTestContext {
             &in_mint_info.mint,
             &in_mint_info.vault,
             &user_state,
-            &self.dex_info.borrow().user_list_entry_page,
             &self.dex_info.borrow().price_feed,
-            remaining_accounts,
             id,
             premium_rate,
             size,
@@ -1816,7 +1768,6 @@ impl UserTestContext {
     }
 
     pub async fn di_buy(&self, id: u64, premium_rate: u16, size: u64) -> DexResult {
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let option = self.di_read_option(id).await;
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
@@ -1836,9 +1787,7 @@ impl UserTestContext {
             &in_mint_info.mint,
             &in_mint_info.vault,
             &user_state,
-            &self.dex_info.borrow().user_list_entry_page,
             &self.dex_info.borrow().price_feed,
-            remaining_accounts,
             id,
             premium_rate,
             size,
@@ -1878,7 +1827,6 @@ impl UserTestContext {
             actual_settle_price <= option.strike_price
         };
 
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
         let bai = self.dex_info.borrow().assets[option.base_asset_index as usize];
@@ -1916,9 +1864,7 @@ impl UserTestContext {
             &mint_vault,
             &asset_program_signer,
             &self.dex_info.borrow().event_queue,
-            &self.dex_info.borrow().user_list_entry_page,
             &self.dex_info.borrow().price_feed,
-            remaining_accounts,
             created,
             force,
             settle_price,
@@ -1943,7 +1889,6 @@ impl UserTestContext {
         let di = DI::mount_buf(di_account.data).unwrap();
         let di_ref = di.borrow();
 
-        let remaining_accounts = self.get_user_list_remaining_accounts().await;
         let option = self.di_find_option(user, created).await;
 
         let actual_settle_price = if let Ok(slot) = di_ref.find_option(option.id) {
@@ -1998,9 +1943,7 @@ impl UserTestContext {
             &mint_vault,
             &asset_program_signer,
             &self.dex_info.borrow().event_queue,
-            &self.dex_info.borrow().user_list_entry_page,
             &self.dex_info.borrow().price_feed,
-            remaining_accounts,
             created,
             force,
             settle_price,
@@ -2535,45 +2478,5 @@ impl UserTestContext {
         let total = self.pending_rewards().await;
 
         assert!(total.abs_diff(expect) <= 1);
-    }
-
-    pub async fn add_user_page(&self) -> DexResult {
-        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
-
-        let mut remaining_pages: Vec<Pubkey> = Vec::new();
-
-        let dex = get_dex_info(&mut context.banks_client, self.dex).await;
-
-        for i in 0..dex.borrow().user_list_remaining_pages_number as usize {
-            let page = dex.borrow().user_list_remaining_pages[i];
-            remaining_pages.push(page);
-        }
-
-        let new_page = Keypair::new();
-        create_account(context, &self.admin, &new_page, 512)
-            .await
-            .assert_ok();
-
-        if let Ok(_) = set_add_user_page::setup(
-            context,
-            &self.program,
-            &self.admin,
-            &self.dex,
-            &self.dex_info.borrow().user_list_entry_page,
-            &remaining_pages,
-            &new_page.pubkey(),
-        )
-        .await
-        {
-            return Ok(());
-        } else {
-            return Err(error!(DexError::NotInitialized));
-        }
-    }
-
-    pub async fn assert_user_page_count(&self, count: u8) {
-        let di = get_dex_info(&mut self.context.borrow_mut().banks_client, self.dex).await;
-
-        assert_eq!(di.borrow().user_list_remaining_pages_number, count);
     }
 }
