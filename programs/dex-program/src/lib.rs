@@ -295,10 +295,6 @@ pub mod dex_program {
     pub fn set_delegate(ctx: Context<SetDelegate>) -> DexResult {
         dex::set_delegate::handler(ctx)
     }
-
-    pub fn add_user_page(ctx: Context<AddUserPage>) -> DexResult {
-        dex::add_user_page::handler(ctx)
-    }
 }
 
 #[derive(Accounts)]

@@ -6,7 +6,7 @@ use anchor_client::{
     },
     Program,
 };
-use anchor_lang::prelude::{AccountMeta, Pubkey};
+use anchor_lang::prelude::Pubkey;
 use solana_program_test::ProgramTestContext;
 use spl_associated_token_account::get_associated_token_address;
 
@@ -26,9 +26,7 @@ pub async fn setup(
     mint_vault: &Pubkey,
     asset_program_signer: &Pubkey,
     event_queue: &Pubkey,
-    user_list_entry_page: &Pubkey,
     price_feed: &Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
     created: u64,
     force: bool,
     settle_price: u64,
@@ -70,9 +68,7 @@ pub async fn setup(
         mint_vault,
         asset_program_signer,
         event_queue,
-        user_list_entry_page,
         price_feed,
-        remaining_accounts,
         created,
         force,
         settle_price,

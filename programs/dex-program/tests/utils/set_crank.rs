@@ -6,7 +6,7 @@ use anchor_client::{
     },
     Program,
 };
-use anchor_lang::prelude::{AccountMeta, Pubkey};
+use anchor_lang::prelude::Pubkey;
 use solana_program_test::ProgramTestContext;
 use spl_associated_token_account::get_associated_token_address;
 
@@ -32,9 +32,7 @@ pub async fn setup(
     out_mint: &Pubkey,
     match_queue: &Pubkey,
     event_queue: &Pubkey,
-    user_list_entry_page: &Pubkey,
     price_feed: &Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
     create_user_mint_acc: bool,
 ) -> Result<(), TransportError> {
     let user_wsol_acc = Keypair::new();
@@ -83,9 +81,7 @@ pub async fn setup(
         market_mint_program_signer,
         match_queue,
         event_queue,
-        user_list_entry_page,
         price_feed,
-        remaining_accounts,
     )
     .await;
 

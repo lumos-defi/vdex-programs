@@ -10,7 +10,6 @@ export async function createDex(authority: Keypair) {
   const dex = Keypair.generate()
   const eventQueue = Keypair.generate()
   const matchQueue = Keypair.generate()
-  const userListEntryPage = Keypair.generate()
   const diOption = Keypair.generate()
   const priceFeed = Keypair.generate()
   const rewardMint = TokenInstructions.WRAPPED_SOL_MINT
@@ -32,7 +31,6 @@ export async function createDex(authority: Keypair) {
 
   await createAccount(eventQueue, 128 * 1024)
   await createAccount(matchQueue, 128 * 1024)
-  await createAccount(userListEntryPage, 128 * 1024)
   await createAccount(diOption, 128 * 1024)
 
   await program.methods
@@ -43,7 +41,6 @@ export async function createDex(authority: Keypair) {
       authority: authority.publicKey,
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
-      userListEntryPage: userListEntryPage.publicKey,
       vdxProgramSigner,
       vdxMint: vdxMint.publicKey,
       vdxVault,

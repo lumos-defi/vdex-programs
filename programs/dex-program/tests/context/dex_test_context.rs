@@ -413,11 +413,6 @@ impl DexTestContext {
         let dtc = DexTestContext::new_raw(false).await;
         dtc.clear_liquidity_fee_rate().await;
 
-        // Add user list page (x2)
-        let user = &dtc.user_context[0];
-        user.add_user_page().await.assert_ok();
-        user.add_user_page().await.assert_ok();
-
         dtc
     }
 
@@ -807,7 +802,6 @@ pub async fn init_dex(
 ) {
     let event_queue = Keypair::new();
     let match_queue = Keypair::new();
-    let user_list_entry_page = Keypair::new();
     let di_option = Keypair::new();
     let price_feed = Keypair::new();
     let reward_mint = spl_token::native_mint::id();
@@ -815,7 +809,6 @@ pub async fn init_dex(
     let dex_account_size = 8 + mem::size_of::<Dex>();
     let event_queue_account_size = 16 * 1024;
     let match_queue_account_size = 16 * 1024;
-    let user_list_entry_page_account_size = 4 * 1024;
     let di_option_account_size = DI::required_account_size(64u8);
     let price_feed_account_size = 8 + mem::size_of::<PriceFeed>();
 
@@ -828,14 +821,7 @@ pub async fn init_dex(
     create_account(context, payer, &match_queue, match_queue_account_size)
         .await
         .assert_ok();
-    create_account(
-        context,
-        payer,
-        &user_list_entry_page,
-        user_list_entry_page_account_size,
-    )
-    .await
-    .assert_ok();
+
     create_account(context, payer, &di_option, di_option_account_size)
         .await
         .assert_ok();
@@ -850,7 +836,6 @@ pub async fn init_dex(
         &usdc_mint,
         &event_queue,
         &match_queue,
-        &user_list_entry_page,
         &di_option,
         &price_feed,
         &reward_mint,

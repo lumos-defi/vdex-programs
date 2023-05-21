@@ -1,14 +1,13 @@
 use crate::{
-    collections::{EventQueue, MountMode, PagedList, SingleEvent, SingleEventQueue},
+    collections::{EventQueue, SingleEvent, SingleEventQueue},
     dex::{
         event::{AppendEvent, PositionAct},
-        AssetInfo, Dex, Position, PriceFeed, UserListItem,
+        AssetInfo, Dex, Position, PriceFeed,
     },
     errors::{DexError, DexResult},
     order::MatchEvent,
-    position::update_user_serial_number,
     user::state::*,
-    utils::{SafeMath, USER_LIST_MAGIC_BYTE},
+    utils::SafeMath,
 };
 
 use anchor_lang::{prelude::*, system_program};
@@ -69,10 +68,6 @@ pub struct Crank<'info> {
     /// CHECK
     #[account(mut, constraint= event_queue.owner == program_id)]
     pub event_queue: UncheckedAccount<'info>,
-
-    /// CHECK
-    #[account(mut, constraint= user_list_entry_page.owner == program_id)]
-    pub user_list_entry_page: UncheckedAccount<'info>,
 
     /// CHECK
     #[account(executable, constraint = (token_program.key == &token::ID))]
@@ -185,16 +180,8 @@ fn withdraw_market_mint(
     Ok(())
 }
 
-/// Layout of remaining accounts:
-///  offset 0 ~ n: user_list remaining pages
 pub fn handler(ctx: Context<Crank>) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
-
-    require_eq!(
-        dex.user_list_remaining_pages_number as usize,
-        ctx.remaining_accounts.len(),
-        DexError::InvalidRemainingAccounts
-    );
 
     require!(
         dex.price_feed == ctx.accounts.price_feed.key(),
@@ -231,11 +218,6 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
     require!(
         dex.event_queue == ctx.accounts.event_queue.key(),
         DexError::InvalidEventQueue
-    );
-
-    require!(
-        dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
-        DexError::InvalidUserListEntryPage
     );
 
     let mi = &dex.markets[order.market as usize];
@@ -413,13 +395,6 @@ pub fn handler(ctx: Context<Crank>) -> DexResult {
     us.borrow_mut().unlink_order(data.user_order_slot, false)?;
 
     match_queue.remove_head()?;
-    let user_list = PagedList::<UserListItem>::mount(
-        &ctx.accounts.user_list_entry_page,
-        &ctx.remaining_accounts,
-        USER_LIST_MAGIC_BYTE,
-        MountMode::ReadWrite,
-    )
-    .map_err(|_| DexError::FailedMountUserList)?;
 
-    update_user_serial_number(&user_list, us.borrow_mut(), ctx.accounts.user_state.key())
+    Ok(())
 }

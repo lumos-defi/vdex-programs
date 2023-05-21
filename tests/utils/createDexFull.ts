@@ -48,7 +48,6 @@ export async function createDexFull(authority: Keypair) {
   const dex = Keypair.generate()
   const eventQueue = Keypair.generate()
   const matchQueue = Keypair.generate()
-  const userListEntryPage = Keypair.generate()
   const diOption = Keypair.generate()
 
   const orderBook = Keypair.generate()
@@ -71,7 +70,6 @@ export async function createDexFull(authority: Keypair) {
 
   await createAccount(eventQueue, 128 * 1024)
   await createAccount(matchQueue, 128 * 1024)
-  await createAccount(userListEntryPage, 128 * 1024)
   await createAccount(diOption, 128 * 1024)
 
   //init dex
@@ -83,7 +81,6 @@ export async function createDexFull(authority: Keypair) {
       authority: authority.publicKey,
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
-      userListEntryPage: userListEntryPage.publicKey,
       vdxProgramSigner,
       vdxMint: vdxMint.publicKey,
       vdxVault,
@@ -217,7 +214,6 @@ export async function createDexFull(authority: Keypair) {
     solNonce,
     authority,
     eventQueue,
-    userListEntryPage,
     orderBook,
     orderPoolEntryPage,
     MOCK_ORACLE_PRICE: BTC_ORACLE_PRICE,

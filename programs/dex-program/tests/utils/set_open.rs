@@ -6,7 +6,7 @@ use anchor_client::{
     },
     Program,
 };
-use anchor_lang::prelude::{AccountMeta, Pubkey};
+use anchor_lang::prelude::Pubkey;
 use solana_program_test::ProgramTestContext;
 use spl_associated_token_account::get_associated_token_address;
 
@@ -27,9 +27,7 @@ pub async fn setup(
     market_oracle: &Pubkey,
     user_state: &Pubkey,
     event_queue: &Pubkey,
-    user_list_entry_page: &Pubkey,
     price_feed: &Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
     market: u8,
     long: bool,
     amount: u64,
@@ -67,9 +65,7 @@ pub async fn setup(
         &user_mint_acc,
         user_state,
         event_queue,
-        user_list_entry_page,
         price_feed,
-        remaining_accounts,
         market,
         long,
         amount,

@@ -2,13 +2,12 @@ use crate::{
     collections::{EventQueue, MountMode, OrderBook, PagedList},
     dex::{
         event::{AppendEvent, PositionAct},
-        get_price, Dex, PriceFeed, UserListItem,
+        get_price, Dex, PriceFeed,
     },
     errors::{DexError, DexResult},
     order::{select_side, Order},
-    position::update_user_serial_number,
     user::state::*,
-    utils::{SafeMath, ORDER_POOL_MAGIC_BYTE, USER_LIST_MAGIC_BYTE},
+    utils::{SafeMath, ORDER_POOL_MAGIC_BYTE},
 };
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::token::{self, CloseAccount, TokenAccount, Transfer};
@@ -56,10 +55,6 @@ pub struct LiquidatePosition<'info> {
     /// CHECK
     #[account(mut, constraint= event_queue.owner == program_id)]
     pub event_queue: UncheckedAccount<'info>,
-
-    /// CHECK
-    #[account(mut, constraint= user_list_entry_page.owner == program_id)]
-    pub user_list_entry_page: UncheckedAccount<'info>,
 
     /// CHECK
     #[account(executable, constraint = (token_program.key == &token::ID))]
@@ -114,7 +109,6 @@ fn relay_native_mint_to_user(ctx: &Context<LiquidatePosition>, lamports: u64) ->
 
 // Layout of remaining accounts:
 //  offset 0 ~ m: order pool remaining pages
-//  offset m + 1 ~ n: user list remaining pages
 pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexResult {
     let dex = &mut ctx.accounts.dex.load_mut()?;
 
@@ -130,11 +124,6 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         DexError::InvalidEventQueue
     );
 
-    require!(
-        dex.user_list_entry_page == ctx.accounts.user_list_entry_page.key(),
-        DexError::InvalidUserListEntryPage
-    );
-
     let mi = &dex.markets[market as usize];
     require!(
         mi.valid
@@ -146,8 +135,7 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
 
     // Check remaining accounts
     require_eq!(
-        mi.order_pool_remaining_pages_number as usize
-            + dex.user_list_remaining_pages_number as usize,
+        mi.order_pool_remaining_pages_number as usize,
         ctx.remaining_accounts.len(),
         DexError::InvalidRemainingAccounts
     );
@@ -156,14 +144,6 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         require_eq!(
             mi.order_pool_remaining_pages[i],
             ctx.remaining_accounts[i].key(),
-            DexError::InvalidRemainingAccounts
-        );
-    }
-    let offset = mi.order_pool_remaining_pages_number as usize;
-    for i in 0..dex.user_list_remaining_pages_number as usize {
-        require_eq!(
-            dex.user_list_remaining_pages[i],
-            ctx.remaining_accounts[offset + i].key(),
             DexError::InvalidRemainingAccounts
         );
     }
@@ -258,7 +238,7 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
     let order_book = OrderBook::mount(&ctx.accounts.order_book, true)?;
     let order_pool = PagedList::<Order>::mount(
         &ctx.accounts.order_pool_entry_page,
-        &ctx.remaining_accounts[0..offset],
+        &ctx.remaining_accounts[0..],
         ORDER_POOL_MAGIC_BYTE,
         MountMode::ReadWrite,
     )
@@ -310,14 +290,5 @@ pub fn handler(ctx: Context<LiquidatePosition>, market: u8, long: bool) -> DexRe
         pnl,
     )?;
 
-    // Update user list
-    let user_list = PagedList::<UserListItem>::mount(
-        &ctx.accounts.user_list_entry_page,
-        &ctx.remaining_accounts[offset..],
-        USER_LIST_MAGIC_BYTE,
-        MountMode::ReadWrite,
-    )
-    .map_err(|_| DexError::FailedMountUserList)?;
-
-    update_user_serial_number(&user_list, us.borrow_mut(), ctx.accounts.user_state.key())
+    Ok(())
 }

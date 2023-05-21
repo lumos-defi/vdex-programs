@@ -14,7 +14,6 @@ describe('Init Dex', () => {
   let authority: Keypair
   let eventQueue: Keypair
   let matchQueue: Keypair
-  let userListEntryPage: Keypair
   let diOption: Keypair
   let priceFeed: Keypair
 
@@ -30,7 +29,6 @@ describe('Init Dex', () => {
     dex = Keypair.generate()
     eventQueue = Keypair.generate()
     matchQueue = Keypair.generate()
-    userListEntryPage = Keypair.generate()
     diOption = Keypair.generate()
     priceFeed = Keypair.generate()
 
@@ -54,7 +52,6 @@ describe('Init Dex', () => {
   it('should init dex account successfully', async () => {
     await createAccount(eventQueue, 128 * 1024)
     await createAccount(matchQueue, 128 * 1024)
-    await createAccount(userListEntryPage, 128 * 1024)
     await createAccount(diOption, 128 * 1024)
 
     await program.methods
@@ -65,7 +62,6 @@ describe('Init Dex', () => {
         authority: authority.publicKey,
         eventQueue: eventQueue.publicKey,
         matchQueue: matchQueue.publicKey,
-        userListEntryPage: userListEntryPage.publicKey,
         vdxProgramSigner,
         vdxMint: vdxMint.publicKey,
         vdxVault,
@@ -87,7 +83,6 @@ describe('Init Dex', () => {
       authority: authority.publicKey,
       eventQueue: eventQueue.publicKey,
       matchQueue: matchQueue.publicKey,
-      userListEntryPage: userListEntryPage.publicKey,
       usdcMint: usdcMint,
       assets: expect.arrayContaining([
         expect.objectContaining({

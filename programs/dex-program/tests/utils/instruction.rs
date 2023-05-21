@@ -8,7 +8,7 @@ use anchor_client::{
 use anchor_lang::prelude::{AccountMeta, Pubkey};
 use dex_program::{
     accounts::{
-        AddAsset, AddLiquidity, AddMarket, AddUserPage, CancelAllOrders, CancelOrder, ClaimRewards,
+        AddAsset, AddLiquidity, AddMarket, CancelAllOrders, CancelOrder, ClaimRewards,
         ClosePosition, Compound, Crank, CreateUserState, DiBuy, DiCreateOption, DiRemoveOption,
         DiSetAdmin, DiSetFeeRate, DiSetSettlePrice, DiSettle, DiUpdateOption, DiWithdrawSettled,
         FeedMockOraclePrice, FillOrder, InitDex, InitMockOracle, LimitAsk, LimitBid, OpenPosition,
@@ -28,7 +28,6 @@ pub async fn compose_init_dex_ixs(
     usdc_mint: &Keypair,
     event_queue: &Keypair,
     match_queue: &Keypair,
-    user_list_entry_page: &Keypair,
     di_option: &Keypair,
     price_feed: &Keypair,
     reward_mint: &Pubkey,
@@ -46,7 +45,6 @@ pub async fn compose_init_dex_ixs(
             authority: payer.pubkey(),
             event_queue: event_queue.pubkey(),
             match_queue: match_queue.pubkey(),
-            user_list_entry_page: user_list_entry_page.pubkey(),
             vdx_program_signer: *vdx_program_signer,
             vdx_mint: *vdx_mint,
             vdx_vault: *vdx_vault,
@@ -337,9 +335,7 @@ pub async fn compose_open_market_position_ix(
     user_mint_acc: &Pubkey,
     user_state: &Pubkey,
     event_queue: &Pubkey,
-    user_list_entry_page: &Pubkey,
     price_feed: &Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
     market: u8,
     long: bool,
     amount: u64,
@@ -360,11 +356,9 @@ pub async fn compose_open_market_position_ix(
             user_state: *user_state,
             authority: payer.pubkey(),
             event_queue: *event_queue,
-            user_list_entry_page: *user_list_entry_page,
             token_program: spl_token::id(),
             price_feed: *price_feed,
         })
-        .accounts(remaining_accounts)
         .args(dex_program::instruction::OpenPosition {
             market,
             long,
@@ -387,9 +381,7 @@ pub async fn compose_close_market_position_ix(
     user_mint_acc: &Pubkey,
     user_state: &Pubkey,
     event_queue: &Pubkey,
-    user_list_entry_page: &Pubkey,
     price_feed: &Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
     market: u8,
     long: bool,
     size: u64,
@@ -405,11 +397,9 @@ pub async fn compose_close_market_position_ix(
             user_state: *user_state,
             authority: payer.pubkey(),
             event_queue: *event_queue,
-            user_list_entry_page: *user_list_entry_page,
             token_program: spl_token::id(),
             price_feed: *price_feed,
         })
-        .accounts(remaining_accounts)
         .args(dex_program::instruction::ClosePosition { market, long, size })
         .instructions()
         .unwrap()
@@ -558,9 +548,7 @@ pub async fn compose_crank_ix(
     market_mint_program_signer: &Pubkey,
     match_queue: &Pubkey,
     event_queue: &Pubkey,
-    user_list_entry_page: &Pubkey,
     price_feed: &Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
 ) -> Instruction {
     program
         .request()
@@ -579,13 +567,11 @@ pub async fn compose_crank_ix(
             market_mint_program_signer: *market_mint_program_signer,
             match_queue: *match_queue,
             event_queue: *event_queue,
-            user_list_entry_page: *user_list_entry_page,
             authority: payer.pubkey(),
             token_program: spl_token::id(),
             system_program: system_program::id(),
             price_feed: *price_feed,
         })
-        .accounts(remaining_accounts)
         .args(dex_program::instruction::Crank {})
         .instructions()
         .unwrap()
@@ -864,9 +850,7 @@ pub async fn compose_di_buy_ix(
     in_mint_vault: &Pubkey,
     user_mint_acc: &Pubkey,
     user_state: &Pubkey,
-    user_list_entry_page: &Pubkey,
     price_feed: &Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
     id: u64,
     premium_rate: u16,
     size: u64,
@@ -880,12 +864,10 @@ pub async fn compose_di_buy_ix(
             in_mint_vault: *in_mint_vault,
             user_mint_acc: *user_mint_acc,
             user_state: *user_state,
-            user_list_entry_page: *user_list_entry_page,
             authority: payer.pubkey(),
             token_program: spl_token::id(),
             price_feed: *price_feed,
         })
-        .accounts(remaining_accounts)
         .args(dex_program::instruction::DiBuy {
             id,
             premium_rate,
@@ -909,9 +891,7 @@ pub async fn compose_di_settle_ix(
     mint_vault: &Pubkey,
     asset_program_signer: &Pubkey,
     event_queue: &Pubkey,
-    user_list_entry_page: &Pubkey,
     price_feed: &Pubkey,
-    remaining_accounts: Vec<AccountMeta>,
     created: u64,
     force: bool,
     settle_price: u64,
@@ -928,13 +908,11 @@ pub async fn compose_di_settle_ix(
             mint_vault: *mint_vault,
             asset_program_signer: *asset_program_signer,
             event_queue: *event_queue,
-            user_list_entry_page: *user_list_entry_page,
             authority: payer.pubkey(),
             token_program: spl_token::id(),
             system_program: system_program::id(),
             price_feed: *price_feed,
         })
-        .accounts(remaining_accounts)
         .args(dex_program::instruction::DiSettle {
             created,
             force,
@@ -1185,35 +1163,6 @@ pub async fn compose_set_liquidity_fee_rate_ix(
             add_fee_rate,
             remove_fee_rate,
         })
-        .instructions()
-        .unwrap()
-        .pop()
-        .unwrap()
-}
-
-pub fn compose_add_user_page_ix(
-    program: &Program,
-    payer: &Keypair,
-    dex: &Pubkey,
-    user_list_entry_page: &Pubkey,
-    user_list_remaining_pages: &[Pubkey],
-    new_page: &Pubkey,
-) -> Instruction {
-    let remaining_accounts: Vec<AccountMeta> = user_list_remaining_pages
-        .iter()
-        .map(|x| AccountMeta::new(*x, false))
-        .collect();
-
-    program
-        .request()
-        .accounts(AddUserPage {
-            dex: *dex,
-            page: *new_page,
-            authority: payer.pubkey(),
-            user_list_entry_page: *user_list_entry_page,
-        })
-        .args(dex_program::instruction::AddUserPage)
-        .accounts(remaining_accounts)
         .instructions()
         .unwrap()
         .pop()
