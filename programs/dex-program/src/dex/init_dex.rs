@@ -73,10 +73,9 @@ pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexRes
         Pubkey::default(),
         Pubkey::default(),
         Pubkey::default(),
-        ctx.accounts.reward_mint.key(),
+        Pubkey::default(), // Update: Reward is also VLP
         u8::MAX,
         VLP_DECIMALS,
-        u8::MAX, // Will be updated when reward asset is added
     );
 
     let (program_signer, program_signer_nonce) = Pubkey::find_program_address(
@@ -106,7 +105,6 @@ pub fn handler(ctx: Context<InitDex>, vdx_nonce: u8, di_fee_rate: u16) -> DexRes
         ctx.accounts.reward_mint.key(),
         vdx_nonce,
         ctx.accounts.vdx_mint.decimals,
-        u8::MAX, // Will be updated when reward asset is added
     );
 
     EventQueue::mount(&mut ctx.accounts.event_queue, false)?.initialize(true)?;

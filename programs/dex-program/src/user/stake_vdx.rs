@@ -107,12 +107,11 @@ pub fn handler(ctx: Context<StakeVdx>, amount: u64) -> DexResult {
 
     let price_feed = &ctx.accounts.price_feed.load()?;
 
-    let reward_asset_debt = dex.update_staking_pool(
+    dex.update_staking_pool(
         &ctx.remaining_accounts[0..assets_oracles_len],
         price_feed,
         true,
     )?;
-    require!(reward_asset_debt == 0, DexError::InsufficientSolLiquidity);
 
     let vdx_vested = us.borrow_mut().stake_and_compound_vdx(&mut dex, amount)?;
     if vdx_vested > 0 {

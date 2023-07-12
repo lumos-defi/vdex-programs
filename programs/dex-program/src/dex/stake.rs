@@ -13,10 +13,10 @@ pub struct StakingPool {
     pub reward_mint: Pubkey,
     pub reward_total: u64,
     pub staked_total: u64,
-    pub accumulate_reward_per_share: u64,
+    pub accumulate_reward_per_share: u64, // Reward is VLP
     pub es_vdx_total: u64,
     pub accumulate_es_vdx_per_share: u64,
-    pub reward_asset_index: u8,
+    pub reward_asset_index: u8, // obsolete
     pub decimals: u8,
     pub nonce: u8,
     pub padding: [u8; 69],
@@ -31,7 +31,6 @@ impl StakingPool {
         reward_mint: Pubkey,
         nonce: u8,
         decimals: u8,
-        reward_asset_index: u8,
     ) {
         self.mint = mint;
         self.vault = vault;
@@ -40,7 +39,6 @@ impl StakingPool {
         self.decimals = decimals;
         self.nonce = nonce;
         self.decimals = decimals;
-        self.reward_asset_index = reward_asset_index;
 
         self.reward_total = 0;
         self.staked_total = 0;

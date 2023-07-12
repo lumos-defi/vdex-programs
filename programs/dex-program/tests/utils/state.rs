@@ -7,6 +7,7 @@ pub enum DexMarket {
     SOL = 2,
 }
 
+#[derive(Clone, Copy)]
 pub enum DexAsset {
     USDC = 0,
     BTC = 1,
