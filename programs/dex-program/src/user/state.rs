@@ -1,7 +1,7 @@
 use std::cell::{RefCell, RefMut};
 
 use crate::collections::small_list::*;
-use crate::dex::{state::*, StakingPool, UserStake};
+use crate::dex::{state::*, UserStake};
 use crate::dual_invest::DIOption;
 use crate::errors::{DexError, DexResult};
 
