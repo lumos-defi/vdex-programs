@@ -8,12 +8,12 @@ use crate::utils::{
     assert_eq_with_dust, btc, convert_to_big_number, create_associated_token_account,
     create_token_account, get_dex_info, get_keypair, get_price_feed_info, get_program,
     get_token_balance, mint_tokens, set_add_liquidity, set_ask, set_bid, set_cancel,
-    set_cancel_all, set_claim_rewards, set_close, set_compound, set_crank, set_di_buy,
-    set_di_create, set_di_remove_option, set_di_set_settle_price, set_di_settle,
-    set_di_update_option, set_di_withdraw_settled, set_feed_mock_oracle, set_fill, set_market_swap,
-    set_open, set_redeem_vdx, set_remove_liquidity, set_stake_vdx, set_update_price,
-    set_user_state, set_withdraw_asset, transfer, usdc, DexAsset, DexMarket, MAX_ASSET_COUNT,
-    PRICE_FEED_DECIMALS, TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
+    set_cancel_all, set_close, set_compound, set_crank, set_di_buy, set_di_create,
+    set_di_remove_option, set_di_set_settle_price, set_di_settle, set_di_update_option,
+    set_di_withdraw_settled, set_feed_mock_oracle, set_fill, set_market_swap, set_open,
+    set_redeem_vdx, set_remove_liquidity, set_stake_vdx, set_update_price, set_user_state,
+    set_withdraw_asset, transfer, usdc, DexAsset, DexMarket, MAX_ASSET_COUNT, PRICE_FEED_DECIMALS,
+    TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{
@@ -2359,38 +2359,6 @@ impl UserTestContext {
             &self.dex_info.borrow().event_queue,
             &self.dex_info.borrow().vdx_pool.mint,
             &self.dex_info.borrow().vdx_pool.program_signer,
-            &self.dex_info.borrow().vdx_pool.vault,
-            remaining_accounts,
-            amount,
-        )
-        .await
-        {
-            return Ok(());
-        } else {
-            return Err(error!(DexError::NotInitialized));
-        }
-    }
-
-    pub async fn claim_rewards(&self, amount: u64) -> DexResult {
-        let reward_asset_index = self.dex_info.borrow().vdx_pool.reward_asset_index;
-        let ai = self.dex_info.borrow().assets[reward_asset_index as usize];
-
-        let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
-
-        let remaining_accounts = self.get_asset_oracle_remaining_accounts().await;
-
-        if let Ok(_) = set_claim_rewards::setup(
-            context,
-            &self.program,
-            &self.user,
-            &self.dex,
-            &ai.vault,
-            &ai.program_signer,
-            &self.user_state,
-            &self.dex_info.borrow().event_queue,
-            &self.dex_info.borrow().price_feed,
-            &self.dex_info.borrow().vdx_pool.program_signer,
-            &self.dex_info.borrow().vdx_pool.mint,
             &self.dex_info.borrow().vdx_pool.vault,
             remaining_accounts,
             amount,

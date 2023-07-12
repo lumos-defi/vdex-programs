@@ -888,16 +888,35 @@ impl<'a> UserState<'a> {
         return false;
     }
 
-    pub fn enter_staking_vlp(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult {
-        self.meta.vlp.enter_staking(pool, amount)
+    pub fn enter_staking_vlp(&mut self, dex: &mut Dex, amount: u64) -> DexResult {
+        let rewards_of_vlp_pool = self.meta.vlp.withdraw_reward(&mut dex.vlp_pool, u64::MAX)?;
+        let rewards_of_vdx_pool = self.meta.vlp.withdraw_reward(&mut dex.vdx_pool, u64::MAX)?;
+
+        self.meta.vlp.enter_staking(
+            &mut dex.vlp_pool,
+            amount + rewards_of_vlp_pool + rewards_of_vdx_pool,
+        )
     }
 
-    pub fn leave_staking_vlp(&mut self, pool: &mut StakingPool, amount: u64) -> DexResult<u64> {
-        self.meta.vlp.leave_staking(pool, amount)
+    pub fn leave_staking_vlp(&mut self, dex: &mut Dex, amount: u64) -> DexResult<u64> {
+        let rewards_of_vlp_pool = self.meta.vlp.withdraw_reward(&mut dex.vlp_pool, u64::MAX)?;
+        let rewards_of_vdx_pool = self.meta.vlp.withdraw_reward(&mut dex.vdx_pool, u64::MAX)?;
+
+        self.meta
+            .vlp
+            .enter_staking(&mut dex.vlp_pool, rewards_of_vlp_pool + rewards_of_vdx_pool)?;
+
+        self.meta.vlp.leave_staking(&mut dex.vlp_pool, amount)
     }
 
-    pub fn withdrawable_vlp_amount(&self, amount: u64) -> u64 {
-        self.meta.vlp.staked.min(amount)
+    pub fn withdrawable_vlp_amount(&self, dex: &mut Dex, amount: u64) -> DexResult<u64> {
+        let base_vlp = self.meta.vlp.staked;
+        let rewards_of_vlp_pool = self.meta.vlp.pending_reward(&mut dex.vlp_pool)?;
+        let rewards_of_vdx_pool = self.meta.vlp.pending_reward(&mut dex.vdx_pool)?;
+
+        let withdrawable = base_vlp + rewards_of_vlp_pool + rewards_of_vdx_pool;
+
+        Ok(withdrawable.min(amount))
     }
 
     pub fn stake_and_compound_vdx(&mut self, dex: &mut Dex, vdx_staked: u64) -> DexResult<u64> {
@@ -922,21 +941,6 @@ impl<'a> UserState<'a> {
         let redeemable = self.meta.vdx.leave_staking(&mut dex.vdx_pool, amount)?;
 
         Ok((vdx_vested, redeemable))
-    }
-
-    pub fn claim_rewards(&mut self, dex: &mut Dex, amount: u64) -> DexResult<(u64, u64)> {
-        let vdx_vested = self.stake_and_compound_vdx(dex, 0)?;
-
-        let amount_from_vdx_pool = self.meta.vdx.withdraw_reward(&mut dex.vdx_pool, amount)?;
-        let amount_from_vlp_pool = self
-            .meta
-            .vlp
-            .withdraw_reward(&mut dex.vlp_pool, amount.safe_sub(amount_from_vdx_pool)?)?;
-
-        Ok((
-            vdx_vested,
-            amount_from_vdx_pool.safe_add(amount_from_vlp_pool)?,
-        ))
     }
 
     pub fn di_new_option(

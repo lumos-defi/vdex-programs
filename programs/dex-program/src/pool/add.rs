@@ -53,7 +53,7 @@ pub struct AddLiquidity<'info> {
 //    market index price oracle account
 // })
 pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
-    let dex = &mut ctx.accounts.dex.load_mut()?;
+    let mut dex = &mut ctx.accounts.dex.load_mut()?;
 
     let assets_oracles_len = dex.assets.iter().filter(|a| a.valid).count();
     let expected_oracles_len = assets_oracles_len + dex.markets.iter().filter(|m| m.valid).count();
@@ -99,8 +99,7 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
         dex.add_liquidity(index, amount, true, &ctx.remaining_accounts, price_feed)?;
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    us.borrow_mut()
-        .enter_staking_vlp(&mut dex.vlp_pool, vlp_amount)?;
+    us.borrow_mut().enter_staking_vlp(&mut dex, vlp_amount)?;
 
     // Save to event queue
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)

@@ -279,10 +279,6 @@ pub mod dex_program {
         user::redeem_vdx::handler(ctx, amount)
     }
 
-    pub fn claim_rewards(ctx: Context<ClaimRewards>, amount: u64) -> DexResult {
-        user::claim_rewards::handler(ctx, amount)
-    }
-
     pub fn set_liquidity_fee_rate(
         ctx: Context<SetLiquidityFeeRate>,
         index: u8,
