@@ -56,13 +56,19 @@ pub struct RedeemVdx<'info> {
 // dex.assets.map({
 //   asset index price oracle account
 // })
+// dex.markets.map({
+//    market index price oracle account
+// })
 pub fn handler(ctx: Context<RedeemVdx>, amount: u64) -> DexResult {
     let mut dex = &mut ctx.accounts.dex.load_mut()?;
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
 
     let assets_oracles_len = dex.assets.iter().filter(|a| a.valid).count();
-    require!(
-        assets_oracles_len == ctx.remaining_accounts.len(),
+    let expected_oracles_len = assets_oracles_len + dex.markets.iter().filter(|m| m.valid).count();
+
+    require_eq!(
+        expected_oracles_len,
+        ctx.remaining_accounts.len(),
         DexError::InvalidRemainingAccounts
     );
 
@@ -107,12 +113,7 @@ pub fn handler(ctx: Context<RedeemVdx>, amount: u64) -> DexResult {
 
     let price_feed = &ctx.accounts.price_feed.load()?;
 
-    let reward_asset_debt = dex.update_staking_pool(
-        &ctx.remaining_accounts[0..assets_oracles_len],
-        price_feed,
-        true,
-    )?;
-    require!(reward_asset_debt == 0, DexError::InsufficientSolLiquidity);
+    dex.update_staking_pool(&ctx.remaining_accounts, price_feed, true)?;
 
     let (vdx_vested, redeemable) = us.borrow_mut().redeem_vdx(&mut dex, amount)?;
 

@@ -57,7 +57,7 @@ pub struct RemoveLiquidity<'info> {
 //    market index price oracle account
 // })
 pub fn handler(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
-    let dex = &mut ctx.accounts.dex.load_mut()?;
+    let mut dex = &mut ctx.accounts.dex.load_mut()?;
 
     let assets_oracles_len = dex.assets.iter().filter(|a| a.valid).count();
     let expected_oracles_len = assets_oracles_len + dex.markets.iter().filter(|m| m.valid).count();
@@ -89,12 +89,14 @@ pub fn handler(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
         ctx.accounts.dex.to_account_info().key.as_ref(),
         &[ai.nonce],
     ];
+    let price_feed = &ctx.accounts.price_feed.load()?;
+
+    dex.update_staking_pool(&ctx.remaining_accounts, price_feed, true)?;
+
     let signer = &[&seeds[..]];
 
     let us = UserState::mount(&ctx.accounts.user_state, true)?;
-    let actual_vlp_amount = us.borrow().withdrawable_vlp_amount(vlp_amount);
-
-    let price_feed = &ctx.accounts.price_feed.load()?;
+    let actual_vlp_amount = us.borrow().withdrawable_vlp_amount(&mut dex, vlp_amount)?;
 
     let (withdraw, fee) = dex.remove_liquidity(
         index,
@@ -119,16 +121,8 @@ pub fn handler(ctx: Context<RemoveLiquidity>, vlp_amount: u64) -> DexResult {
         token::transfer(cpi_ctx, withdraw)?;
     }
 
-    // Update rewards
-    let reward_asset_debt = dex.update_staking_pool(
-        &ctx.remaining_accounts[0..assets_oracles_len],
-        price_feed,
-        true,
-    )?;
-    require!(reward_asset_debt == 0, DexError::InsufficientSolLiquidity);
-
     us.borrow_mut()
-        .leave_staking_vlp(&mut dex.vlp_pool, actual_vlp_amount)?;
+        .leave_staking_vlp(&mut dex, actual_vlp_amount)?;
 
     // Save to event queue
     let mut event_queue = EventQueue::mount(&ctx.accounts.event_queue, true)

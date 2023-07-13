@@ -5,7 +5,7 @@ mod utils;
 
 use solana_program_test::tokio;
 
-use crate::utils::{minus_add_fee, DexAsset, INIT_VLP_AMOUNT};
+use crate::utils::{minus_add_fee, DexAsset};
 use context::DexTestContext;
 
 #[tokio::test]
@@ -18,7 +18,7 @@ async fn test_add_liquidity_with_usdc() {
     //0.1% add liquidity fee
     alice.assert_vlp(9_990.0).await;
     alice.assert_usdc_balance(0.).await;
-    alice.assert_vlp_total(INIT_VLP_AMOUNT + 9_990.0).await;
+    alice.assert_vlp_total(9_990.0).await;
 }
 
 #[tokio::test]
@@ -34,7 +34,7 @@ async fn test_add_liquidity_with_btc() {
     //0.1% add liquidity fee
     alice.assert_vlp(19_9800.0).await;
     alice.assert_btc_balance(0.).await;
-    alice.assert_vlp_total(INIT_VLP_AMOUNT + 19_9800.0).await;
+    alice.assert_vlp_total(19_9800.0).await;
 }
 
 #[tokio::test]
@@ -50,7 +50,7 @@ async fn test_add_liquidity_with_eth() {
     //0.1% add liquidity fee
     alice.assert_vlp(1_998.0).await;
     alice.assert_eth_balance(0.).await;
-    alice.assert_vlp_total(INIT_VLP_AMOUNT + 1_998.0).await;
+    alice.assert_vlp_total(1_998.0).await;
 }
 
 #[tokio::test]
@@ -63,7 +63,7 @@ async fn test_add_liquidity_with_sol() {
     //0.1% add liquidity fee
     alice.assert_vlp(199.8).await;
 
-    alice.assert_vlp_total(INIT_VLP_AMOUNT + 199.8).await;
+    alice.assert_vlp_total(199.8).await;
 }
 
 #[tokio::test]
@@ -78,18 +78,10 @@ async fn test_add_multiple_liquidity() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
-    market.assert_liquidity(DexAsset::SOL, 999.).await;
-    market.assert_fee(DexAsset::SOL, 1.).await;
-
     // Add BTC
-    mike.add_liquidity_with_btc(1.0).await; // fee = 0.001 BTC (20 USD/1 SOL)
+    mike.add_liquidity_with_btc(1.0).await;
     market.assert_liquidity(DexAsset::BTC, 0.999).await;
     market.assert_fee(DexAsset::BTC, 0.001).await;
-
-    market.assert_liquidity(DexAsset::SOL, 999.).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_rewards(1.0).await; // Fee rewards are collected and distributed among the vlp stakers
 
     // Add ETH
     joe.add_liquidity_with_eth(10.0).await; // fee = 0.01 ETH (20 USD)
@@ -98,14 +90,12 @@ async fn test_add_multiple_liquidity() {
     market.assert_fee(DexAsset::ETH, 0.01).await;
 
     market.assert_liquidity(DexAsset::BTC, 1.).await;
-    market.assert_fee(DexAsset::BTC, 0.).await; // BTC fees are converted to SOL
+    market.assert_fee(DexAsset::BTC, 0.).await;
 
-    market.assert_liquidity(DexAsset::SOL, 998.).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_rewards(2.0).await;
+    market.assert_rewards(20.).await;
 
     // Add USDC
-    alice.add_liquidity_with_usdc(20000.).await; // fee = (20 USD/1 SOL)
+    alice.add_liquidity_with_usdc(20000.).await; // fee = (20 USD)
 
     market.assert_liquidity(DexAsset::USDC, 19980.).await;
     market.assert_fee(DexAsset::USDC, 20.).await;
@@ -116,9 +106,7 @@ async fn test_add_multiple_liquidity() {
     market.assert_liquidity(DexAsset::ETH, 10.).await;
     market.assert_fee(DexAsset::ETH, 0.).await;
 
-    market.assert_liquidity(DexAsset::SOL, 997.).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_rewards(3.0).await;
+    market.assert_rewards(40.0).await;
 }
 
 #[tokio::test]
@@ -133,7 +121,7 @@ async fn test_add_liquidity_with_usdc_use_feed_price() {
     //0.1% add liquidity fee
     alice.assert_vlp(10_989.0).await;
     alice.assert_usdc_balance(0.).await;
-    alice.assert_vlp_total(INIT_VLP_AMOUNT + 10_989.0).await;
+    alice.assert_vlp_total(10_989.0).await;
 }
 
 #[tokio::test]
@@ -150,7 +138,7 @@ async fn test_add_liquidity_with_btc_use_feed_price() {
     //0.1% add liquidity fee
     alice.assert_vlp(19_9800.0).await;
     alice.assert_btc_balance(0.).await;
-    alice.assert_vlp_total(INIT_VLP_AMOUNT + 19_9800.0).await;
+    alice.assert_vlp_total(19_9800.0).await;
 }
 
 #[tokio::test]
@@ -172,18 +160,10 @@ async fn test_add_multiple_liquidity_use_price_feed() {
     alice.feed_eth_price(2000.).await;
     alice.feed_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
-    market.assert_liquidity(DexAsset::SOL, 999.).await;
-    market.assert_fee(DexAsset::SOL, 1.).await;
-
     // Add BTC
-    mike.add_liquidity_with_btc(1.0).await; // fee = 0.001 BTC (20 USD/1 SOL)
+    mike.add_liquidity_with_btc(1.0).await; // fee = 0.001 BTC (20 USD)
     market.assert_liquidity(DexAsset::BTC, 0.999).await;
     market.assert_fee(DexAsset::BTC, 0.001).await;
-
-    market.assert_liquidity(DexAsset::SOL, 999.).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_rewards(1.0).await; // Fee rewards are collected and distributed among the vlp stakers
 
     // Add ETH
     joe.add_liquidity_with_eth(10.0).await; // fee = 0.01 ETH (20 USD)
@@ -194,9 +174,7 @@ async fn test_add_multiple_liquidity_use_price_feed() {
     market.assert_liquidity(DexAsset::BTC, 1.).await;
     market.assert_fee(DexAsset::BTC, 0.).await; // BTC fees are converted to SOL
 
-    market.assert_liquidity(DexAsset::SOL, 998.).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_rewards(2.0).await;
+    market.assert_rewards(20.0).await;
 
     // Add USDC
     alice.add_liquidity_with_usdc(20000.).await; // fee = (20 USD/1 SOL)
@@ -210,7 +188,5 @@ async fn test_add_multiple_liquidity_use_price_feed() {
     market.assert_liquidity(DexAsset::ETH, 10.).await;
     market.assert_fee(DexAsset::ETH, 0.).await;
 
-    market.assert_liquidity(DexAsset::SOL, 997.).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
-    market.assert_rewards(3.0).await;
+    market.assert_rewards(40.0).await;
 }
