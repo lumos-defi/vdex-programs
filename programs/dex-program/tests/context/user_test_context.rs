@@ -2295,7 +2295,7 @@ impl UserTestContext {
     pub async fn compound(&self) -> DexResult {
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
-        let remaining_accounts = self.get_asset_oracle_remaining_accounts().await;
+        let remaining_accounts = self.get_oracle_remaining_accounts().await;
 
         if let Ok(_) = set_compound::setup(
             context,
@@ -2320,7 +2320,7 @@ impl UserTestContext {
     pub async fn stake_vdx(&self, amount: u64) -> DexResult {
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
-        let remaining_accounts = self.get_asset_oracle_remaining_accounts().await;
+        let remaining_accounts = self.get_oracle_remaining_accounts().await;
 
         if let Ok(_) = set_stake_vdx::setup(
             context,
@@ -2347,7 +2347,7 @@ impl UserTestContext {
     pub async fn redeem_vdx(&self, amount: u64) -> DexResult {
         let context: &mut ProgramTestContext = &mut self.context.borrow_mut();
 
-        let remaining_accounts = self.get_asset_oracle_remaining_accounts().await;
+        let remaining_accounts = self.get_oracle_remaining_accounts().await;
 
         if let Ok(_) = set_redeem_vdx::setup(
             context,
