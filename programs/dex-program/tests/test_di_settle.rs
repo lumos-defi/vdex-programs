@@ -621,12 +621,13 @@ async fn test_sol_call_not_exercised() {
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
     market.add_liquidity_with_usdc(20000.).await;
+    market.add_liquidity_with_sol(1000.).await;
 
     market.assert_liquidity(DexAsset::BTC, 1.).await;
     market.assert_liquidity(DexAsset::ETH, 10.).await;
-    market.assert_liquidity(DexAsset::USDC, 19980.).await;
-    market.assert_liquidity(DexAsset::SOL, 997.).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
+    market.assert_liquidity(DexAsset::USDC, 20000.).await;
+    market.assert_liquidity(DexAsset::SOL, 999.).await;
+    market.assert_fee(DexAsset::SOL, 1.).await;
 
     // Create call option: premium = 5%, strike = 25000, minimum size = 10. sol
     let mut now = now();
@@ -638,13 +639,13 @@ async fn test_sol_call_not_exercised() {
     // Check borrowed sol: size * premium_rate
     let borrowed_sol = 10. * 500. / 10000.;
     market
-        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .assert_liquidity(DexAsset::SOL, 999. - borrowed_sol)
         .await;
 
     // Check borrowed usdc: size * strike_price * ( 1 + premium_rate )
     let borrowed_usdc = 10. * 25. * (1. + 500. / 10000.);
     market
-        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .assert_liquidity(DexAsset::USDC, 20000. - borrowed_usdc)
         .await;
 
     let options = user.di_collect_my_options(100).await;
@@ -677,12 +678,12 @@ async fn test_sol_call_not_exercised() {
 
     // Check liquidity
     market
-        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .assert_liquidity(DexAsset::SOL, 999. - borrowed_sol)
         .await;
-    market.assert_liquidity(DexAsset::USDC, 19980.).await;
+    market.assert_liquidity(DexAsset::USDC, 20000.).await;
 
     let fee = (10. + borrowed_sol) * TEST_DI_FEE_RATE as f64 / 10000.;
-    market.assert_fee(DexAsset::SOL, fee).await;
+    market.assert_fee(DexAsset::SOL, 1.0 + fee).await;
 
     let user_sol_balance_after = user.balance().await;
 
@@ -709,12 +710,13 @@ async fn test_sol_call_exercised() {
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
     market.add_liquidity_with_usdc(20000.).await;
+    market.add_liquidity_with_sol(1000.).await;
 
     market.assert_liquidity(DexAsset::BTC, 1.).await;
     market.assert_liquidity(DexAsset::ETH, 10.).await;
-    market.assert_liquidity(DexAsset::USDC, 19980.).await;
-    market.assert_liquidity(DexAsset::SOL, 997.).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
+    market.assert_liquidity(DexAsset::USDC, 20000.).await;
+    market.assert_liquidity(DexAsset::SOL, 999.).await;
+    market.assert_fee(DexAsset::SOL, 1.).await;
 
     // Create call option: premium = 5%, strike = 25000, minimum size = 10. sol
     let mut now = now();
@@ -726,13 +728,13 @@ async fn test_sol_call_exercised() {
     // Check borrowed sol: size * premium_rate
     let borrowed_sol = 10. * 500. / 10000.;
     market
-        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .assert_liquidity(DexAsset::SOL, 999. - borrowed_sol)
         .await;
 
     // Check borrowed usdc: size * strike_price * ( 1 + premium_rate )
     let borrowed_usdc = 10. * 25. * (1. + 500. / 10000.);
     market
-        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .assert_liquidity(DexAsset::USDC, 20000. - borrowed_usdc)
         .await;
 
     let options = user.di_collect_my_options(100).await;
@@ -765,14 +767,14 @@ async fn test_sol_call_exercised() {
         .assert_ok();
 
     // Check liquidity
-    market.assert_liquidity(DexAsset::SOL, 997. + 10.).await;
+    market.assert_liquidity(DexAsset::SOL, 999. + 10.).await;
     market
-        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .assert_liquidity(DexAsset::USDC, 20000. - borrowed_usdc)
         .await;
 
     let fee = borrowed_usdc * TEST_DI_FEE_RATE as f64 / 10000.;
-    market.assert_fee(DexAsset::USDC, 20. + fee).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
+    market.assert_fee(DexAsset::USDC, fee).await;
+    market.assert_fee(DexAsset::SOL, 1.).await;
 
     let user_sol_balance_after = user.balance().await;
     assert_eq!(user_sol_balance_after - user_sol_balance_before, sol(0.));
@@ -797,12 +799,13 @@ async fn test_sol_put_not_exercised() {
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
     market.add_liquidity_with_usdc(20000.).await;
+    market.add_liquidity_with_sol(1000.).await;
 
     market.assert_liquidity(DexAsset::BTC, 1.).await;
     market.assert_liquidity(DexAsset::ETH, 10.).await;
-    market.assert_liquidity(DexAsset::USDC, 19980.).await;
-    market.assert_liquidity(DexAsset::SOL, 997.).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
+    market.assert_liquidity(DexAsset::USDC, 20000.).await;
+    market.assert_liquidity(DexAsset::SOL, 999.).await;
+    market.assert_fee(DexAsset::SOL, 1.).await;
 
     // Create put option: premium = 5%, strike = 15, minimum size = 100. usdc
     let mut now = now();
@@ -815,13 +818,13 @@ async fn test_sol_put_not_exercised() {
     // Check borrowed sol: ( usdc_size / strike_price ) * ( 1 + premium_rate )
     let borrowed_sol = (150. / 15.) * (1. + 500. / 10000.);
     market
-        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .assert_liquidity(DexAsset::SOL, 999. - borrowed_sol)
         .await;
 
     // Check borrowed usdc: size * premium_rate
     let borrowed_usdc = 150. * 500. / 10000.;
     market
-        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .assert_liquidity(DexAsset::USDC, 20000. - borrowed_usdc)
         .await;
 
     let options = user.di_collect_my_options(100).await;
@@ -854,14 +857,14 @@ async fn test_sol_put_not_exercised() {
         .assert_ok();
 
     // Check liquidity
-    market.assert_liquidity(DexAsset::SOL, 997.).await;
+    market.assert_liquidity(DexAsset::SOL, 999.).await;
     market
-        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .assert_liquidity(DexAsset::USDC, 20000. - borrowed_usdc)
         .await;
 
     let fee = (150. + borrowed_usdc) * TEST_DI_FEE_RATE as f64 / 10000.;
-    market.assert_fee(DexAsset::USDC, 20. + fee).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
+    market.assert_fee(DexAsset::USDC, fee).await;
+    market.assert_fee(DexAsset::SOL, 1.).await;
 
     let user_sol_balance_after = user.balance().await;
     assert_eq!(user_sol_balance_after - user_sol_balance_before, sol(0.));
@@ -886,12 +889,13 @@ async fn test_sol_put_exercised() {
     market.add_liquidity_with_btc(1.0).await;
     market.add_liquidity_with_eth(10.0).await;
     market.add_liquidity_with_usdc(20000.).await;
+    market.add_liquidity_with_sol(1000.).await;
 
     market.assert_liquidity(DexAsset::BTC, 1.).await;
     market.assert_liquidity(DexAsset::ETH, 10.).await;
-    market.assert_liquidity(DexAsset::USDC, 19980.).await;
-    market.assert_liquidity(DexAsset::SOL, 997.).await;
-    market.assert_fee(DexAsset::SOL, 0.).await;
+    market.assert_liquidity(DexAsset::USDC, 20000.).await;
+    market.assert_liquidity(DexAsset::SOL, 999.).await;
+    market.assert_fee(DexAsset::SOL, 1.).await;
 
     // Create put option: premium = 5%, strike = 15, minimum size = 100. usdc
     let mut now = now();
@@ -904,13 +908,13 @@ async fn test_sol_put_exercised() {
     // Check borrowed sol: ( usdc_size / strike_price ) * ( 1 + premium_rate )
     let borrowed_sol = (150. / 15.) * (1. + 500. / 10000.);
     market
-        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .assert_liquidity(DexAsset::SOL, 999. - borrowed_sol)
         .await;
 
     // Check borrowed usdc: size * premium_rate
     let borrowed_usdc = 150. * 500. / 10000.;
     market
-        .assert_liquidity(DexAsset::USDC, 19980. - borrowed_usdc)
+        .assert_liquidity(DexAsset::USDC, 20000. - borrowed_usdc)
         .await;
 
     let options = user.di_collect_my_options(100).await;
@@ -944,13 +948,13 @@ async fn test_sol_put_exercised() {
 
     // Check liquidity
     market
-        .assert_liquidity(DexAsset::SOL, 997. - borrowed_sol)
+        .assert_liquidity(DexAsset::SOL, 999. - borrowed_sol)
         .await;
-    market.assert_liquidity(DexAsset::USDC, 19980. + 150.).await;
+    market.assert_liquidity(DexAsset::USDC, 20000. + 150.).await;
 
     let fee = borrowed_sol * TEST_DI_FEE_RATE as f64 / 10000.;
-    market.assert_fee(DexAsset::SOL, fee).await;
-    market.assert_fee(DexAsset::USDC, 20.).await;
+    market.assert_fee(DexAsset::SOL, 1.0 + fee).await;
+    market.assert_fee(DexAsset::USDC, 0.).await;
 
     let user_sol_balance_after = user.balance().await;
     assert_eq!(

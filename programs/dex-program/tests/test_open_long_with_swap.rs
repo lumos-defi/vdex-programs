@@ -19,9 +19,6 @@ async fn test_open_btc_long_with_eth() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
-    market.assert_liquidity(DexAsset::SOL, 999.).await;
-
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(1000.).await;
@@ -108,9 +105,6 @@ async fn test_open_btc_long_with_usdc() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
-    market.assert_liquidity(DexAsset::SOL, 999.).await;
-
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_usdc(100000.).await;
@@ -195,7 +189,9 @@ async fn test_open_btc_long_with_sol() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
+    user.add_liquidity_with_sol(1000.).await;
+
+    // Assert SOL
     market.assert_liquidity(DexAsset::SOL, 999.).await;
     market.assert_fee(DexAsset::SOL, add_fee(1000.)).await;
     market.assert_borrow(DexAsset::SOL, 0.).await;
@@ -262,7 +258,7 @@ async fn test_open_btc_long_with_sol() {
 
     // Check SOL liquidity
     market
-        .assert_liquidity(DexAsset::SOL, minus_add_fee(1000.) + input_sol - swap_fee)
+        .assert_liquidity(DexAsset::SOL, 1000. + input_sol - swap_fee)
         .await;
 
     market.assert_fee(DexAsset::SOL, swap_fee).await;

@@ -70,7 +70,10 @@ impl Dex {
         // Otherwise should read the token's total supply
 
         Ok((
-            self.vlp_pool.staked_total,
+            self.vlp_pool.staked_total
+                + self.vlp_pool.reward_total
+                + self.vdx_pool.staked_total
+                + self.vdx_pool.reward_total,
             self.vlp_pool.decimals,
             self.vlp_pool.reward_asset_index,
         ))
@@ -620,10 +623,15 @@ impl Dex {
 
         let vlp_rewards = self.collect_rewards_as_vlp(oracles, price_feed)?;
 
-        let vlp_rewards_for_vdx_pool = vlp_rewards
-            .safe_mul(REWARD_PERCENTAGE_FOR_VDX_POOL as u64)?
-            .safe_div(100)? as u64;
-        let vlp_rewards_for_vlp_pool = vlp_rewards.safe_sub(vlp_rewards)?;
+        let vdx_pool_percentage = if self.vdx_pool.staked_total == 0 {
+            0
+        } else {
+            REWARD_PERCENTAGE_FOR_VDX_POOL
+        } as u64;
+
+        let vlp_rewards_for_vdx_pool =
+            vlp_rewards.safe_mul(vdx_pool_percentage)?.safe_div(100)? as u64;
+        let vlp_rewards_for_vlp_pool = vlp_rewards.safe_sub(vlp_rewards_for_vdx_pool)?;
 
         self.vdx_pool.add_rewards(vlp_rewards_for_vdx_pool)?;
         self.vlp_pool.add_rewards(vlp_rewards_for_vlp_pool)?;

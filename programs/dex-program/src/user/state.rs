@@ -890,7 +890,7 @@ impl<'a> UserState<'a> {
 
     pub fn enter_staking_vlp(&mut self, dex: &mut Dex, amount: u64) -> DexResult {
         let rewards_of_vlp_pool = self.meta.vlp.withdraw_reward(&mut dex.vlp_pool, u64::MAX)?;
-        let rewards_of_vdx_pool = self.meta.vlp.withdraw_reward(&mut dex.vdx_pool, u64::MAX)?;
+        let rewards_of_vdx_pool = self.meta.vdx.withdraw_reward(&mut dex.vdx_pool, u64::MAX)?;
 
         self.meta.vlp.enter_staking(
             &mut dex.vlp_pool,
@@ -900,7 +900,7 @@ impl<'a> UserState<'a> {
 
     pub fn leave_staking_vlp(&mut self, dex: &mut Dex, amount: u64) -> DexResult<u64> {
         let rewards_of_vlp_pool = self.meta.vlp.withdraw_reward(&mut dex.vlp_pool, u64::MAX)?;
-        let rewards_of_vdx_pool = self.meta.vlp.withdraw_reward(&mut dex.vdx_pool, u64::MAX)?;
+        let rewards_of_vdx_pool = self.meta.vdx.withdraw_reward(&mut dex.vdx_pool, u64::MAX)?;
 
         self.meta
             .vlp
@@ -912,7 +912,7 @@ impl<'a> UserState<'a> {
     pub fn withdrawable_vlp_amount(&self, dex: &mut Dex, amount: u64) -> DexResult<u64> {
         let base_vlp = self.meta.vlp.staked;
         let rewards_of_vlp_pool = self.meta.vlp.pending_reward(&mut dex.vlp_pool)?;
-        let rewards_of_vdx_pool = self.meta.vlp.pending_reward(&mut dex.vdx_pool)?;
+        let rewards_of_vdx_pool = self.meta.vdx.pending_reward(&mut dex.vdx_pool)?;
 
         let withdrawable = base_vlp + rewards_of_vlp_pool + rewards_of_vdx_pool;
 

@@ -89,11 +89,7 @@ pub fn handler(ctx: Context<AddLiquidity>, amount: u64) -> DexResult {
     let price_feed = &ctx.accounts.price_feed.load()?;
 
     // Update rewards
-    dex.update_staking_pool(
-        &ctx.remaining_accounts[0..assets_oracles_len],
-        price_feed,
-        true,
-    )?;
+    dex.update_staking_pool(&ctx.remaining_accounts, price_feed, true)?;
 
     let (vlp_amount, fee) =
         dex.add_liquidity(index, amount, true, &ctx.remaining_accounts, price_feed)?;

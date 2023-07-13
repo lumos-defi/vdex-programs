@@ -13,7 +13,7 @@ use crate::utils::{
     set_di_withdraw_settled, set_feed_mock_oracle, set_fill, set_market_swap, set_open,
     set_redeem_vdx, set_remove_liquidity, set_stake_vdx, set_update_price, set_user_state,
     set_withdraw_asset, transfer, usdc, DexAsset, DexMarket, MAX_ASSET_COUNT, PRICE_FEED_DECIMALS,
-    TEST_SOL_DECIMALS, TEST_USDC_DECIMALS,
+    TEST_USDC_DECIMALS,
 };
 use anchor_client::{
     solana_sdk::{
@@ -675,7 +675,7 @@ impl UserTestContext {
         let reward_total = reward_for_vlp + reward_for_vdx;
         assert_eq_with_dust(
             reward_total,
-            convert_to_big_number(amount.into(), TEST_SOL_DECIMALS),
+            convert_to_big_number(amount.into(), TEST_VLP_DECIMALS),
         );
     }
 

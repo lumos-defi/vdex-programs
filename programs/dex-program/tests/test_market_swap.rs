@@ -19,7 +19,8 @@ async fn test_btc_to_usdc() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
+    // Add SOL
+    market.add_liquidity_with_sol(1000.).await;
     market.assert_liquidity(DexAsset::SOL, 999.).await;
 
     // Prepare liquidity & price
@@ -75,9 +76,6 @@ async fn test_btc_to_eth() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
-    market.assert_liquidity(DexAsset::SOL, 999.).await;
-
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
     user.add_liquidity_with_eth(200.).await;
@@ -131,7 +129,8 @@ async fn test_btc_to_sol() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
+    // Add SOL
+    market.add_liquidity_with_sol(1000.).await;
     market.assert_liquidity(DexAsset::SOL, 999.).await;
 
     // Prepare liquidity & price
@@ -170,7 +169,7 @@ async fn test_btc_to_sol() {
         .await;
 
     market
-        .assert_liquidity(DexAsset::SOL, 999. - sol_equivalent)
+        .assert_liquidity(DexAsset::SOL, 1000. - sol_equivalent)
         .await;
 }
 
@@ -185,8 +184,10 @@ async fn test_usdc_to_btc() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
+    // Add SOL
+    market.add_liquidity_with_sol(1000.).await;
     market.assert_liquidity(DexAsset::SOL, 999.).await;
+    market.assert_fee(DexAsset::SOL, 1.).await;
 
     // Prepare liquidity & price
     user.add_liquidity_with_btc(10.).await;
@@ -246,8 +247,10 @@ async fn test_usdc_to_eth() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
+    // Add SOL
+    market.add_liquidity_with_sol(1000.).await;
     market.assert_liquidity(DexAsset::SOL, 999.).await;
+    market.assert_fee(DexAsset::SOL, 1.).await;
 
     // Prepare liquidity & price
     user.add_liquidity_with_eth(100.).await;
@@ -307,8 +310,10 @@ async fn test_usdc_to_sol() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
+    // Add SOL
+    market.add_liquidity_with_sol(1000.).await;
     market.assert_liquidity(DexAsset::SOL, 999.).await;
+    market.assert_fee(DexAsset::SOL, 1.).await;
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
@@ -334,7 +339,7 @@ async fn test_usdc_to_sol() {
     let sol_equivalent = (usdc_amount - swap_usdc_fee) / 20.;
 
     market
-        .assert_liquidity(DexAsset::SOL, 999. - sol_equivalent)
+        .assert_liquidity(DexAsset::SOL, 1000. - sol_equivalent)
         .await;
 
     market
@@ -359,7 +364,8 @@ async fn test_sol_to_usdc() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
+    // Add SOL
+    market.add_liquidity_with_sol(1000.).await;
     market.assert_liquidity(DexAsset::SOL, 999.).await;
     market.assert_fee(DexAsset::SOL, 1.).await;
 
@@ -387,7 +393,7 @@ async fn test_sol_to_usdc() {
     alice.assert_usdc_balance(usdc_equivalent).await;
 
     market
-        .assert_liquidity(DexAsset::SOL, 999. + sol_amount - swap_sol_fee)
+        .assert_liquidity(DexAsset::SOL, 1000. + sol_amount - swap_sol_fee)
         .await;
     market.assert_fee(DexAsset::SOL, swap_sol_fee).await;
 
@@ -408,7 +414,8 @@ async fn test_sol_to_btc() {
     market.mock_eth_price(2000.).await;
     market.mock_sol_price(20.).await;
 
-    // Assert SOL (added when creating dex)
+    // Add SOL
+    market.add_liquidity_with_sol(1000.).await;
     market.assert_liquidity(DexAsset::SOL, 999.).await;
 
     // Prepare liquidity & price
@@ -435,7 +442,7 @@ async fn test_sol_to_btc() {
     alice.assert_btc_balance(btc_equivalent).await;
 
     market
-        .assert_liquidity(DexAsset::SOL, 999. + sol_amount - swap_sol_fee)
+        .assert_liquidity(DexAsset::SOL, 1000. + sol_amount - swap_sol_fee)
         .await;
     market.assert_fee(DexAsset::SOL, swap_sol_fee).await;
 
