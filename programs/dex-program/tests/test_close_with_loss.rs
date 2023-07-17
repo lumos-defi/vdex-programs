@@ -5,7 +5,9 @@ mod utils;
 
 use solana_program_test::tokio;
 
-use crate::utils::{add_fee, close_fee, collateral_to_size, minus_add_fee, DexAsset, DexMarket};
+use crate::utils::{
+    add_fee, close_fee, collateral_to_size, minus_add_fee, DexAsset, DexMarket, TestResult, DAY,
+};
 use context::DexTestContext;
 
 #[tokio::test]
@@ -93,6 +95,7 @@ async fn test_close_btc_short_with_loss() {
     let dtc = DexTestContext::new().await;
     let user = &dtc.user_context[0];
     let alice = &dtc.user_context[1];
+    let bob = &dtc.user_context[2];
 
     // Prepare liquidity & price
     user.add_liquidity_with_usdc(100000.).await;
@@ -165,4 +168,17 @@ async fn test_close_btc_short_with_loss() {
     .await;
     user.assert_borrow(DexAsset::USDC, 0.).await;
     user.assert_collateral(DexAsset::USDC, 0.).await;
+
+    for _ in 0..32 {
+        dtc.after(DAY).await;
+        bob.compound().await.assert_ok();
+
+        bob.assert_liquidity(
+            DexAsset::USDC,
+            100000. + expected_open_fee + expected_close_fee + expected_loss,
+        )
+        .await;
+
+        user.assert_fee(DexAsset::USDC, 0.0).await;
+    }
 }
