@@ -483,6 +483,10 @@ impl Dex {
         let mut collected_vlp: u64 = 0;
         let mut oracle_offset = 0usize;
 
+        let mut aum = self.aum(oracles, price_feed)?;
+        require!(aum >= 0, DexError::AUMBelowZero);
+        let (mut vlp_supply, vlp_decimals, _) = self.vlp_info()?;
+
         for i in 0..self.assets_number as usize {
             let ai = self.asset_as_ref(i as u8)?;
             if !ai.valid {
@@ -501,15 +505,32 @@ impl Dex {
                 oracles[oracle_offset].key(),
                 DexError::InvalidOracle
             );
-            let fee_amount = ai.fee_amount;
 
-            let (vlp_amount, _) =
-                self.add_liquidity(i as u8, fee_amount, false, oracles, price_feed)?;
+            let price = get_price(
+                i as u8,
+                ai.oracle_source,
+                &oracles[oracle_offset],
+                price_feed,
+            )?;
+            let fee = ai.fee_amount;
+            let fee_value = value(fee, price, ai.decimals)?;
+
+            let vlp_minted = if aum == 0 {
+                fee_value
+                    .safe_mul(10u64.pow(vlp_decimals.into()))?
+                    .safe_div(USD_POW_DECIMALS as u128)? as u64
+            } else {
+                fee_value.safe_mul(vlp_supply)?.safe_div(aum as u128)? as u64
+            };
+
+            aum += fee_value as i64;
+            vlp_supply += vlp_minted;
 
             let mai = self.asset_as_mut(i as u8)?;
+            mai.liquidity_amount = mai.liquidity_amount.safe_add(fee)?;
             mai.fee_amount = 0;
 
-            collected_vlp = collected_vlp.safe_add(vlp_amount)?;
+            collected_vlp = collected_vlp.safe_add(vlp_minted)?;
             oracle_offset += 1;
         }
 
